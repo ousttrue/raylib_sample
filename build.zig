@@ -34,4 +34,18 @@ pub fn build(b: *std.Build) void {
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    //
+    // examples
+    //
+    const example = b.addExecutable(.{
+        .name = "core_3d_camera_first_person",
+        .root_source_file = b.path("examples/core/core_3d_camera_first_person.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    b.installArtifact(example);
+    example.addIncludePath(b.path("raylib"));
+    example.linkLibC();
+    example.linkLibrary(raylib_compile);
 }
