@@ -71,20 +71,20 @@ const rlgl = @cImport({
     // #include <stdio.h>              // Required for: printf()
 });
 
-const RED = rlgl.Color{ .r = 230, .g = 41, .b = 55, .a = 255 }; // Red
-const RAYWHITE = rlgl.Color{ .r = 245, .g = 245, .b = 245, .a = 255 }; // My own White (raylib logo)
-// #define DARKGRAY   (Color){ 80, 80, 80, 255 }      // Dark Gray
-//
-// //----------------------------------------------------------------------------------
-// // Structures Definition
-// //----------------------------------------------------------------------------------
-// // Color, 4 components, R8G8B8A8 (32bit)
-// typedef struct Color {
-//     unsigned char r;        // Color red value
-//     unsigned char g;        // Color green value
-//     unsigned char b;        // Color blue value
-//     unsigned char a;        // Color alpha value
-// } Color;
+const RED = Color{ .r = 230, .g = 41, .b = 55, .a = 255 }; // Red
+const RAYWHITE = Color{ .r = 245, .g = 245, .b = 245, .a = 255 }; // My own White (raylib logo)
+const DARKGRAY = Color{ .r = 80, .g = 80, .b = 80, .a = 255 }; // Dark Gray
+
+//----------------------------------------------------------------------------------
+// Structures Definition
+//----------------------------------------------------------------------------------
+// Color, 4 components, R8G8B8A8 (32bit)
+const Color = struct {
+    r: u8, // Color red value
+    g: u8, // Color green value
+    b: u8, // Color blue value
+    a: u8, // Color alpha value
+};
 
 // Camera type, defines a camera position/orientation in 3d space
 const Camera = struct {
@@ -95,24 +95,6 @@ const Camera = struct {
     // projection: c_int, // Camera projection: CAMERA_PERSPECTIVE or CAMERA_ORTHOGRAPHIC
 };
 
-// //----------------------------------------------------------------------------------
-// // Module specific Functions Declaration
-// //----------------------------------------------------------------------------------
-// static void ErrorCallback(int error, const char *description);
-// static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
-//
-// // Drawing functions (uses rlgl functionality)
-// static void DrawGrid(int slices, float spacing);
-// static void DrawCube(Vector3 position, float width, float height, float length, Color color);
-// static void DrawCubeWires(Vector3 position, float width, float height, float length, Color color);
-// static void DrawRectangleV(Vector2 position, Vector2 size, Color color);
-//
-// // NOTE: We use raymath to get this functionality but it could be implemented in this module
-// //static Matrix MatrixIdentity(void);
-// //static Matrix MatrixOrtho(double left, double right, double bottom, double top, double near, double far);
-// //static Matrix MatrixPerspective(double fovy, double aspect, double near, double far);
-// //static Matrix MatrixLookAt(Vector3 eye, Vector3 target, Vector3 up);
-//
 //------------------------------------------------------------------------------------
 // Program main entry point
 //------------------------------------------------------------------------------------
@@ -132,15 +114,16 @@ pub fn main() void {
     } else {
         _ = std.c.printf("GLFW3: GLFW initialized successfully\n");
     }
+    defer rlgl.glfwTerminate(); // Free GLFW3 resources
 
-    //     glfwWindowHint(GLFW_SAMPLES, 4);
-    //     glfwWindowHint(GLFW_DEPTH_BITS, 16);
-    //
-    //     // WARNING: OpenGL 3.3 Core profile only
-    //     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    //     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    //     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    //     //glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+    rlgl.glfwWindowHint(rlgl.GLFW_SAMPLES, 4);
+    rlgl.glfwWindowHint(rlgl.GLFW_DEPTH_BITS, 16);
+
+    // WARNING: OpenGL 3.3 Core profile only
+    rlgl.glfwWindowHint(rlgl.GLFW_CONTEXT_VERSION_MAJOR, 3);
+    rlgl.glfwWindowHint(rlgl.GLFW_CONTEXT_VERSION_MINOR, 3);
+    rlgl.glfwWindowHint(rlgl.GLFW_OPENGL_PROFILE, rlgl.GLFW_OPENGL_CORE_PROFILE);
+    rlgl.glfwWindowHint(rlgl.GLFW_OPENGL_DEBUG_CONTEXT, rlgl.GL_TRUE);
     // #if defined(__APPLE__)
     //     glfwWindowHint( GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE );
     // #endif
@@ -159,10 +142,11 @@ pub fn main() void {
     } else {
         _ = std.c.printf("GLFW3: Window created successfully\n");
     }
+    defer rlgl.glfwDestroyWindow(window); // Close window
 
     rlgl.glfwSetWindowPos(window, 200, 200);
 
-    // rlgl.glfwSetKeyCallback(window, KeyCallback);
+    _ = rlgl.glfwSetKeyCallback(window, KeyCallback);
 
     rlgl.glfwMakeContextCurrent(window);
     rlgl.glfwSwapInterval(0);
@@ -229,8 +213,8 @@ pub fn main() void {
         rlgl.rlDrawRenderBatchActive();
         //-----------------------------------------------
 
-        //             // Draw '2D' elements in the scene (GUI)
-        //             //-----------------------------------------------
+        // Draw '2D' elements in the scene (GUI)
+        //-----------------------------------------------
         // #define RLGL_SET_MATRIX_MANUALLY
         // #if defined(RLGL_SET_MATRIX_MANUALLY)
         //             matProj = MatrixOrtho(0.0, screenWidth, screenHeight, 0.0, 0.0, 1.0);
@@ -240,30 +224,24 @@ pub fn main() void {
         //             rlSetMatrixProjection(matProj);   // Set internal projection matrix (default shader)
         //
         // #else   // Let rlgl generate and multiply matrix internally
-        //
-        //             rlMatrixMode(RL_PROJECTION);                            // Enable internal projection matrix
-        //             rlLoadIdentity();                                       // Reset internal projection matrix
-        //             rlOrtho(0.0, screenWidth, screenHeight, 0.0, 0.0, 1.0); // Recalculate internal projection matrix
-        //             rlMatrixMode(RL_MODELVIEW);                             // Enable internal modelview matrix
-        //             rlLoadIdentity();                                       // Reset internal modelview matrix
-        // #endif
-        //             DrawRectangleV((Vector2){ 10.0f, 10.0f }, (Vector2){ 780.0f, 20.0f }, DARKGRAY);
-        //
-        //             // Draw internal render batch buffers (2D data)
-        //             rlDrawRenderBatchActive();
-        //             //-----------------------------------------------
-        //
-        //         glfwSwapBuffers(window);
-        //         glfwPollEvents();
-        //         //----------------------------------------------------------------------------------
-    }
 
-    //
-    //     glfwDestroyWindow(window);      // Close window
-    //     glfwTerminate();                // Free GLFW3 resources
-    //     //--------------------------------------------------------------------------------------
-    //
-    //     return 0;
+        rlgl.rlMatrixMode(rlgl.RL_PROJECTION); // Enable internal projection matrix
+        rlgl.rlLoadIdentity(); // Reset internal projection matrix
+        rlgl.rlOrtho(0.0, screenWidth, screenHeight, 0.0, 0.0, 1.0); // Recalculate internal projection matrix
+        rlgl.rlMatrixMode(rlgl.RL_MODELVIEW); // Enable internal modelview matrix
+        rlgl.rlLoadIdentity(); // Reset internal modelview matrix
+
+        // #endif
+        DrawRectangleV(.{ .x = 10.0, .y = 10.0 }, .{ .x = 780.0, .y = 20.0 }, DARKGRAY);
+
+        // Draw internal render batch buffers (2D data)
+        rlgl.rlDrawRenderBatchActive();
+        //-----------------------------------------------
+
+        rlgl.glfwSwapBuffers(window);
+        rlgl.glfwPollEvents();
+        //----------------------------------------------------------------------------------
+    }
 }
 
 //----------------------------------------------------------------------------------
@@ -275,37 +253,37 @@ fn ErrorCallback(_: c_int, description: [*c]const u8) callconv(.C) void {
     _ = std.c.printf("%s", description);
 }
 
-// // GLFW3: Keyboard callback
-// static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
-// {
-//     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-//     {
-//         glfwSetWindowShouldClose(window, GL_TRUE);
-//     }
-// }
-//
-// // Draw rectangle using rlgl OpenGL 1.1 style coding (translated to OpenGL 3.3 internally)
-// static void DrawRectangleV(Vector2 position, Vector2 size, Color color)
-// {
-//     rlBegin(RL_TRIANGLES);
-//         rlColor4ub(color.r, color.g, color.b, color.a);
-//
-//         rlVertex2f(position.x, position.y);
-//         rlVertex2f(position.x, position.y + size.y);
-//         rlVertex2f(position.x + size.x, position.y + size.y);
-//
-//         rlVertex2f(position.x, position.y);
-//         rlVertex2f(position.x + size.x, position.y + size.y);
-//         rlVertex2f(position.x + size.x, position.y);
-//     rlEnd();
-// }
+// GLFW3: Keyboard callback
+fn KeyCallback(window: ?*rlgl.GLFWwindow, key: c_int, scancode: c_int, action: c_int, mods: c_int) callconv(.C) void {
+    _ = scancode;
+    _ = mods;
+    if (key == rlgl.GLFW_KEY_ESCAPE and action == rlgl.GLFW_PRESS) {
+        rlgl.glfwSetWindowShouldClose(window, rlgl.GL_TRUE);
+    }
+}
+
+// Draw rectangle using rlgl OpenGL 1.1 style coding (translated to OpenGL 3.3 internally)
+fn DrawRectangleV(position: rlgl.Vector2, size: rlgl.Vector2, color: Color) void {
+    rlgl.rlBegin(rlgl.RL_TRIANGLES);
+    rlgl.rlColor4ub(color.r, color.g, color.b, color.a);
+
+    rlgl.rlVertex2f(position.x, position.y);
+    rlgl.rlVertex2f(position.x, position.y + size.y);
+    rlgl.rlVertex2f(position.x + size.x, position.y + size.y);
+
+    rlgl.rlVertex2f(position.x, position.y);
+    rlgl.rlVertex2f(position.x + size.x, position.y + size.y);
+    rlgl.rlVertex2f(position.x + size.x, position.y);
+    rlgl.rlEnd();
+}
 
 // Draw a grid centered at (0, 0, 0)
 fn DrawGrid(slices: i32, spacing: f32) void {
-    const halfSlices = slices / 2;
+    const halfSlices: i32 = @divTrunc(slices, 2);
 
     rlgl.rlBegin(rlgl.RL_LINES);
-    for (-halfSlices..halfSlices + 1) |i| {
+    var i = halfSlices;
+    while (i <= halfSlices) : (i += 1) {
         if (i == 0) {
             rlgl.rlColor3f(0.5, 0.5, 0.5);
             rlgl.rlColor3f(0.5, 0.5, 0.5);
@@ -318,154 +296,154 @@ fn DrawGrid(slices: i32, spacing: f32) void {
             rlgl.rlColor3f(0.75, 0.75, 0.75);
         }
 
-        rlgl.rlVertex3f(@as(f32, i * spacing), 0.0, @floatFromInt(-halfSlices * spacing));
-        rlgl.rlVertex3f(@as(f32, i * spacing), 0.0, @as(f32, halfSlices * spacing));
+        rlgl.rlVertex3f(@as(f32, @floatFromInt(i)) * spacing, 0.0, @as(f32, @floatFromInt(-halfSlices)) * spacing);
+        rlgl.rlVertex3f(@as(f32, @floatFromInt(i)) * spacing, 0.0, @as(f32, @floatFromInt(halfSlices)) * spacing);
 
-        rlgl.rlVertex3f(@as(f32, -halfSlices * spacing), 0.0, @as(f32, i * spacing));
-        rlgl.rlVertex3f(@as(f32, halfSlices * spacing), 0.0, @as(f32, i * spacing));
+        rlgl.rlVertex3f(@as(f32, @floatFromInt(-halfSlices)) * spacing, 0.0, @as(f32, @floatFromInt(i)) * spacing);
+        rlgl.rlVertex3f(@as(f32, @floatFromInt(halfSlices)) * spacing, 0.0, @as(f32, @floatFromInt(i)) * spacing);
     }
     rlgl.rlEnd();
 }
 
 // Draw cube
 // NOTE: Cube position is the center position
-fn DrawCube(position: rlgl.Vector3, width: f32, height: f32, length: f32, color: rlgl.Color) void {
-    //     float x = 0.0f;
-    //     float y = 0.0f;
-    //     float z = 0.0f;
-    //
-    //     rlPushMatrix();
-    //
-    //         // NOTE: Be careful! Function order matters (rotate -> scale -> translate)
-    //         rlTranslatef(position.x, position.y, position.z);
-    //         //rlScalef(2.0f, 2.0f, 2.0f);
-    //         //rlRotatef(45, 0, 1, 0);
-    //
-    //         rlBegin(RL_TRIANGLES);
-    //             rlColor4ub(color.r, color.g, color.b, color.a);
-    //
-    //             // Front Face -----------------------------------------------------
-    //             rlVertex3f(x-width/2, y-height/2, z+length/2);  // Bottom Left
-    //             rlVertex3f(x+width/2, y-height/2, z+length/2);  // Bottom Right
-    //             rlVertex3f(x-width/2, y+height/2, z+length/2);  // Top Left
-    //
-    //             rlVertex3f(x+width/2, y+height/2, z+length/2);  // Top Right
-    //             rlVertex3f(x-width/2, y+height/2, z+length/2);  // Top Left
-    //             rlVertex3f(x+width/2, y-height/2, z+length/2);  // Bottom Right
-    //
-    //             // Back Face ------------------------------------------------------
-    //             rlVertex3f(x-width/2, y-height/2, z-length/2);  // Bottom Left
-    //             rlVertex3f(x-width/2, y+height/2, z-length/2);  // Top Left
-    //             rlVertex3f(x+width/2, y-height/2, z-length/2);  // Bottom Right
-    //
-    //             rlVertex3f(x+width/2, y+height/2, z-length/2);  // Top Right
-    //             rlVertex3f(x+width/2, y-height/2, z-length/2);  // Bottom Right
-    //             rlVertex3f(x-width/2, y+height/2, z-length/2);  // Top Left
-    //
-    //             // Top Face -------------------------------------------------------
-    //             rlVertex3f(x-width/2, y+height/2, z-length/2);  // Top Left
-    //             rlVertex3f(x-width/2, y+height/2, z+length/2);  // Bottom Left
-    //             rlVertex3f(x+width/2, y+height/2, z+length/2);  // Bottom Right
-    //
-    //             rlVertex3f(x+width/2, y+height/2, z-length/2);  // Top Right
-    //             rlVertex3f(x-width/2, y+height/2, z-length/2);  // Top Left
-    //             rlVertex3f(x+width/2, y+height/2, z+length/2);  // Bottom Right
-    //
-    //             // Bottom Face ----------------------------------------------------
-    //             rlVertex3f(x-width/2, y-height/2, z-length/2);  // Top Left
-    //             rlVertex3f(x+width/2, y-height/2, z+length/2);  // Bottom Right
-    //             rlVertex3f(x-width/2, y-height/2, z+length/2);  // Bottom Left
-    //
-    //             rlVertex3f(x+width/2, y-height/2, z-length/2);  // Top Right
-    //             rlVertex3f(x+width/2, y-height/2, z+length/2);  // Bottom Right
-    //             rlVertex3f(x-width/2, y-height/2, z-length/2);  // Top Left
-    //
-    //             // Right face -----------------------------------------------------
-    //             rlVertex3f(x+width/2, y-height/2, z-length/2);  // Bottom Right
-    //             rlVertex3f(x+width/2, y+height/2, z-length/2);  // Top Right
-    //             rlVertex3f(x+width/2, y+height/2, z+length/2);  // Top Left
-    //
-    //             rlVertex3f(x+width/2, y-height/2, z+length/2);  // Bottom Left
-    //             rlVertex3f(x+width/2, y-height/2, z-length/2);  // Bottom Right
-    //             rlVertex3f(x+width/2, y+height/2, z+length/2);  // Top Left
-    //
-    //             // Left Face ------------------------------------------------------
-    //             rlVertex3f(x-width/2, y-height/2, z-length/2);  // Bottom Right
-    //             rlVertex3f(x-width/2, y+height/2, z+length/2);  // Top Left
-    //             rlVertex3f(x-width/2, y+height/2, z-length/2);  // Top Right
-    //
-    //             rlVertex3f(x-width/2, y-height/2, z+length/2);  // Bottom Left
-    //             rlVertex3f(x-width/2, y+height/2, z+length/2);  // Top Left
-    //             rlVertex3f(x-width/2, y-height/2, z-length/2);  // Bottom Right
-    //         rlEnd();
-    //     rlPopMatrix();
+fn DrawCube(position: rlgl.Vector3, width: f32, height: f32, length: f32, color: Color) void {
+    const x = 0.0;
+    const y = 0.0;
+    const z = 0.0;
+
+    rlgl.rlPushMatrix();
+
+    // NOTE: Be careful! Function order matters (rotate -> scale -> translate)
+    rlgl.rlTranslatef(position.x, position.y, position.z);
+    rlgl.rlScalef(2.0, 2.0, 2.0);
+    rlgl.rlRotatef(45, 0, 1, 0);
+
+    rlgl.rlBegin(rlgl.RL_TRIANGLES);
+    rlgl.rlColor4ub(color.r, color.g, color.b, color.a);
+
+    // Front Face -----------------------------------------------------
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z + length / 2); // Bottom Left
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z + length / 2); // Bottom Right
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z + length / 2); // Top Left
+
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z + length / 2); // Top Right
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z + length / 2); // Top Left
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z + length / 2); // Bottom Right
+
+    // Back Face ------------------------------------------------------
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z - length / 2); // Bottom Left
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z - length / 2); // Top Left
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z - length / 2); // Bottom Right
+
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z - length / 2); // Top Right
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z - length / 2); // Bottom Right
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z - length / 2); // Top Left
+
+    // Top Face -------------------------------------------------------
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z - length / 2); // Top Left
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z + length / 2); // Bottom Left
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z + length / 2); // Bottom Right
+
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z - length / 2); // Top Right
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z - length / 2); // Top Left
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z + length / 2); // Bottom Right
+
+    // Bottom Face ----------------------------------------------------
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z - length / 2); // Top Left
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z + length / 2); // Bottom Right
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z + length / 2); // Bottom Left
+
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z - length / 2); // Top Right
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z + length / 2); // Bottom Right
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z - length / 2); // Top Left
+
+    // Right face -----------------------------------------------------
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z - length / 2); // Bottom Right
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z - length / 2); // Top Right
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z + length / 2); // Top Left
+
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z + length / 2); // Bottom Left
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z - length / 2); // Bottom Right
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z + length / 2); // Top Left
+
+    // Left Face ------------------------------------------------------
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z - length / 2); // Bottom Right
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z + length / 2); // Top Left
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z - length / 2); // Top Right
+
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z + length / 2); // Bottom Left
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z + length / 2); // Top Left
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z - length / 2); // Bottom Right
+    rlgl.rlEnd();
+    rlgl.rlPopMatrix();
 }
 
 // Draw cube wires
-fn DrawCubeWires(position: rlgl.Vector3, width: f32, height: f32, length: f32, color: rlgl.Color) void {
-    //     float x = 0.0f;
-    //     float y = 0.0f;
-    //     float z = 0.0f;
-    //
-    //     rlPushMatrix();
-    //
-    //         rlTranslatef(position.x, position.y, position.z);
-    //         //rlRotatef(45, 0, 1, 0);
-    //
-    //         rlBegin(RL_LINES);
-    //             rlColor4ub(color.r, color.g, color.b, color.a);
-    //
-    //             // Front Face -----------------------------------------------------
-    //             // Bottom Line
-    //             rlVertex3f(x-width/2, y-height/2, z+length/2);  // Bottom Left
-    //             rlVertex3f(x+width/2, y-height/2, z+length/2);  // Bottom Right
-    //
-    //             // Left Line
-    //             rlVertex3f(x+width/2, y-height/2, z+length/2);  // Bottom Right
-    //             rlVertex3f(x+width/2, y+height/2, z+length/2);  // Top Right
-    //
-    //             // Top Line
-    //             rlVertex3f(x+width/2, y+height/2, z+length/2);  // Top Right
-    //             rlVertex3f(x-width/2, y+height/2, z+length/2);  // Top Left
-    //
-    //             // Right Line
-    //             rlVertex3f(x-width/2, y+height/2, z+length/2);  // Top Left
-    //             rlVertex3f(x-width/2, y-height/2, z+length/2);  // Bottom Left
-    //
-    //             // Back Face ------------------------------------------------------
-    //             // Bottom Line
-    //             rlVertex3f(x-width/2, y-height/2, z-length/2);  // Bottom Left
-    //             rlVertex3f(x+width/2, y-height/2, z-length/2);  // Bottom Right
-    //
-    //             // Left Line
-    //             rlVertex3f(x+width/2, y-height/2, z-length/2);  // Bottom Right
-    //             rlVertex3f(x+width/2, y+height/2, z-length/2);  // Top Right
-    //
-    //             // Top Line
-    //             rlVertex3f(x+width/2, y+height/2, z-length/2);  // Top Right
-    //             rlVertex3f(x-width/2, y+height/2, z-length/2);  // Top Left
-    //
-    //             // Right Line
-    //             rlVertex3f(x-width/2, y+height/2, z-length/2);  // Top Left
-    //             rlVertex3f(x-width/2, y-height/2, z-length/2);  // Bottom Left
-    //
-    //             // Top Face -------------------------------------------------------
-    //             // Left Line
-    //             rlVertex3f(x-width/2, y+height/2, z+length/2);  // Top Left Front
-    //             rlVertex3f(x-width/2, y+height/2, z-length/2);  // Top Left Back
-    //
-    //             // Right Line
-    //             rlVertex3f(x+width/2, y+height/2, z+length/2);  // Top Right Front
-    //             rlVertex3f(x+width/2, y+height/2, z-length/2);  // Top Right Back
-    //
-    //             // Bottom Face  ---------------------------------------------------
-    //             // Left Line
-    //             rlVertex3f(x-width/2, y-height/2, z+length/2);  // Top Left Front
-    //             rlVertex3f(x-width/2, y-height/2, z-length/2);  // Top Left Back
-    //
-    //             // Right Line
-    //             rlVertex3f(x+width/2, y-height/2, z+length/2);  // Top Right Front
-    //             rlVertex3f(x+width/2, y-height/2, z-length/2);  // Top Right Back
-    //         rlEnd();
-    //     rlPopMatrix();
+fn DrawCubeWires(position: rlgl.Vector3, width: f32, height: f32, length: f32, color: Color) void {
+    const x = 0.0;
+    const y = 0.0;
+    const z = 0.0;
+
+    rlgl.rlPushMatrix();
+
+    rlgl.rlTranslatef(position.x, position.y, position.z);
+    //rlRotatef(45, 0, 1, 0);
+
+    rlgl.rlBegin(rlgl.RL_LINES);
+    rlgl.rlColor4ub(color.r, color.g, color.b, color.a);
+
+    // Front Face -----------------------------------------------------
+    // Bottom Line
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z + length / 2); // Bottom Left
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z + length / 2); // Bottom Right
+
+    // Left Line
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z + length / 2); // Bottom Right
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z + length / 2); // Top Right
+
+    // Top Line
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z + length / 2); // Top Right
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z + length / 2); // Top Left
+
+    // Right Line
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z + length / 2); // Top Left
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z + length / 2); // Bottom Left
+
+    // Back Face ------------------------------------------------------
+    // Bottom Line
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z - length / 2); // Bottom Left
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z - length / 2); // Bottom Right
+
+    // Left Line
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z - length / 2); // Bottom Right
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z - length / 2); // Top Right
+
+    // Top Line
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z - length / 2); // Top Right
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z - length / 2); // Top Left
+
+    // Right Line
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z - length / 2); // Top Left
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z - length / 2); // Bottom Left
+
+    // Top Face -------------------------------------------------------
+    // Left Line
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z + length / 2); // Top Left Front
+    rlgl.rlVertex3f(x - width / 2, y + height / 2, z - length / 2); // Top Left Back
+
+    // Right Line
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z + length / 2); // Top Right Front
+    rlgl.rlVertex3f(x + width / 2, y + height / 2, z - length / 2); // Top Right Back
+
+    // Bottom Face  ---------------------------------------------------
+    // Left Line
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z + length / 2); // Top Left Front
+    rlgl.rlVertex3f(x - width / 2, y - height / 2, z - length / 2); // Top Left Back
+
+    // Right Line
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z + length / 2); // Top Right Front
+    rlgl.rlVertex3f(x + width / 2, y - height / 2, z - length / 2); // Top Right Back
+    rlgl.rlEnd();
+    rlgl.rlPopMatrix();
 }
