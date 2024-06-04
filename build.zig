@@ -5,8 +5,10 @@ const Program = struct {
     name: []const u8,
     path: []const u8,
     includes: []const []const u8 = &.{},
+    source: ?[]const u8 = null,
 };
 
+// example.addIncludePath(b.path());
 const examples = [_]Program{
     .{
         .name = "core_3d_camera_first_person",
@@ -15,10 +17,16 @@ const examples = [_]Program{
     .{
         .name = "rlgl_standalone",
         .path = "examples/others/rlgl_standalone.zig",
+        .includes = &.{
+            "raylib/external/glfw/include",
+        },
     },
     .{
         .name = "shapes_draw_ring",
         .path = "examples/shapes/shapes_draw_ring.zig",
+        .includes = &.{
+            "raygui",
+        },
     },
     .{
         .name = "text_raylib_fonts",
@@ -32,7 +40,18 @@ const examples = [_]Program{
     .{
         .name = "timeline",
         .path = "examples//raygui/timeline/timeline.zig",
-        .includes = &.{"examples//raygui/timeline/"},
+        .includes = &.{
+            "examples/raygui/timeline",
+            "raygui",
+        },
+        .source =
+        \\#include "raylib.h"
+        \\#define RAYGUI_IMPLEMENTATION
+        \\#include "raygui.h"
+        \\#define _TIMELINE_IMPL_
+        \\#include "timeline.h"
+        //
+        ,
     },
     // macro define not work
     // .{
@@ -106,28 +125,22 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
         b.installArtifact(example);
-        example.addIncludePath(b.path("raylib"));
-        example.addIncludePath(b.path("raylib/external/glfw/include"));
-        example.addIncludePath(b.path("raygui"));
-
-        for (ex.includes) |include| {
-            example.addIncludePath(b.path(include));
-        }
 
         example.linkLibC();
         example.linkLibrary(raylib_compile);
 
-        var gen_step = b.addWriteFiles();
-        example.step.dependOn(&gen_step.step);
+        // for @cImclude
+        example.addIncludePath(b.path("raylib"));
+        for (ex.includes) |include| {
+            example.addIncludePath(b.path(include));
+        }
 
-        const timeline_c_path = gen_step.add("timeline.c",
-            \\#include "raylib.h"
-            \\#define RAYGUI_IMPLEMENTATION
-            \\#include "raygui.h"
-            \\#define _TIMELINE_IMPL_
-            \\#include "timeline.h"
-        );
-        example.addCSourceFile(.{ .file = timeline_c_path });
-        example.addIncludePath(b.path("examples/raygui/timeline"));
+        // add c source
+        if (ex.source) |src| {
+            var gen_step = b.addWriteFiles();
+            example.step.dependOn(&gen_step.step);
+            const timeline_c_path = gen_step.add("tmp.c", src);
+            example.addCSourceFile(.{ .file = timeline_c_path });
+        }
     }
 }
