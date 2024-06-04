@@ -20,6 +20,10 @@ const examples = [_]Program{
         .name = "shapes_draw_ring",
         .path = "examples/shapes/shapes_draw_ring.zig",
     },
+    .{
+        .name = "text_raylib_fonts",
+        .path = "examples/text/text_raylib_fonts.zig",
+    },
     // macro define not work
     // .{
     //     .name = "property_list",
