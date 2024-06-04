@@ -1,6 +1,18 @@
 const std = @import("std");
 const raylib_build = @import("raylib/build.zig");
 
+const Program = struct {
+    name: []const u8,
+    path: []const u8,
+};
+
+const examples = [_]Program{
+    .{
+        .name = "core_3d_camera_first_person",
+        .path = "examples/core/core_3d_camera_first_person.zig",
+    },
+};
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -38,14 +50,17 @@ pub fn build(b: *std.Build) void {
     //
     // examples
     //
-    const example = b.addExecutable(.{
-        .name = "core_3d_camera_first_person",
-        .root_source_file = b.path("examples/core/core_3d_camera_first_person.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    b.installArtifact(example);
-    example.addIncludePath(b.path("raylib"));
-    example.linkLibC();
-    example.linkLibrary(raylib_compile);
+    // https://github.com/Not-Nik/raylib-zig/blob/devel/build.zig
+    for (examples) |ex| {
+        const example = b.addExecutable(.{
+            .name = ex.name,
+            .root_source_file = b.path(ex.path),
+            .target = target,
+            .optimize = optimize,
+        });
+        b.installArtifact(example);
+        example.addIncludePath(b.path("raylib"));
+        example.linkLibC();
+        example.linkLibrary(raylib_compile);
+    }
 }

@@ -1,7 +1,7 @@
 # zig raylib sample
 
-- zig-0.12
-- raylib-5.0
+- [zig](https://github.com/ziglang/zig)-0.12
+- [raylib](https://github.com/raysan5/raylib)-5.0
 - use @cImport
 
 ```zig
