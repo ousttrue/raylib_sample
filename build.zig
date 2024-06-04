@@ -41,6 +41,10 @@ const examples = [_]Program{
         .name = "shaders_texture_tiling",
         .path = "examples/shaders/shaders_texture_tiling.zig",
     },
+    // .{
+    //     .name = "bvhview",
+    //     .path = "examples/others/bvhview.zig",
+    // },
     .{
         .name = "timeline",
         .path = "examples//raygui/timeline/timeline.zig",
