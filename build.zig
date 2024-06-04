@@ -4,6 +4,7 @@ const raylib_build = @import("raylib/build.zig");
 const Program = struct {
     name: []const u8,
     path: []const u8,
+    includes: []const []const u8 = &.{},
 };
 
 const examples = [_]Program{
@@ -15,6 +16,16 @@ const examples = [_]Program{
         .name = "rlgl_standalone",
         .path = "examples/others/rlgl_standalone.zig",
     },
+    .{
+        .name = "shapes_draw_ring",
+        .path = "examples/shapes/shapes_draw_ring.zig",
+    },
+    // macro define not work
+    // .{
+    //     .name = "property_list",
+    //     .path = "examples/raygui/property_list/property_list.zig",
+    //     .includes = &[_][]const u8{"examples/raygui/property_list"},
+    // },
 };
 
 pub fn build(b: *std.Build) void {
@@ -83,6 +94,11 @@ pub fn build(b: *std.Build) void {
         b.installArtifact(example);
         example.addIncludePath(b.path("raylib"));
         example.addIncludePath(b.path("raylib/external/glfw/include"));
+        example.addIncludePath(b.path("raygui"));
+
+        for (ex.includes) |include| {
+            example.addIncludePath(b.path(include));
+        }
 
         example.linkLibC();
         example.linkLibrary(raylib_compile);
