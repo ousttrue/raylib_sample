@@ -11,6 +11,10 @@ const examples = [_]Program{
         .name = "core_3d_camera_first_person",
         .path = "examples/core/core_3d_camera_first_person.zig",
     },
+    .{
+        .name = "rlgl_standalone",
+        .path = "examples/others/rlgl_standalone.zig",
+    },
 };
 
 pub fn build(b: *std.Build) void {
@@ -60,6 +64,8 @@ pub fn build(b: *std.Build) void {
         });
         b.installArtifact(example);
         example.addIncludePath(b.path("raylib"));
+        example.addIncludePath(b.path("raylib/external/glfw/include"));
+
         example.linkLibC();
         example.linkLibrary(raylib_compile);
     }
