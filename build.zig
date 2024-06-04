@@ -38,6 +38,10 @@ const examples = [_]Program{
         .includes = &.{"raygizmo"},
     },
     .{
+        .name = "shaders_texture_tiling",
+        .path = "examples/shaders/shaders_texture_tiling.zig",
+    },
+    .{
         .name = "timeline",
         .path = "examples//raygui/timeline/timeline.zig",
         .includes = &.{
