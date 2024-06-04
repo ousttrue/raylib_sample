@@ -5,6 +5,8 @@
 - use @cImport
 - [raygui](https://github.com/raysan5/raygui)-4.0
 
+- [raygizmo](https://github.com/alexeykarnachev/raygizmo)
+
 ```zig
 const raylib = @cImport({
     @cInclude("raylib.h");
@@ -31,4 +33,3 @@ pub fn main() !void {
 ```
 
 - lsp zls works !
-

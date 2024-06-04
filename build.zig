@@ -24,6 +24,11 @@ const examples = [_]Program{
         .name = "text_raylib_fonts",
         .path = "examples/text/text_raylib_fonts.zig",
     },
+    .{
+        .name = "raygizmo",
+        .path = "examples/others/raygizmo.zig",
+        .includes = &.{"raygizmo"},
+    },
     // macro define not work
     // .{
     //     .name = "property_list",
