@@ -90,7 +90,7 @@ pub fn addRaylib(
         const raygui_c_path = gen_step.add("raygui.c", "#define RAYGUI_IMPLEMENTATION\n#include \"raygui.h\"\n");
         raylib.addCSourceFile(.{ .file = raygui_c_path, .flags = raylib_flags });
         raylib.addIncludePath(.{ .path = srcdir });
-        raylib.addIncludePath(.{ .path = srcdir ++ "/../../raygui/src" });
+        raylib.addIncludePath(.{ .path = srcdir ++ "/../raygui" });
     }
 
     switch (target.result.os.tag) {

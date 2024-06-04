@@ -3,6 +3,7 @@
 - [zig](https://github.com/ziglang/zig)-0.12
 - [raylib](https://github.com/raysan5/raylib)-5.0
 - use @cImport
+- [raygui](https://github.com/raysan5/raygui)-4.0
 
 ```zig
 const raylib = @cImport({
