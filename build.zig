@@ -29,6 +29,11 @@ const examples = [_]Program{
         .path = "examples/others/raygizmo.zig",
         .includes = &.{"raygizmo"},
     },
+    .{
+        .name = "timeline",
+        .path = "examples//raygui/timeline/timeline.zig",
+        .includes = &.{"examples//raygui/timeline/"},
+    },
     // macro define not work
     // .{
     //     .name = "property_list",
@@ -111,5 +116,18 @@ pub fn build(b: *std.Build) void {
 
         example.linkLibC();
         example.linkLibrary(raylib_compile);
+
+        var gen_step = b.addWriteFiles();
+        example.step.dependOn(&gen_step.step);
+
+        const timeline_c_path = gen_step.add("timeline.c",
+            \\#include "raylib.h"
+            \\#define RAYGUI_IMPLEMENTATION
+            \\#include "raygui.h"
+            \\#define _TIMELINE_IMPL_
+            \\#include "timeline.h"
+        );
+        example.addCSourceFile(.{ .file = timeline_c_path });
+        example.addIncludePath(b.path("examples/raygui/timeline"));
     }
 }
