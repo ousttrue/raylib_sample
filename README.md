@@ -36,7 +36,9 @@ pub fn main() !void {
 
 - [raygizmo](https://github.com/alexeykarnachev/raygizmo)
 - [RayGUI-timeline](https://github.com/MonstersGoBoom/RayGUI-timeline)
+- [raylib-blender-camera](https://github.com/grplyler/raylib-blender-camera)
 
 ### WIP
 
 - [BVHView](https://github.com/orangeduck/BVHView)
+- [OritCamera](https://gist.github.com/JeffM2501/000787070aef421a00c02ae4cf799ea1)

@@ -19,6 +19,17 @@ const examples = [_]Program{
         .path = "examples/core/core_3d_camera_first_person.zig",
     },
     .{
+        .name = "orbitcamera",
+        .path = "examples/core/orbitcamera.zig",
+    },
+    .{
+        .name = "blender_fly_camera",
+        .path = "examples/core/blender_fly_camera.zig",
+        .includes = &.{
+            "examples/core",
+        },
+    },
+    .{
         .name = "rlgl_standalone",
         .path = "examples/others/rlgl_standalone.zig",
         .includes = &.{
@@ -33,7 +44,7 @@ const examples = [_]Program{
         .name = "shapes_draw_ring",
         .path = "examples/shapes/shapes_basic_shapes.zig",
     },
-     .{
+    .{
         .name = "shapes_draw_ring",
         .path = "examples/shapes/shapes_draw_ring.zig",
         .includes = &.{
