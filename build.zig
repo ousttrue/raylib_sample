@@ -22,6 +22,14 @@ const examples = [_]Program{
         },
     },
     .{
+        .name = "shapes_lines_bezier",
+        .path = "examples/shapes/shapes_lines_bezier.zig",
+    },
+    .{
+        .name = "shapes_draw_ring",
+        .path = "examples/shapes/shapes_basic_shapes.zig",
+    },
+     .{
         .name = "shapes_draw_ring",
         .path = "examples/shapes/shapes_draw_ring.zig",
         .includes = &.{
