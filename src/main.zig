@@ -3,7 +3,35 @@ const raylib = @cImport({
     @cInclude("raylib.h");
     @cInclude("rcamera.h");
     @cInclude("raymath.h");
+    @cInclude("rlgl.h");
 });
+
+const Scene = struct {
+    cubePosition: raylib.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
+    cameras: [2]*raylib.Camera,
+
+    pub fn draw(self: @This(), current: *raylib.Camera) void {
+        raylib.BeginMode3D(current.*);
+
+        for (self.cameras) |camera| {
+            if (camera != current) {
+                const m = raylib.MatrixTranspose(raylib.MatrixInvert(raylib.GetCameraViewMatrix(camera)));
+                raylib.rlPushMatrix();
+                // raylib.rlTranslatef(m.m12, m.m13, m.m14);
+                raylib.rlMultMatrixf(&m.m0);
+                raylib.DrawCube(.{}, 0.5, 0.5, 0.5, raylib.YELLOW);
+                raylib.rlPopMatrix();
+            }
+        }
+
+        raylib.DrawCube(self.cubePosition, 2.0, 2.0, 2.0, raylib.RED);
+        raylib.DrawCubeWires(self.cubePosition, 2.0, 2.0, 2.0, raylib.MAROON);
+
+        raylib.DrawGrid(10, 1.0);
+
+        raylib.EndMode3D();
+    }
+};
 
 const OribtCamera = struct {
     yawDegree: i32 = 0,
@@ -95,7 +123,6 @@ const View = struct {
     camera: raylib.Camera3D = .{},
     orbit: OribtCamera = .{},
     render_texture: ?raylib.RenderTexture2D = null,
-    cubePosition: raylib.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
     is_active: bool = false,
 
     const Self = @This();
@@ -130,46 +157,37 @@ const View = struct {
     }
 
     fn process(self: *Self) bool {
-        return self.orbit.MouseUpdateCamera(
+        self.is_active = self.orbit.MouseUpdateCamera(
             &self.camera,
             self.rect,
         );
+        return self.is_active;
     }
 
-    fn render(self: *Self) void {
+    fn render(self: *Self, scene: Scene) void {
         const render_texture = self.get_or_create_render_texture();
 
         raylib.BeginTextureMode(render_texture);
-        raylib.ClearBackground(if (self.is_active) raylib.RED else raylib.SKYBLUE);
+        raylib.ClearBackground(raylib.SKYBLUE);
 
-        // raylib.DrawText(
-        //     raylib.TextFormat(
-        //         "yaw: %d, pitch: %d, shift: %.3f, %.3f, distance: %.3f",
-        //         orbit.yawDegree,
-        //         orbit.pitchDegree,
-        //         orbit.shiftX,
-        //         orbit.shiftY,
-        //         orbit.distance,
-        //     ),
-        //     190,
-        //     200,
-        //     20,
-        //     raylib.LIGHTGRAY,
-        // );
-
-        // {
-        // }
-
-        {
-            raylib.BeginMode3D(self.camera);
-
-            raylib.DrawCube(self.cubePosition, 2.0, 2.0, 2.0, raylib.RED);
-            raylib.DrawCubeWires(self.cubePosition, 2.0, 2.0, 2.0, raylib.MAROON);
-
-            raylib.DrawGrid(10, 1.0);
-
-            raylib.EndMode3D();
+        if (self.is_active) {
+            raylib.DrawText(
+                raylib.TextFormat(
+                    "yaw: %d, pitch: %d, shift: %.3f, %.3f, distance: %.3f",
+                    self.orbit.yawDegree,
+                    self.orbit.pitchDegree,
+                    self.orbit.shiftX,
+                    self.orbit.shiftY,
+                    self.orbit.distance,
+                ),
+                0,
+                0,
+                20,
+                raylib.LIGHTGRAY,
+            );
         }
+
+        scene.draw(&self.camera);
 
         raylib.EndTextureMode();
 
@@ -202,13 +220,13 @@ const View = struct {
 };
 
 const Focus = struct {
-    views: [4]View,
+    views: [2]View,
     active: ?*View = null,
 
     const Self = @This();
     fn make(screen_width: i32, screen_height: i32) Self {
         const half_width = @divTrunc(screen_width, 2);
-        const half_height = @divTrunc(screen_height, 2);
+        // const half_height = @divTrunc(screen_height, 2);
 
         var focus = Focus{
             .views = [_]View{
@@ -216,25 +234,13 @@ const Focus = struct {
                     .x = 0,
                     .y = 0,
                     .width = @as(f32, @floatFromInt(half_width)),
-                    .height = @as(f32, @floatFromInt(half_height)),
+                    .height = @as(f32, @floatFromInt(screen_height)),
                 }),
                 View.make(.{
                     .x = @as(f32, @floatFromInt(half_width)),
                     .y = 0,
                     .width = @as(f32, @floatFromInt(half_width)),
-                    .height = @as(f32, @floatFromInt(half_height)),
-                }),
-                View.make(.{
-                    .x = 0,
-                    .y = @as(f32, @floatFromInt(half_height)),
-                    .width = @as(f32, @floatFromInt(half_width)),
-                    .height = @as(f32, @floatFromInt(half_height)),
-                }),
-                View.make(.{
-                    .x = @as(f32, @floatFromInt(half_width)),
-                    .y = @as(f32, @floatFromInt(half_height)),
-                    .width = @as(f32, @floatFromInt(half_width)),
-                    .height = @as(f32, @floatFromInt(half_height)),
+                    .height = @as(f32, @floatFromInt(screen_height)),
                 }),
             },
         };
@@ -263,13 +269,20 @@ const Focus = struct {
 };
 
 pub fn main() !void {
-    raylib.InitWindow(1024, 786, "experiment");
+    raylib.InitWindow(1280, 786, "experiment");
     defer raylib.CloseWindow();
 
     const w = raylib.GetScreenWidth();
     const h = raylib.GetScreenHeight();
 
     var focus = Focus.make(w, h);
+
+    const scene = Scene{
+        .cameras = .{
+            &focus.views[0].camera,
+            &focus.views[1].camera,
+        },
+    };
 
     while (!raylib.WindowShouldClose()) {
 
@@ -295,7 +308,7 @@ pub fn main() !void {
         }
 
         for (&focus.views) |*view| {
-            view.render();
+            view.render(scene);
         }
 
         raylib.EndDrawing();
