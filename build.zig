@@ -11,6 +11,10 @@ const Program = struct {
 // example.addIncludePath(b.path());
 const examples = [_]Program{
     .{
+        .name = "core_world_screen",
+        .path = "examples/core/core_world_screen.zig",
+    },
+    .{
         .name = "core_3d_camera_split_screen",
         .path = "examples/core/core_3d_camera_split_screen.zig",
     },
