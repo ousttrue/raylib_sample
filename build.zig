@@ -39,14 +39,7 @@ const examples = [_]Program{
         .name = "models_geometric_shapes",
         .path = "examples/models/models_geometric_shapes.zig",
     },
-    // others
-    .{
-        .name = "rlgl_standalone",
-        .path = "examples/others/rlgl_standalone.zig",
-        .includes = &.{
-            "raylib/external/glfw/include",
-        },
-    },
+    // shapes
     .{
         .name = "shapes_lines_bezier",
         .path = "examples/shapes/shapes_lines_bezier.zig",
@@ -62,23 +55,41 @@ const examples = [_]Program{
             "raygui",
         },
     },
+    // text
     .{
         .name = "text_raylib_fonts",
         .path = "examples/text/text_raylib_fonts.zig",
+    },
+    // others
+    .{
+        .name = "rlgl_standalone",
+        .path = "examples/others/rlgl_standalone.zig",
+        .includes = &.{
+            "raylib/external/glfw/include",
+        },
     },
     .{
         .name = "raygizmo",
         .path = "examples/others/raygizmo.zig",
         .includes = &.{"raygizmo"},
     },
-    .{
-        .name = "shaders_texture_tiling",
-        .path = "examples/shaders/shaders_texture_tiling.zig",
-    },
     // .{
     //     .name = "bvhview",
     //     .path = "examples/others/bvhview.zig",
     // },
+    // shaders
+    .{
+        .name = "shaders_texture_tiling",
+        .path = "examples/shaders/shaders_texture_tiling.zig",
+    },
+    // raygui
+    .{
+        .name = "floating_window",
+        .path = "examples/raygui/floating_window.zig",
+        .includes = &.{
+            "raygui",
+        },
+    },
     .{
         .name = "timeline",
         .path = "examples//raygui/timeline/timeline.zig",

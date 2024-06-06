@@ -8,7 +8,7 @@ const raylib = @cImport({
 
 const Scene = struct {
     cubePosition: raylib.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
-    cameras: [2]*raylib.Camera,
+    cameras: []*raylib.Camera,
 
     pub fn draw(self: @This(), current: *raylib.Camera) void {
         raylib.BeginMode3D(current.*);
@@ -280,11 +280,13 @@ pub fn main() !void {
 
     var focus = Focus.make(w, h);
 
+    var cameras = [_]*raylib.Camera{
+        &focus.views[0].camera,
+        &focus.views[1].camera,
+    };
+
     const scene = Scene{
-        .cameras = .{
-            &focus.views[0].camera,
-            &focus.views[1].camera,
-        },
+        .cameras = &cameras,
     };
 
     while (!raylib.WindowShouldClose()) {
