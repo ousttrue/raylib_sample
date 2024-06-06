@@ -86,9 +86,17 @@ const examples = [_]Program{
     .{
         .name = "floating_window",
         .path = "examples/raygui/floating_window.zig",
-        .includes = &.{
-            "raygui",
-        },
+        .includes = &.{"raygui"},
+    },
+    .{
+        .name = "controls_test_suite",
+        .path = "examples/raygui/controls_test_suite/controls_test_suite.zig",
+        .includes = &.{"raygui"},
+    },
+    .{
+        .name = "portable_window",
+        .path = "examples/raygui/portable_window/portable_window.zig",
+        .includes = &.{"raygui"},
     },
     .{
         .name = "timeline",
