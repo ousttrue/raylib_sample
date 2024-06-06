@@ -10,6 +10,7 @@ const Program = struct {
 
 // example.addIncludePath(b.path());
 const examples = [_]Program{
+    // core
     .{
         .name = "core_world_screen",
         .path = "examples/core/core_world_screen.zig",
@@ -33,6 +34,12 @@ const examples = [_]Program{
             "examples/core",
         },
     },
+    // models
+    .{
+        .name = "models_geometric_shapes",
+        .path = "examples/models/models_geometric_shapes.zig",
+    },
+    // others
     .{
         .name = "rlgl_standalone",
         .path = "examples/others/rlgl_standalone.zig",

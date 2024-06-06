@@ -15,11 +15,14 @@ const Scene = struct {
 
         for (self.cameras) |camera| {
             if (camera != current) {
-                const m = raylib.MatrixTranspose(raylib.MatrixInvert(raylib.GetCameraViewMatrix(camera)));
+                const m = raylib.MatrixInvert(raylib.GetCameraViewMatrix(camera));
+                const r = raylib.MatrixRotateX(90.0 * raylib.DEG2RAD);
+                const t = raylib.MatrixTranspose(raylib.MatrixMultiply(r, m));
                 raylib.rlPushMatrix();
                 // raylib.rlTranslatef(m.m12, m.m13, m.m14);
-                raylib.rlMultMatrixf(&m.m0);
-                raylib.DrawCube(.{}, 0.5, 0.5, 0.5, raylib.YELLOW);
+                raylib.rlMultMatrixf(&t.m0);
+                // raylib.DrawCube(.{}, 0.5, 0.5, 0.5, raylib.YELLOW);
+                raylib.DrawCylinderWires(.{}, 0, 2.0, 2, 4, raylib.DARKBLUE);
                 raylib.rlPopMatrix();
             }
         }
@@ -269,7 +272,7 @@ const Focus = struct {
 };
 
 pub fn main() !void {
-    raylib.InitWindow(1280, 786, "experiment");
+    raylib.InitWindow(1600, 1200, "experiment");
     defer raylib.CloseWindow();
 
     const w = raylib.GetScreenWidth();
