@@ -23,11 +23,11 @@ pub fn addRaylib(
 
     // No GLFW required on PLATFORM_DRM
     if (!options.platform_drm) {
-        raylib.addIncludePath(.{ .path = srcdir ++ "/external/glfw/include" });
+        raylib.addIncludePath(.{ .cwd_relative = srcdir ++ "/external/glfw/include" });
     }
 
     raylib.addCSourceFiles(.{
-        .root = .{ .path = srcdir },
+        .root = .{ .cwd_relative = srcdir },
         .files = &.{
             "rcore.c",
             "utils.c",
@@ -37,7 +37,7 @@ pub fn addRaylib(
 
     if (options.raudio) {
         raylib.addCSourceFiles(.{
-            .root = .{ .path = srcdir },
+            .root = .{ .cwd_relative = srcdir },
             .files = &.{
                 "raudio.c",
             },
@@ -46,7 +46,7 @@ pub fn addRaylib(
     }
     if (options.rmodels) {
         raylib.addCSourceFiles(.{
-            .root = .{ .path = srcdir },
+            .root = .{ .cwd_relative = srcdir },
             .files = &.{
                 "rmodels.c",
             },
@@ -57,7 +57,7 @@ pub fn addRaylib(
     }
     if (options.rshapes) {
         raylib.addCSourceFiles(.{
-            .root = .{ .path = srcdir },
+            .root = .{ .cwd_relative = srcdir },
             .files = &.{
                 "rshapes.c",
             },
@@ -66,7 +66,7 @@ pub fn addRaylib(
     }
     if (options.rtext) {
         raylib.addCSourceFiles(.{
-            .root = .{ .path = srcdir },
+            .root = .{ .cwd_relative = srcdir },
             .files = &.{
                 "rtext.c",
             },
@@ -75,7 +75,7 @@ pub fn addRaylib(
     }
     if (options.rtextures) {
         raylib.addCSourceFiles(.{
-            .root = .{ .path = srcdir },
+            .root = .{ .cwd_relative = srcdir },
             .files = &.{
                 "rtextures.c",
             },
@@ -89,14 +89,14 @@ pub fn addRaylib(
     if (options.raygui) {
         const raygui_c_path = gen_step.add("raygui.c", "#define RAYGUI_IMPLEMENTATION\n#include \"raygui.h\"\n");
         raylib.addCSourceFile(.{ .file = raygui_c_path, .flags = raylib_flags });
-        raylib.addIncludePath(.{ .path = srcdir });
-        raylib.addIncludePath(.{ .path = srcdir ++ "/../raygui" });
+        raylib.addIncludePath(.{ .cwd_relative = srcdir });
+        raylib.addIncludePath(.{ .cwd_relative = srcdir ++ "/../raygui" });
     }
 
     switch (target.result.os.tag) {
         .windows => {
             raylib.addCSourceFiles(.{
-                .root = .{ .path = srcdir },
+                .root = .{ .cwd_relative = srcdir },
                 .files = &.{
                     "rglfw.c",
                 },
@@ -105,14 +105,14 @@ pub fn addRaylib(
             raylib.linkSystemLibrary("winmm");
             raylib.linkSystemLibrary("gdi32");
             raylib.linkSystemLibrary("opengl32");
-            raylib.addIncludePath(.{ .path = "external/glfw/deps/mingw" });
+            raylib.addIncludePath(.{ .cwd_relative = "external/glfw/deps/mingw" });
 
             raylib.defineCMacro("PLATFORM_DESKTOP", null);
         },
         .linux => {
             if (!options.platform_drm) {
                 raylib.addCSourceFiles(.{
-                    .root = .{ .path = srcdir },
+                    .root = .{ .cwd_relative = srcdir },
                     .files = &.{
                         "rglfw.c",
                     },
@@ -123,8 +123,8 @@ pub fn addRaylib(
                 raylib.linkSystemLibrary("dl");
                 raylib.linkSystemLibrary("m");
                 raylib.linkSystemLibrary("X11");
-                raylib.addLibraryPath(.{ .path = "/usr/lib" });
-                raylib.addIncludePath(.{ .path = "/usr/include" });
+                raylib.addLibraryPath(.{ .cwd_relative = "/usr/lib" });
+                raylib.addIncludePath(.{ .cwd_relative = "/usr/include" });
 
                 raylib.defineCMacro("PLATFORM_DESKTOP", null);
             } else {
@@ -136,7 +136,7 @@ pub fn addRaylib(
                 raylib.linkSystemLibrary("rt");
                 raylib.linkSystemLibrary("m");
                 raylib.linkSystemLibrary("dl");
-                raylib.addIncludePath(.{ .path = "/usr/include/libdrm" });
+                raylib.addIncludePath(.{ .cwd_relative = "/usr/include/libdrm" });
 
                 raylib.defineCMacro("PLATFORM_DRM", null);
                 raylib.defineCMacro("GRAPHICS_API_OPENGL_ES2", null);
@@ -146,7 +146,7 @@ pub fn addRaylib(
         },
         .freebsd, .openbsd, .netbsd, .dragonfly => {
             raylib.addCSourceFiles(.{
-                .root = .{ .path = srcdir },
+                .root = .{ .cwd_relative = srcdir },
                 .files = &.{
                     "rglfw.c",
                 },
@@ -171,7 +171,7 @@ pub fn addRaylib(
                 "-ObjC",
             };
             raylib.addCSourceFiles(.{
-                .root = .{ .path = srcdir },
+                .root = .{ .cwd_relative = srcdir },
                 .files = &.{
                     "rglfw.c",
                 },
@@ -199,7 +199,7 @@ pub fn addRaylib(
             var dir = std.fs.openDirAbsolute(cache_include, std.fs.Dir.OpenDirOptions{ .access_sub_paths = true, .no_follow = true }) catch @panic("No emscripten cache. Generate it!");
             dir.close();
 
-            raylib.addIncludePath(.{ .path = cache_include });
+            raylib.addIncludePath(.{ .cwd_relative = cache_include });
         },
         else => {
             @panic("Unsupported OS");
