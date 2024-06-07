@@ -1,8 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-// for zig-0.12
-pub fn addRaylib(
+// for zig-0.13
+pub fn compile(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -218,41 +218,6 @@ pub const Options = struct {
     raygui: bool = false,
     platform_drm: bool = false,
 };
-
-pub fn build(b: *std.Build) void {
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
-    const target = b.standardTargetOptions(.{});
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
-    const optimize = b.standardOptimizeOption(.{});
-
-    const defaults = Options{};
-    const options = Options{
-        .platform_drm = b.option(bool, "platform_drm", "Compile raylib in native mode (no X11)") orelse defaults.platform_drm,
-        .raudio = b.option(bool, "raudio", "Compile with audio support") orelse defaults.raudio,
-        .rmodels = b.option(bool, "rmodels", "Compile with models support") orelse defaults.rmodels,
-        .rtext = b.option(bool, "rtext", "Compile with text support") orelse defaults.rtext,
-        .rtextures = b.option(bool, "rtextures", "Compile with textures support") orelse defaults.rtextures,
-        .rshapes = b.option(bool, "rshapes", "Compile with shapes support") orelse defaults.rshapes,
-        .raygui = b.option(bool, "raygui", "Compile with raygui support") orelse defaults.raygui,
-    };
-
-    const lib = addRaylib(b, target, optimize, options);
-
-    lib.installHeader("src/raylib.h", "raylib.h");
-    lib.installHeader("src/raymath.h", "raymath.h");
-    lib.installHeader("src/rlgl.h", "rlgl.h");
-
-    if (options.raygui) {
-        lib.installHeader("../raygui/src/raygui.h", "raygui.h");
-    }
-
-    b.installArtifact(lib);
-}
 
 const srcdir = struct {
     fn getSrcDir() []const u8 {

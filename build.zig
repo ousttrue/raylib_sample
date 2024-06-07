@@ -1,11 +1,13 @@
 const std = @import("std");
 const raylib_build = @import("raylib/build.zig");
+const imgui_build = @import("imgui-1.90.8-docking/build.zig");
 
 const Program = struct {
     name: []const u8,
     path: []const u8,
     includes: []const []const u8 = &.{},
     source: ?[]const u8 = null,
+    sources: []const []const u8 = &.{},
 };
 
 // example.addIncludePath(b.path());
@@ -125,15 +127,28 @@ const examples = [_]Program{
     //     .path = "examples/raygui/property_list/property_list.zig",
     //     .includes = &[_][]const u8{"examples/raygui/property_list"},
     // },
+    .{
+        .name = "rlImGui_simple",
+        .path = "examples/rlImGui/simple.zig",
+        .includes = &.{
+            "rlImGui",
+            "imgui-1.90.8-docking",
+        },
+        .sources = &.{
+            "rlImGui/rlImGui.cpp",
+        },
+    },
 };
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const raylib_compile = raylib_build.addRaylib(b, target, optimize, .{
+    const raylib_compile = raylib_build.compile(b, target, optimize, .{
         .raygui = true,
     });
+
+    const imgui_compile = imgui_build.compile(b, target, optimize);
 
     {
         const exe = b.addExecutable(.{
@@ -162,23 +177,6 @@ pub fn build(b: *std.Build) void {
         exe.linkLibrary(raylib_compile);
     }
 
-    // const run_cmd = b.addRunArtifact(exe);
-    // run_cmd.step.dependOn(b.getInstallStep());
-    // if (b.args) |args| {
-    //     run_cmd.addArgs(args);
-    // }
-    // const run_step = b.step("run", "Run the app");
-    // run_step.dependOn(&run_cmd.step);
-    //
-    // const exe_unit_tests = b.addTest(.{
-    //     .root_source_file = b.path("src/main.zig"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
-    // const test_step = b.step("test", "Run unit tests");
-    // test_step.dependOn(&run_exe_unit_tests.step);
-
     //
     // examples
     //
@@ -194,11 +192,19 @@ pub fn build(b: *std.Build) void {
 
         example.linkLibC();
         example.linkLibrary(raylib_compile);
+        example.linkLibrary(imgui_compile);
 
         // for @cImclude
         example.addIncludePath(b.path("raylib"));
         for (ex.includes) |include| {
             example.addIncludePath(b.path(include));
+        }
+
+        // add c sources
+        if (ex.sources.len > 0) {
+            example.addCSourceFiles(.{
+                .files = ex.sources,
+            });
         }
 
         // add c source
