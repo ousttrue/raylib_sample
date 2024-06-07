@@ -84,6 +84,11 @@ const examples = [_]Program{
     },
     // raygui
     .{
+        .name = "scroll_panel",
+        .path = "examples/raygui/scroll_panel/scroll_panel.zig",
+        .includes = &.{"raygui"},
+    },
+    .{
         .name = "floating_window",
         .path = "examples/raygui/floating_window.zig",
         .includes = &.{"raygui"},
