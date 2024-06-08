@@ -127,9 +127,22 @@ const examples = [_]Program{
     //     .path = "examples/raygui/property_list/property_list.zig",
     //     .includes = &[_][]const u8{"examples/raygui/property_list"},
     // },
+    // rlImGui
     .{
         .name = "rlImGui_simple",
         .path = "examples/rlImGui/simple.zig",
+        .includes = &.{
+            "rlImGui",
+            "cimgui-1.90.8dock",
+            "cimgui-1.90.8dock/imgui",
+        },
+        .sources = &.{
+            "rlImGui/rlImGui.cpp",
+        },
+    },
+    .{
+        .name = "rlImGui_editor",
+        .path = "examples/rlImGui/editor.zig",
         .includes = &.{
             "rlImGui",
             "cimgui-1.90.8dock",
