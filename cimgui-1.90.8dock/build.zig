@@ -14,13 +14,14 @@ pub fn compile(
     imgui.linkLibCpp();
 
     imgui.addCSourceFiles(.{
-        .root = b.path("imgui-1.90.8-docking"),
+        .root = b.path("cimgui-1.90.8dock"),
         .files = &.{
-            "imgui.cpp",
-            "imgui_demo.cpp",
-            "imgui_draw.cpp",
-            "imgui_tables.cpp",
-            "imgui_widgets.cpp",
+            "imgui/imgui.cpp",
+            "imgui/imgui_demo.cpp",
+            "imgui/imgui_draw.cpp",
+            "imgui/imgui_tables.cpp",
+            "imgui/imgui_widgets.cpp",
+            "cimgui.cpp",
         },
     });
 

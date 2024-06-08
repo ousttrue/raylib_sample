@@ -1,6 +1,6 @@
 const std = @import("std");
 const raylib_build = @import("raylib/build.zig");
-const imgui_build = @import("imgui-1.90.8-docking/build.zig");
+const imgui_build = @import("cimgui-1.90.8dock/build.zig");
 
 const Program = struct {
     name: []const u8,
@@ -132,7 +132,8 @@ const examples = [_]Program{
         .path = "examples/rlImGui/simple.zig",
         .includes = &.{
             "rlImGui",
-            "imgui-1.90.8-docking",
+            "cimgui-1.90.8dock",
+            "cimgui-1.90.8dock/imgui",
         },
         .sources = &.{
             "rlImGui/rlImGui.cpp",

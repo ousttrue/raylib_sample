@@ -14,7 +14,9 @@
 const raylib = @cImport({
     @cInclude("raylib.h");
     @cInclude("raymath.h");
-    // #include "imgui.h"
+    @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", "");
+    @cDefine("IMGUI_DISABLE_OBSOLETE_FUNCTIONS", "1");
+    @cInclude("cimgui.h");
     @cInclude("rlImGui.h");
 });
 
@@ -40,10 +42,10 @@ pub fn main() void {
 
         // start ImGui Conent
         raylib.rlImGuiBegin();
-        //
-        // 		// show ImGui Content
-        // 		bool open = true;
-        // 		ImGui::ShowDemoWindow(&open);
+
+        // show ImGui Content
+        var open = true;
+        raylib.igShowDemoWindow(&open);
 
         // end ImGui Content
         raylib.rlImGuiEnd();
