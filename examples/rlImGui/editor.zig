@@ -348,7 +348,7 @@ fn DoMainMenu(ImageViewer: *ImageViewerWindow, SceneView: *SceneViewWindow) void
         if (raylib.igBeginMenu("Window", true)) {
             _ = raylib.igMenuItem_BoolPtr("ImGui Demo", null, &ImGuiDemoOpen, true);
             _ = raylib.igMenuItem_BoolPtr("Image Viewer", null, &ImageViewer.Open, true);
-            _ = raylib.igMenuItem("3D View", null, &SceneView.Open, true);
+            _ = raylib.igMenuItem_BoolPtr("3D View", null, &SceneView.Open, true);
 
             raylib.igEndMenu();
         }

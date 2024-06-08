@@ -152,6 +152,30 @@ const examples = [_]Program{
             "rlImGui/rlImGui.cpp",
         },
     },
+    .{
+        .name = "rlImGui_style",
+        .path = "examples/rlImGui/imgui_style_example.zig",
+        .includes = &.{
+            "rlImGui",
+            "cimgui-1.90.8dock",
+            "cimgui-1.90.8dock/imgui",
+        },
+        .sources = &.{
+            "rlImGui/rlImGui.cpp",
+        },
+    },
+    .{
+        .name = "rlImGui_docking",
+        .path = "examples/rlImGui/docking_example.zig",
+        .includes = &.{
+            "rlImGui",
+            "cimgui-1.90.8dock",
+            "cimgui-1.90.8dock/imgui",
+        },
+        .sources = &.{
+            "rlImGui/rlImGui.cpp",
+        },
+    },
 };
 
 pub fn build(b: *std.Build) void {
