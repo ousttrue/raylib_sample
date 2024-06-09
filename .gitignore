@@ -1,2 +1,8 @@
 .zig-cache
 zig-out
+
+builddir
+prefix
+subprojects/*
+!subprojects/glfw.wrap
+!subprojects/glew.wrap

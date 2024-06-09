@@ -1,5 +1,5 @@
 const std = @import("std");
-const raylib = @cImport({
+const c = @cImport({
     @cInclude("raylib.h");
     @cInclude("rcamera.h");
     @cInclude("raymath.h");
@@ -7,32 +7,32 @@ const raylib = @cImport({
 });
 
 const Scene = struct {
-    cubePosition: raylib.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
-    cameras: []*raylib.Camera,
+    cubePosition: c.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
+    cameras: []*c.Camera,
 
-    pub fn draw(self: @This(), current: *raylib.Camera) void {
-        raylib.BeginMode3D(current.*);
+    pub fn draw(self: @This(), current: *c.Camera) void {
+        c.BeginMode3D(current.*);
 
         for (self.cameras) |camera| {
             if (camera != current) {
-                const m = raylib.MatrixInvert(raylib.GetCameraViewMatrix(camera));
-                const r = raylib.MatrixRotateX(90.0 * raylib.DEG2RAD);
-                const t = raylib.MatrixTranspose(raylib.MatrixMultiply(r, m));
-                raylib.rlPushMatrix();
-                // raylib.rlTranslatef(m.m12, m.m13, m.m14);
-                raylib.rlMultMatrixf(&t.m0);
-                // raylib.DrawCube(.{}, 0.5, 0.5, 0.5, raylib.YELLOW);
-                raylib.DrawCylinderWires(.{}, 0, 2.0, 2, 4, raylib.DARKBLUE);
-                raylib.rlPopMatrix();
+                const m = c.MatrixInvert(c.GetCameraViewMatrix(camera));
+                const r = c.MatrixRotateX(90.0 * c.DEG2RAD);
+                const t = c.MatrixTranspose(c.MatrixMultiply(r, m));
+                c.rlPushMatrix();
+                // c.rlTranslatef(m.m12, m.m13, m.m14);
+                c.rlMultMatrixf(&t.m0);
+                // c.DrawCube(.{}, 0.5, 0.5, 0.5, c.YELLOW);
+                c.DrawCylinderWires(.{}, 0, 2.0, 2, 4, c.DARKBLUE);
+                c.rlPopMatrix();
             }
         }
 
-        raylib.DrawCube(self.cubePosition, 2.0, 2.0, 2.0, raylib.RED);
-        raylib.DrawCubeWires(self.cubePosition, 2.0, 2.0, 2.0, raylib.MAROON);
+        c.DrawCube(self.cubePosition, 2.0, 2.0, 2.0, c.RED);
+        c.DrawCubeWires(self.cubePosition, 2.0, 2.0, 2.0, c.MAROON);
 
-        raylib.DrawGrid(10, 1.0);
+        c.DrawGrid(10, 1.0);
 
-        raylib.EndMode3D();
+        c.EndMode3D();
     }
 };
 
@@ -43,17 +43,17 @@ const OribtCamera = struct {
     shiftX: f32 = 0,
     shiftY: f32 = 0,
 
-    // prevMousePos: raylib.Vector2 = .{ .x = 0, .y = 0 },
+    // prevMousePos: c.Vector2 = .{ .x = 0, .y = 0 },
     const Self = @This();
     fn MouseUpdateCamera(
         self: *Self,
-        camera: *raylib.Camera3D,
-        rect: raylib.Rectangle,
+        camera: *c.Camera3D,
+        rect: c.Rectangle,
     ) bool {
-        const delta = raylib.GetMouseDelta();
+        const delta = c.GetMouseDelta();
 
         // mouse wheel
-        const wheel = raylib.GetMouseWheelMoveV();
+        const wheel = c.GetMouseWheelMoveV();
         if (wheel.y > 0) {
             self.distance *= 0.9;
         } else if (wheel.y < 0) {
@@ -63,8 +63,8 @@ const OribtCamera = struct {
         var active = false;
 
         // camera shift
-        if (raylib.IsMouseButtonDown(raylib.MOUSE_BUTTON_MIDDLE)) {
-            const d = raylib.Vector3Distance(camera.target, camera.position);
+        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
+            const d = c.Vector3Distance(camera.target, camera.position);
             const speed = d * std.math.tan(camera.fovy * 0.5) * 2.0 / rect.height;
             self.shiftX += delta.x * speed;
             self.shiftY += delta.y * speed;
@@ -72,7 +72,7 @@ const OribtCamera = struct {
         }
 
         // yaw pitch
-        if (raylib.IsMouseButtonDown(raylib.MOUSE_BUTTON_RIGHT)) {
+        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
             self.yawDegree -= @intFromFloat(delta.x);
             self.pitchDegree -= @intFromFloat(delta.y);
             if (self.pitchDegree > 89) {
@@ -83,38 +83,38 @@ const OribtCamera = struct {
             active = true;
         }
 
-        const pitch = raylib.MatrixRotateX(
-            @as(f32, @floatFromInt(self.pitchDegree)) * raylib.DEG2RAD,
+        const pitch = c.MatrixRotateX(
+            @as(f32, @floatFromInt(self.pitchDegree)) * c.DEG2RAD,
         );
-        const yaw = raylib.MatrixRotateY(
-            @as(f32, @floatFromInt(-self.yawDegree)) * raylib.DEG2RAD,
+        const yaw = c.MatrixRotateY(
+            @as(f32, @floatFromInt(-self.yawDegree)) * c.DEG2RAD,
         );
-        const translation = raylib.MatrixTranslate(
+        const translation = c.MatrixTranslate(
             -self.shiftX,
             -self.shiftY,
             --self.distance,
         );
 
-        const view = raylib.MatrixMultiply(
-            raylib.MatrixMultiply(yaw, pitch),
+        const view = c.MatrixMultiply(
+            c.MatrixMultiply(yaw, pitch),
             translation,
         );
 
-        const viewInverse = raylib.MatrixInvert(view);
+        const viewInverse = c.MatrixInvert(view);
 
         camera.position = .{
             .x = viewInverse.m12,
             .y = viewInverse.m13,
             .z = viewInverse.m14,
         };
-        const forward = raylib.Vector3{
+        const forward = c.Vector3{
             .x = viewInverse.m8,
             .y = viewInverse.m9,
             .z = viewInverse.m10,
         };
-        camera.target = raylib.Vector3Add(
+        camera.target = c.Vector3Add(
             camera.position,
-            raylib.Vector3Scale(forward, self.distance),
+            c.Vector3Scale(forward, self.distance),
         );
 
         return active;
@@ -122,28 +122,28 @@ const OribtCamera = struct {
 };
 
 const View = struct {
-    rect: raylib.Rectangle = .{},
-    camera: raylib.Camera3D = .{},
+    rect: c.Rectangle = .{},
+    camera: c.Camera3D = .{},
     orbit: OribtCamera = .{},
-    render_texture: ?raylib.RenderTexture2D = null,
+    render_texture: ?c.RenderTexture2D = null,
     is_active: bool = false,
 
     const Self = @This();
 
-    fn make(rect: raylib.Rectangle) Self {
+    fn make(rect: c.Rectangle) Self {
         return .{
             .rect = rect,
-            .camera = raylib.Camera3D{
+            .camera = c.Camera3D{
                 .position = .{ .x = 0.0, .y = 10.0, .z = 10.0 }, // Camera position
                 .target = .{ .x = 0.0, .y = 0.0, .z = 0.0 }, // Camera looking at point
                 .up = .{ .x = 0.0, .y = 1.0, .z = 0.0 }, // Camera up vector (rotation towards target)
                 .fovy = 45.0, // Camera field-of-view Y
-                .projection = raylib.CAMERA_PERSPECTIVE, // Camera mode type
+                .projection = c.CAMERA_PERSPECTIVE, // Camera mode type
             },
         };
     }
 
-    fn contains(self: Self, cursor: raylib.Vector2) bool {
+    fn contains(self: Self, cursor: c.Vector2) bool {
         if (cursor.x < self.rect.x) {
             return false;
         }
@@ -170,12 +170,12 @@ const View = struct {
     fn render(self: *Self, scene: Scene) void {
         const render_texture = self.get_or_create_render_texture();
 
-        raylib.BeginTextureMode(render_texture);
-        raylib.ClearBackground(raylib.SKYBLUE);
+        c.BeginTextureMode(render_texture);
+        c.ClearBackground(c.SKYBLUE);
 
         if (self.is_active) {
-            raylib.DrawText(
-                raylib.TextFormat(
+            c.DrawText(
+                c.TextFormat(
                     "yaw: %d, pitch: %d, shift: %.3f, %.3f, distance: %.3f",
                     self.orbit.yawDegree,
                     self.orbit.pitchDegree,
@@ -186,15 +186,15 @@ const View = struct {
                 0,
                 0,
                 20,
-                raylib.LIGHTGRAY,
+                c.LIGHTGRAY,
             );
         }
 
         scene.draw(&self.camera);
 
-        raylib.EndTextureMode();
+        c.EndTextureMode();
 
-        raylib.DrawTextureRec(
+        c.DrawTextureRec(
             render_texture.texture,
             .{
                 .width = self.rect.width,
@@ -204,15 +204,15 @@ const View = struct {
                 .x = self.rect.x,
                 .y = self.rect.y,
             },
-            raylib.WHITE,
+            c.WHITE,
         );
     }
 
-    fn get_or_create_render_texture(self: *Self) raylib.RenderTexture2D {
+    fn get_or_create_render_texture(self: *Self) c.RenderTexture2D {
         if (self.render_texture) |render_texture| {
             return render_texture;
         } else {
-            const render_texture = raylib.LoadRenderTexture(
+            const render_texture = c.LoadRenderTexture(
                 @intFromFloat(self.rect.width),
                 @intFromFloat(self.rect.height),
             );
@@ -253,7 +253,7 @@ const Focus = struct {
         return focus;
     }
 
-    fn get_active(self: *Self, cursor: raylib.Vector2) ?*View {
+    fn get_active(self: *Self, cursor: c.Vector2) ?*View {
         if (self.active) |view| {
             return view;
         } else {
@@ -272,15 +272,15 @@ const Focus = struct {
 };
 
 pub fn main() !void {
-    raylib.InitWindow(1600, 1200, "experiment");
-    defer raylib.CloseWindow();
+    c.InitWindow(1600, 1200, "experiment");
+    defer c.CloseWindow();
 
-    const w = raylib.GetScreenWidth();
-    const h = raylib.GetScreenHeight();
+    const w = c.GetScreenWidth();
+    const h = c.GetScreenHeight();
 
     var focus = Focus.make(w, h);
 
-    var cameras = [_]*raylib.Camera{
+    var cameras = [_]*c.Camera{
         &focus.views[0].camera,
         &focus.views[1].camera,
     };
@@ -289,13 +289,13 @@ pub fn main() !void {
         .cameras = &cameras,
     };
 
-    while (!raylib.WindowShouldClose()) {
+    while (!c.WindowShouldClose()) {
 
         // render
-        raylib.BeginDrawing();
-        raylib.ClearBackground(raylib.RAYWHITE);
+        c.BeginDrawing();
+        c.ClearBackground(c.RAYWHITE);
 
-        const cursor = raylib.GetMousePosition();
+        const cursor = c.GetMousePosition();
         if (focus.get_active(cursor)) |active| {
             if (active.process()) {
                 focus.set_active(active);
@@ -316,6 +316,6 @@ pub fn main() !void {
             view.render(scene);
         }
 
-        raylib.EndDrawing();
+        c.EndDrawing();
     }
 }

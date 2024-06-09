@@ -176,6 +176,11 @@ const examples = [_]Program{
             "rlImGui/rlImGui.cpp",
         },
     },
+    //
+    .{
+        .name = "tinygizmo",
+        .path = "examples/tiny-gizmo-example/example-main.zig",
+    },
 };
 
 pub fn build(b: *std.Build) void {
