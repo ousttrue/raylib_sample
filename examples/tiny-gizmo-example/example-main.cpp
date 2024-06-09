@@ -5,11 +5,9 @@
 #include <iostream>
 
 #include "gl-api.hpp"
-#include "raylib.h"
+#include <raylib.h>
 #include "teapot.h"
-#include "util.hpp"
-
-using namespace minalg;
+#include "tiny-gizmo.hpp"
 
 static inline uint64_t get_local_time_ns() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -103,16 +101,16 @@ tinygizmo::geometry_mesh make_teapot() {
   tinygizmo::geometry_mesh mesh;
   for (int i = 0; i < 4974; i += 6) {
     tinygizmo::geometry_vertex v;
-    v.position = float3(teapot_vertices[i + 0], teapot_vertices[i + 1],
-                        teapot_vertices[i + 2]);
-    v.normal = float3(teapot_vertices[i + 3], teapot_vertices[i + 4],
-                      teapot_vertices[i + 5]);
+    v.position = minalg::float3(teapot_vertices[i + 0], teapot_vertices[i + 1],
+                                teapot_vertices[i + 2]);
+    v.normal = minalg::float3(teapot_vertices[i + 3], teapot_vertices[i + 4],
+                              teapot_vertices[i + 5]);
     mesh.vertices.push_back(v);
   }
   for (int i = 0; i < 4680; i += 3)
-    mesh.triangles.push_back(uint3(teapot_triangles[i + 0],
-                                   teapot_triangles[i + 1],
-                                   teapot_triangles[i + 2]));
+    mesh.triangles.push_back(minalg::uint3(teapot_triangles[i + 0],
+                                           teapot_triangles[i + 1],
+                                           teapot_triangles[i + 2]));
   return mesh;
 }
 
@@ -158,6 +156,54 @@ void upload_mesh(const tinygizmo::geometry_mesh &cpu, GlMesh &gpu) {
                     sizeof(tinygizmo::geometry_vertex),
                     (GLvoid *)offsetof(tinygizmo::geometry_vertex, color));
   gpu.set_elements(tris, GL_DYNAMIC_DRAW);
+}
+
+struct camera {
+  float yfov, near_clip, far_clip;
+  linalg::aliases::float3 position;
+  float pitch, yaw;
+  linalg::aliases::float4 get_orientation() const {
+    return qmul(rotation_quat(linalg::aliases::float3(0, 1, 0), yaw),
+                rotation_quat(linalg::aliases::float3(1, 0, 0), pitch));
+  }
+  linalg::aliases::float4x4 get_view_matrix() const {
+    return mul(rotation_matrix(qconj(get_orientation())),
+               translation_matrix(-position));
+  }
+  linalg::aliases::float4x4
+  get_projection_matrix(const float aspectRatio) const {
+    return linalg::perspective_matrix(yfov, aspectRatio, near_clip, far_clip);
+  }
+  linalg::aliases::float4x4 get_viewproj_matrix(const float aspectRatio) const {
+    return mul(get_projection_matrix(aspectRatio), get_view_matrix());
+  }
+};
+
+struct ray {
+  linalg::aliases::float3 origin;
+  linalg::aliases::float3 direction;
+};
+
+struct rect {
+  int x0, y0, x1, y1;
+  int width() const { return x1 - x0; }
+  int height() const { return y1 - y0; }
+  linalg::aliases::int2 dims() const { return {width(), height()}; }
+  float aspect_ratio() const { return (float)width() / height(); }
+};
+
+// Returns a world-space ray through the given pixel, originating at the camera
+ray get_ray_from_pixel(const linalg::aliases::float2 &pixel,
+                       const rect &viewport, const camera &cam) {
+  const float x = 2 * (pixel.x - viewport.x0) / viewport.width() - 1,
+              y = 1 - 2 * (pixel.y - viewport.y0) / viewport.height();
+  const linalg::aliases::float4x4 inv_view_proj =
+      inverse(cam.get_viewproj_matrix(viewport.aspect_ratio()));
+  const linalg::aliases::float4 p0 = mul(inv_view_proj,
+                                         linalg::aliases::float4(x, y, -1, 1)),
+                                p1 = mul(inv_view_proj,
+                                         linalg::aliases::float4(x, y, +1, 1));
+  return {cam.position, p1.xyz() * p0.w - p0.xyz() * p1.w};
 }
 
 int main(int argc, char *argv[]) {
