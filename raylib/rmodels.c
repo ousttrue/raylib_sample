@@ -1281,8 +1281,10 @@ void UploadMesh(Mesh *mesh, bool dynamic)
         mesh->vboId[6] = rlLoadVertexBufferElement(mesh->indices, mesh->triangleCount*3*sizeof(unsigned short), dynamic);
     }
 
-    if (mesh->vaoId > 0) TRACELOG(LOG_INFO, "VAO: [ID %i] Mesh uploaded successfully to VRAM (GPU)", mesh->vaoId);
-    else TRACELOG(LOG_INFO, "VBO: Mesh uploaded successfully to VRAM (GPU)");
+    if(!dynamic){
+      if (mesh->vaoId > 0) TRACELOG(LOG_INFO, "VAO: [ID %i] Mesh uploaded successfully to VRAM (GPU)", mesh->vaoId);
+      else TRACELOG(LOG_INFO, "VBO: Mesh uploaded successfully to VRAM (GPU)");
+    }
 
     rlDisableVertexArray();
 #endif

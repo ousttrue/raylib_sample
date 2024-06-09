@@ -1,7 +1,5 @@
 project('tinygizmo', 'c', 'cpp', default_options: ['cpp_std=c++20'])
 
-glew_dep = dependency('glew', default_options: ['default_library=static'])
-
 cc = meson.get_compiler('c')
 winmm_lib = cc.find_library('winmm', required: true)
 gdi32_lib = cc.find_library('gdi32', required: true)
@@ -42,7 +40,6 @@ executable(
         'tinygizmo',
     ),
     dependencies: [
-        glew_dep,
         raylib_dep,
     ],
     cpp_args: ['/utf-8'],
