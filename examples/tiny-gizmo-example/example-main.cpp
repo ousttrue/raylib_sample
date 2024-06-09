@@ -7,7 +7,9 @@
 #include <iostream>
 #include <linalg.h>
 #include <map>
+
 #include <raylib.h>
+#include <rlgl.h>
 
 static inline uint64_t get_local_time_ns() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -645,21 +647,65 @@ ray get_ray_from_pixel(const linalg::aliases::float2 &pixel,
 }
 
 struct Teapot {
-  GlShader shader;
-  GlMesh mesh;
+  Model model = {};
 
-  void upload() {
+  // Generate a simple triangle mesh from code
+  void load() {
     auto teapot = make_teapot();
-    upload_mesh(teapot, this->mesh);
+
+    Mesh mesh = {0};
+    mesh.triangleCount = teapot.triangles.size();
+    mesh.vertexCount = teapot.vertices.size();
+    mesh.vertices = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
+    mesh.normals = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
+    mesh.colors =
+        (unsigned char *)MemAlloc(mesh.vertexCount * 4 * sizeof(unsigned char));
+
+    auto pos = 0;
+    auto nom = 0;
+    auto col = 0;
+    for (auto &v : teapot.vertices) {
+      mesh.vertices[pos++] = v.position.x;
+      mesh.vertices[pos++] = v.position.y;
+      mesh.vertices[pos++] = v.position.z;
+
+      mesh.normals[nom++] = v.normal.x;
+      mesh.normals[nom++] = v.normal.y;
+      mesh.normals[nom++] = v.normal.z;
+
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.x * 255);
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.y * 255);
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.z * 255);
+      mesh.colors[col++] = 255;
+    }
+
+    mesh.indices = (unsigned short *)MemAlloc(mesh.triangleCount * 3 *
+                                              sizeof(unsigned short));
+    auto index = 0;
+    for (auto &t : teapot.triangles) {
+      mesh.indices[index++] = t.x;
+      mesh.indices[index++] = t.y;
+      mesh.indices[index++] = t.z;
+    }
+
+    // Upload mesh data from CPU (RAM) to GPU (VRAM) memory
+    UploadMesh(&mesh, false);
+    this->model = LoadModelFromMesh(mesh);
   }
 
-  void draw(const linalg::aliases::float3 &camera_position,
-            const linalg::aliases::float4x4 &camera_matrix,
-            const minalg::float4x4 &tmp) {
-    auto model_matrix =
-        reinterpret_cast<const linalg::aliases::float4x4 &>(tmp);
-    draw_lit_mesh(this->shader, this->mesh, camera_position, camera_matrix,
-                  model_matrix);
+  void draw(const minalg::float4x4 &tmp) {
+    // auto model_matrix =
+    //     reinterpret_cast<const linalg::aliases::float4x4 &>(tmp);
+    // draw_lit_mesh(this->shader, this->mesh, camera_position, camera_matrix,
+    //               model_matrix);
+
+    rlPushMatrix();
+    // c.rlTranslatef(m.m12, m.m13, m.m14);
+    rlMultMatrixf(&tmp.x.x);
+    // DrawCube({}, 0.5, 0.5, 0.5, YELLOW);
+    DrawModel(this->model, {0, 0, 0}, 1.0f, WHITE);
+    // c.DrawCylinderWires(.{}, 0, 2.0, 2, 4, c.DARKBLUE);
+    rlPopMatrix();
   }
 };
 
@@ -720,10 +766,8 @@ int main(int argc, char *argv[]) {
 
   auto wireframeShader = GlShader(gizmo_vert, gizmo_frag);
 
-  auto teapot = Teapot{
-      .shader = GlShader(lit_vert, lit_frag),
-  };
-  teapot.upload();
+  auto teapot = Teapot{};
+  teapot.load();
 
   gizmo_ctx.render = [&](const tinygizmo::geometry_mesh &r) {
     upload_mesh(r, gizmoEditorMesh);
@@ -823,12 +867,22 @@ int main(int argc, char *argv[]) {
     glClearColor(0.725f, 0.725f, 0.725f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // teapot
-    teapot.draw(cam.position, cam.get_viewproj_matrix(aspect),
-                xform_a.matrix());
+    {
+      auto proj = cam.get_projection_matrix(aspect);
+      rlMatrixMode(RL_PROJECTION); // Switch to projection matrix
+      rlLoadIdentity();            // Reset current matrix (projection)
+      rlMultMatrixf(&proj.x.x);
 
-    teapot.draw(cam.position, cam.get_viewproj_matrix(aspect),
-                xform_b.matrix());
+      rlMatrixMode(RL_MODELVIEW); // Switch to projection matrix
+      rlLoadIdentity();           // Reset current matrix (projection)
+      auto view = cam.get_view_matrix();
+      rlMultMatrixf(&view.x.x);
+
+      // teapot
+      teapot.draw(xform_a.matrix());
+      teapot.draw(xform_b.matrix());
+      DrawGrid(10, 1.0);
+    }
 
     // gizmo
     glClear(GL_DEPTH_BUFFER_BIT);

@@ -17,6 +17,7 @@ raylib_lib = static_library(
         'raylib/rtextures.c',
         'raylib/rshapes.c',
         'raylib/rtext.c',
+        'raylib/rmodels.c',
     ],
     include_directories: include_directories(
         'raylib/external/glfw/include',
