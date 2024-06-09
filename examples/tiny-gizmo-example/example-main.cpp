@@ -1,13 +1,13 @@
 ﻿// This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
-
-#include <chrono>
-#include <iostream>
-
-#include "gl-api.hpp"
-#include <raylib.h>
 #include "teapot.h"
 #include "tiny-gizmo.hpp"
+#include <GL/glew.h>
+#include <chrono>
+#include <iostream>
+#include <linalg.h>
+#include <map>
+#include <raylib.h>
 
 static inline uint64_t get_local_time_ns() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -114,6 +114,444 @@ tinygizmo::geometry_mesh make_teapot() {
   return mesh;
 }
 
+//////////////////
+//   GlShader   //
+//////////////////
+static void compile_shader(GLuint program, GLenum type, const char *source) {
+  GLuint shader = glCreateShader(type);
+  glShaderSource(shader, 1, &source, nullptr);
+  glCompileShader(shader);
+
+  GLint status, length;
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+
+  if (status == GL_FALSE) {
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
+    std::vector<GLchar> buffer(length);
+    glGetShaderInfoLog(shader, (GLsizei)buffer.size(), nullptr, buffer.data());
+    glDeleteShader(shader);
+    std::cerr << "GL Compile Error: " << buffer.data() << std::endl;
+    std::cerr << "Source: " << source << std::endl;
+    throw std::runtime_error("GLSL Compile Failure");
+  }
+
+  glAttachShader(program, shader);
+  glDeleteShader(shader);
+}
+
+class GlShader {
+  GLuint program;
+  bool enabled = false;
+
+protected:
+  GlShader(const GlShader &r) = delete;
+  GlShader &operator=(const GlShader &r) = delete;
+
+public:
+  GlShader() : program() {}
+
+  GlShader(const GLuint type, const std::string &src) {
+    program = glCreateProgram();
+
+    compile_shader(program, type, src.c_str());
+    glProgramParameteri(program, GL_PROGRAM_SEPARABLE, GL_TRUE);
+
+    glLinkProgram(program);
+
+    GLint status, length;
+    glGetProgramiv(program, GL_LINK_STATUS, &status);
+
+    if (status == GL_FALSE) {
+      glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+      std::vector<GLchar> buffer(length);
+      glGetProgramInfoLog(program, (GLsizei)buffer.size(), nullptr,
+                          buffer.data());
+      std::cerr << "GL Link Error: " << buffer.data() << std::endl;
+      throw std::runtime_error("GLSL Link Failure");
+    }
+  }
+
+  GlShader(const std::string &vert, const std::string &frag,
+           const std::string &geom = "") {
+    program = glCreateProgram();
+
+    glProgramParameteri(program, GL_PROGRAM_SEPARABLE, GL_FALSE);
+
+    ::compile_shader(program, GL_VERTEX_SHADER, vert.c_str());
+    ::compile_shader(program, GL_FRAGMENT_SHADER, frag.c_str());
+
+    if (geom.length() != 0)
+      ::compile_shader(program, GL_GEOMETRY_SHADER, geom.c_str());
+
+    glLinkProgram(program);
+
+    GLint status, length;
+    glGetProgramiv(program, GL_LINK_STATUS, &status);
+
+    if (status == GL_FALSE) {
+      glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+      std::vector<GLchar> buffer(length);
+      glGetProgramInfoLog(program, (GLsizei)buffer.size(), nullptr,
+                          buffer.data());
+      std::cerr << "GL Link Error: " << buffer.data() << std::endl;
+      throw std::runtime_error("GLSL Link Failure");
+    }
+  }
+
+  ~GlShader() {
+    if (program)
+      glDeleteProgram(program);
+  }
+
+  GlShader(GlShader &&r) : GlShader() { *this = std::move(r); }
+
+  GLuint handle() const { return program; }
+  GLint get_uniform_location(const std::string &name) const {
+    return glGetUniformLocation(program, name.c_str());
+  }
+
+  GlShader &operator=(GlShader &&r) {
+    std::swap(program, r.program);
+    return *this;
+  }
+
+  std::map<uint32_t, std::string> reflect() {
+    std::map<uint32_t, std::string> locations;
+    GLint count;
+    glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &count);
+    for (GLuint i = 0; i < static_cast<GLuint>(count); ++i) {
+      char buffer[1024];
+      GLenum type;
+      GLsizei length;
+      GLint size, block_index;
+      glGetActiveUniform(program, i, sizeof(buffer), &length, &size, &type,
+                         buffer);
+      glGetActiveUniformsiv(program, 1, &i, GL_UNIFORM_BLOCK_INDEX,
+                            &block_index);
+      if (block_index != -1)
+        continue;
+      GLint loc = glGetUniformLocation(program, buffer);
+      locations[loc] = std::string(buffer);
+    }
+    return locations;
+  }
+
+  void uniform(const std::string &name, int scalar) const {
+    glProgramUniform1i(program, get_uniform_location(name), scalar);
+  }
+  void uniform(const std::string &name, float scalar) const {
+    glProgramUniform1f(program, get_uniform_location(name), scalar);
+  }
+  void uniform(const std::string &name,
+               const linalg::aliases::float2 &vec) const {
+    glProgramUniform2fv(program, get_uniform_location(name), 1, &vec.x);
+  }
+  void uniform(const std::string &name,
+               const linalg::aliases::float3 &vec) const {
+    glProgramUniform3fv(program, get_uniform_location(name), 1, &vec.x);
+  }
+  void uniform(const std::string &name,
+               const linalg::aliases::float4 &vec) const {
+    glProgramUniform4fv(program, get_uniform_location(name), 1, &vec.x);
+  }
+  void uniform(const std::string &name,
+               const linalg::aliases::float3x3 &mat) const {
+    glProgramUniformMatrix3fv(program, get_uniform_location(name), 1, GL_FALSE,
+                              &mat.x.x);
+  }
+  void uniform(const std::string &name,
+               const linalg::aliases::float4x4 &mat) const {
+    glProgramUniformMatrix4fv(program, get_uniform_location(name), 1, GL_FALSE,
+                              &mat.x.x);
+  }
+
+  void uniform(const std::string &name, const int elements,
+               const std::vector<int> &scalar) const {
+    glProgramUniform1iv(program, get_uniform_location(name), elements,
+                        scalar.data());
+  }
+  void uniform(const std::string &name, const int elements,
+               const std::vector<float> &scalar) const {
+    glProgramUniform1fv(program, get_uniform_location(name), elements,
+                        scalar.data());
+  }
+  void uniform(const std::string &name, const int elements,
+               const std::vector<linalg::aliases::float2> &vec) const {
+    glProgramUniform2fv(program, get_uniform_location(name), elements,
+                        &vec[0].x);
+  }
+  void uniform(const std::string &name, const int elements,
+               const std::vector<linalg::aliases::float3> &vec) const {
+    glProgramUniform3fv(program, get_uniform_location(name), elements,
+                        &vec[0].x);
+  }
+  void uniform(const std::string &name, const int elements,
+               const std::vector<linalg::aliases::float3x3> &mat) const {
+    glProgramUniformMatrix3fv(program, get_uniform_location(name), elements,
+                              GL_FALSE, &mat[0].x.x);
+  }
+  void uniform(const std::string &name, const int elements,
+               const std::vector<linalg::aliases::float4x4> &mat) const {
+    glProgramUniformMatrix4fv(program, get_uniform_location(name), elements,
+                              GL_FALSE, &mat[0].x.x);
+  }
+
+  void texture(GLint loc, GLenum target, int unit, GLuint tex) const {
+    glBindMultiTextureEXT(GL_TEXTURE0 + unit, target, tex);
+    glProgramUniform1i(program, loc, unit);
+  }
+
+  void texture(const char *name, int unit, GLuint tex, GLenum target) const {
+    texture(get_uniform_location(name), target, unit, tex);
+  }
+
+  void bind() {
+    if (program > 0)
+      enabled = true;
+    glUseProgram(program);
+  }
+  void unbind() {
+    enabled = false;
+    glUseProgram(0);
+  }
+};
+
+////////////////
+//   GlMesh   //
+////////////////
+template <typename factory_t> class GlObject {
+  mutable GLuint handle = 0;
+  std::string n;
+
+public:
+  GlObject() {}
+  GlObject(GLuint h) : handle(h) {}
+  ~GlObject() {
+    if (handle)
+      factory_t::destroy(handle);
+  }
+  GlObject(const GlObject &r) = delete;
+  GlObject &operator=(GlObject &&r) {
+    std::swap(handle, r.handle);
+    std::swap(n, r.n);
+    return *this;
+  }
+  GlObject(GlObject &&r) { *this = std::move(r); }
+  operator GLuint() const {
+    if (!handle)
+      factory_t::create(handle);
+    return handle;
+  }
+  GlObject &operator=(GLuint &other) {
+    handle = other;
+    return *this;
+  }
+  void set_name(const std::string &newName) { n = newName; }
+  std::string name() const { return n; }
+  GLuint id() const { return handle; };
+};
+struct GlVertexArrayFactory {
+  static void create(GLuint &x) { glGenVertexArrays(1, &x); };
+  static void destroy(GLuint x) { glDeleteVertexArrays(1, &x); };
+};
+typedef GlObject<GlVertexArrayFactory> GlVertexArrayObject;
+
+//////////////////
+//   GlBuffer   //
+//////////////////
+struct GlBufferFactory {
+  static void create(GLuint &x) { glGenBuffers(1, &x); };
+  static void destroy(GLuint x) { glDeleteBuffers(1, &x); };
+};
+typedef GlObject<GlBufferFactory> GlBufferObject;
+
+struct GlBuffer : public GlBufferObject {
+  GLsizeiptr size;
+  GlBuffer() {}
+  void set_buffer_data(const GLsizeiptr s, const GLvoid *data,
+                       const GLenum usage) {
+    this->size = s;
+    glNamedBufferDataEXT(*this, size, data, usage);
+  }
+  void set_buffer_data(const std::vector<GLubyte> &bytes, const GLenum usage) {
+    set_buffer_data(bytes.size(), bytes.data(), usage);
+  }
+  void set_buffer_sub_data(const GLsizeiptr s, const GLintptr offset,
+                           const GLvoid *data) {
+    glNamedBufferSubDataEXT(*this, offset, s, data);
+  }
+  void set_buffer_sub_data(const std::vector<GLubyte> &bytes,
+                           const GLintptr offset, const GLenum usage) {
+    set_buffer_sub_data(bytes.size(), offset, bytes.data());
+  }
+};
+
+static size_t gl_size_bytes(GLenum type) {
+  switch (type) {
+  case GL_UNSIGNED_BYTE:
+    return sizeof(uint8_t);
+  case GL_UNSIGNED_SHORT:
+    return sizeof(uint16_t);
+  case GL_UNSIGNED_INT:
+    return sizeof(uint32_t);
+  default:
+    throw std::logic_error("unknown element type");
+    break;
+  }
+}
+
+class GlMesh {
+  GlVertexArrayObject vao;
+  GlBuffer vertexBuffer, instanceBuffer, indexBuffer;
+
+  GLenum drawMode = GL_TRIANGLES;
+  GLenum indexType = 0;
+  GLsizei vertexStride = 0, instanceStride = 0, indexCount = 0;
+
+public:
+  GlMesh() {}
+  GlMesh(GlMesh &&r) { *this = std::move(r); }
+  GlMesh(const GlMesh &r) = delete;
+  GlMesh &operator=(GlMesh &&r) {
+    char buffer[sizeof(GlMesh)];
+    memcpy(buffer, this, sizeof(buffer));
+    memcpy(this, &r, sizeof(buffer));
+    memcpy(&r, buffer, sizeof(buffer));
+    return *this;
+  }
+  GlMesh &operator=(const GlMesh &r) = delete;
+  ~GlMesh(){};
+
+  void set_non_indexed(GLenum newMode) {
+    drawMode = newMode;
+    indexBuffer = {};
+    indexType = 0;
+    indexCount = 0;
+  }
+
+  void draw_elements(int instances = 0) const {
+    if (vertexBuffer.size) {
+      glBindVertexArray(vao);
+      if (indexCount) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        if (instances)
+          glDrawElementsInstanced(drawMode, indexCount, indexType, 0,
+                                  instances);
+        else
+          glDrawElements(drawMode, indexCount, indexType, nullptr);
+      } else {
+        if (instances)
+          glDrawArraysInstanced(
+              drawMode, 0,
+              static_cast<GLsizei>(vertexBuffer.size / vertexStride),
+              instances);
+        else
+          glDrawArrays(drawMode, 0,
+                       static_cast<GLsizei>(vertexBuffer.size / vertexStride));
+      }
+      glBindVertexArray(0);
+    }
+  }
+
+  void set_vertex_data(GLsizeiptr size, const GLvoid *data, GLenum usage) {
+    vertexBuffer.set_buffer_data(size, data, usage);
+  }
+  GlBuffer &get_vertex_data_buffer() { return vertexBuffer; };
+
+  void set_instance_data(GLsizeiptr size, const GLvoid *data, GLenum usage) {
+    instanceBuffer.set_buffer_data(size, data, usage);
+  }
+
+  void set_index_data(GLenum mode, GLenum type, GLsizei count,
+                      const GLvoid *data, GLenum usage) {
+    size_t size = gl_size_bytes(type);
+    indexBuffer.set_buffer_data(size * count, data, usage);
+    drawMode = mode;
+    indexType = type;
+    indexCount = count;
+  }
+  GlBuffer &get_index_data_buffer() { return indexBuffer; };
+
+  void set_attribute(GLuint index, GLint size, GLenum type,
+                     GLboolean normalized, GLsizei stride,
+                     const GLvoid *offset) {
+    glEnableVertexArrayAttribEXT(vao, index);
+    glVertexArrayVertexAttribOffsetEXT(vao, vertexBuffer, index, size, type,
+                                       normalized, stride, (GLintptr)offset);
+    vertexStride = stride;
+  }
+
+  void set_instance_attribute(GLuint index, GLint size, GLenum type,
+                              GLboolean normalized, GLsizei stride,
+                              const GLvoid *offset) {
+    glEnableVertexArrayAttribEXT(vao, index);
+    glVertexArrayVertexAttribOffsetEXT(vao, instanceBuffer, index, size, type,
+                                       normalized, stride, (GLintptr)offset);
+    glVertexArrayVertexAttribDivisorEXT(vao, index, 1);
+    instanceStride = stride;
+  }
+
+  void set_indices(GLenum mode, GLsizei count, const uint8_t *indices,
+                   GLenum usage) {
+    set_index_data(mode, GL_UNSIGNED_BYTE, count, indices, usage);
+  }
+  void set_indices(GLenum mode, GLsizei count, const uint16_t *indices,
+                   GLenum usage) {
+    set_index_data(mode, GL_UNSIGNED_SHORT, count, indices, usage);
+  }
+  void set_indices(GLenum mode, GLsizei count, const uint32_t *indices,
+                   GLenum usage) {
+    set_index_data(mode, GL_UNSIGNED_INT, count, indices, usage);
+  }
+
+  template <class T>
+  void set_vertices(size_t count, const T *vertices, GLenum usage) {
+    set_vertex_data(count * sizeof(T), vertices, usage);
+  }
+  template <class T>
+  void set_vertices(const std::vector<T> &vertices, GLenum usage) {
+    set_vertices(vertices.size(), vertices.data(), usage);
+  }
+  template <class T, int N>
+  void set_vertices(const T (&vertices)[N], GLenum usage) {
+    set_vertices(N, vertices, usage);
+  }
+
+  template <class V> void set_attribute(GLuint index, float V::*field) {
+    set_attribute(index, 1, GL_FLOAT, GL_FALSE, sizeof(V), &(((V *)0)->*field));
+  }
+  template <class V, int N>
+  void set_attribute(GLuint index, linalg::vec<float, N> V::*field) {
+    set_attribute(index, N, GL_FLOAT, GL_FALSE, sizeof(V), &(((V *)0)->*field));
+  }
+
+  template <class T>
+  void set_elements(GLsizei count, const linalg::vec<T, 2> *elements,
+                    GLenum usage) {
+    set_indices(GL_LINES, count * 2, &elements->x, usage);
+  }
+  template <class T>
+  void set_elements(GLsizei count, const linalg::vec<T, 3> *elements,
+                    GLenum usage) {
+    set_indices(GL_TRIANGLES, count * 3, &elements->x, usage);
+  }
+  template <class T>
+  void set_elements(GLsizei count, const linalg::vec<T, 4> *elements,
+                    GLenum usage) {
+    set_indices(GL_QUADS, count * 4, &elements->x, usage);
+  }
+
+  template <class T>
+  void set_elements(const std::vector<T> &elements, GLenum usage) {
+    set_elements((GLsizei)elements.size(), elements.data(), usage);
+  }
+
+  template <class T, int N>
+  void set_elements(const T (&elements)[N], GLenum usage) {
+    set_elements(N, elements, usage);
+  }
+};
+
 void draw_mesh(GlShader &shader, GlMesh &mesh,
                const linalg::aliases::float3 eye,
                const linalg::aliases::float4x4 &viewProj,
@@ -206,6 +644,53 @@ ray get_ray_from_pixel(const linalg::aliases::float2 &pixel,
   return {cam.position, p1.xyz() * p0.w - p0.xyz() * p1.w};
 }
 
+struct Teapot {
+  GlShader shader;
+  GlMesh mesh;
+
+  void upload() {
+    auto teapot = make_teapot();
+    upload_mesh(teapot, this->mesh);
+  }
+
+  void draw(const linalg::aliases::float3 &camera_position,
+            const linalg::aliases::float4x4 &camera_matrix,
+            const minalg::float4x4 &tmp) {
+    auto model_matrix =
+        reinterpret_cast<const linalg::aliases::float4x4 &>(tmp);
+    draw_lit_mesh(this->shader, this->mesh, camera_position, camera_matrix,
+                  model_matrix);
+  }
+};
+
+static void gl_check_error(const char *file, int32_t line) {
+#if defined(_DEBUG) || defined(DEBUG)
+  GLint error = glGetError();
+  if (error) {
+    const char *errorStr = 0;
+    switch (error) {
+    case GL_INVALID_ENUM:
+      errorStr = "GL_INVALID_ENUM";
+      break;
+    case GL_INVALID_VALUE:
+      errorStr = "GL_INVALID_VALUE";
+      break;
+    case GL_INVALID_OPERATION:
+      errorStr = "GL_INVALID_OPERATION";
+      break;
+    case GL_OUT_OF_MEMORY:
+      errorStr = "GL_OUT_OF_MEMORY";
+      break;
+    default:
+      errorStr = "unknown error";
+      break;
+    }
+    printf("GL error : %s, line %d : %s\n", file, line, errorStr);
+    error = 0;
+  }
+#endif
+}
+
 int main(int argc, char *argv[]) {
   bool ml = {};
   bool mr = {};
@@ -231,13 +716,14 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  GlMesh gizmoEditorMesh, teapotMesh;
+  GlMesh gizmoEditorMesh;
 
   auto wireframeShader = GlShader(gizmo_vert, gizmo_frag);
-  auto litShader = GlShader(lit_vert, lit_frag);
 
-  tinygizmo::geometry_mesh teapot = make_teapot();
-  upload_mesh(teapot, teapotMesh);
+  auto teapot = Teapot{
+      .shader = GlShader(lit_vert, lit_frag),
+  };
+  teapot.upload();
 
   gizmo_ctx.render = [&](const tinygizmo::geometry_mesh &r) {
     upload_mesh(r, gizmoEditorMesh);
@@ -259,8 +745,16 @@ int main(int argc, char *argv[]) {
 
   auto t0 = std::chrono::high_resolution_clock::now();
   while (!WindowShouldClose()) {
+    auto w = GetScreenWidth();
+    auto h = GetScreenHeight();
+    auto aspect = static_cast<float>(w) / static_cast<float>(h);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    float timestep = std::chrono::duration<float>(t1 - t0).count();
+    t0 = t1;
+
     BeginDrawing();
 
+    // keyboard
     gizmo_state.hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL);
     gizmo_state.hotkey_local = IsKeyDown(KEY_L);
     gizmo_state.hotkey_translate = IsKeyDown(KEY_T);
@@ -270,24 +764,18 @@ int main(int argc, char *argv[]) {
     bl = IsKeyDown(KEY_A);
     bb = IsKeyDown(KEY_S);
     br = IsKeyDown(KEY_D);
-
+    // mouse
     gizmo_state.mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     ml = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     mr = IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
-
     auto position = GetMousePosition();
     auto deltaCursorMotion =
         minalg::float2(position.x, position.y) - lastCursor;
+    lastCursor = minalg::float2(position.x, position.y);
     if (mr) {
       cam.yaw -= deltaCursorMotion.x * 0.01f;
       cam.pitch -= deltaCursorMotion.y * 0.01f;
     }
-    lastCursor = minalg::float2(position.x, position.y);
-
-    auto t1 = std::chrono::high_resolution_clock::now();
-    float timestep = std::chrono::duration<float>(t1 - t0).count();
-    t0 = t1;
-
     if (mr) {
       const linalg::aliases::float4 orientation = cam.get_orientation();
       linalg::aliases::float3 move;
@@ -303,23 +791,11 @@ int main(int argc, char *argv[]) {
         cam.position += normalize(move) * (timestep * 10);
     }
 
-    auto w = GetScreenWidth();
-    auto h = GetScreenHeight();
-
-    glViewport(0, 0, w, h);
-
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glClearColor(0.725f, 0.725f, 0.725f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+    // gizmo
     auto cameraOrientation = cam.get_orientation();
-
     const auto rayDir =
         get_ray_from_pixel({lastCursor.x, lastCursor.y}, {0, 0, w, h}, cam)
             .direction;
-
     // Gizmo input interaction state populated via win->on_input(...) callback
     // above. Update app parameters:
     gizmo_state.viewport_size =
@@ -338,25 +814,24 @@ int main(int argc, char *argv[]) {
     // gizmo_state.screenspace_scale = 80.f; // optional flag to draw the gizmos
     // at a constant screen-space scale
 
+    // render
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);
-    auto teapotModelMatrix_a_tmp = xform_a.matrix();
-    auto teapotModelMatrix_a =
-        reinterpret_cast<const linalg::aliases::float4x4 &>(
-            teapotModelMatrix_a_tmp);
-    draw_lit_mesh(litShader, teapotMesh, cam.position,
-                  cam.get_viewproj_matrix((float)w / (float)h),
-                  teapotModelMatrix_a);
+    glViewport(0, 0, w, h);
+    glClearColor(0.725f, 0.725f, 0.725f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    auto teapotModelMatrix_b_tmp = xform_b.matrix();
-    auto teapotModelMatrix_b =
-        reinterpret_cast<const linalg::aliases::float4x4 &>(
-            teapotModelMatrix_b_tmp);
-    draw_lit_mesh(litShader, teapotMesh, cam.position,
-                  cam.get_viewproj_matrix((float)w / (float)h),
-                  teapotModelMatrix_b);
+    // teapot
+    teapot.draw(cam.position, cam.get_viewproj_matrix(aspect),
+                xform_a.matrix());
 
+    teapot.draw(cam.position, cam.get_viewproj_matrix(aspect),
+                xform_b.matrix());
+
+    // gizmo
     glClear(GL_DEPTH_BUFFER_BIT);
-
     gizmo_ctx.update(gizmo_state);
 
     if (transform_gizmo("first-example-gizmo", gizmo_ctx, xform_a)) {

@@ -1,4 +1,4 @@
-project('tinygizmo', 'c', 'cpp')
+project('tinygizmo', 'c', 'cpp', default_options: ['cpp_std=c++20'])
 
 glew_dep = dependency('glew', default_options: ['default_library=static'])
 
