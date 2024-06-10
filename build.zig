@@ -177,10 +177,10 @@ const examples = [_]Program{
         },
     },
     //
-    .{
-        .name = "tinygizmo",
-        .path = "examples/tiny-gizmo-example/example-main.zig",
-    },
+    // .{
+    //     .name = "tinygizmo",
+    //     .path = "examples/tiny-gizmo-example/example-main.zig",
+    // },
 };
 
 pub fn build(b: *std.Build) void {

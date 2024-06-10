@@ -43,29 +43,29 @@ const OribtCamera = struct {
     shiftX: f32 = 0,
     shiftY: f32 = 0,
 
-    // prevMousePos: c.Vector2 = .{ .x = 0, .y = 0 },
     const Self = @This();
     fn MouseUpdateCamera(
         self: *Self,
-        camera: *c.Camera3D,
+        distance: f32,
+        fovy: f32,
         rect: c.Rectangle,
     ) bool {
         const delta = c.GetMouseDelta();
+        var active = false;
 
         // mouse wheel
         const wheel = c.GetMouseWheelMoveV();
         if (wheel.y > 0) {
             self.distance *= 0.9;
+            active = true;
         } else if (wheel.y < 0) {
             self.distance *= 1.1;
+            active = true;
         }
-
-        var active = false;
 
         // camera shift
         if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
-            const d = c.Vector3Distance(camera.target, camera.position);
-            const speed = d * std.math.tan(camera.fovy * 0.5) * 2.0 / rect.height;
+            const speed = distance * std.math.tan(fovy * 0.5) * 2.0 / rect.height;
             self.shiftX += delta.x * speed;
             self.shiftY += delta.y * speed;
             active = true;
@@ -83,6 +83,10 @@ const OribtCamera = struct {
             active = true;
         }
 
+        return active;
+    }
+
+    fn update_view(self: *@This(), camera: *c.Camera3D) void {
         const pitch = c.MatrixRotateX(
             @as(f32, @floatFromInt(self.pitchDegree)) * c.DEG2RAD,
         );
@@ -116,8 +120,6 @@ const OribtCamera = struct {
             camera.position,
             c.Vector3Scale(forward, self.distance),
         );
-
-        return active;
     }
 };
 
@@ -160,10 +162,15 @@ const View = struct {
     }
 
     fn process(self: *Self) bool {
+        const distance = c.Vector3Distance(self.camera.target, self.camera.position);
         self.is_active = self.orbit.MouseUpdateCamera(
-            &self.camera,
+            distance,
+            self.camera.fovy,
             self.rect,
         );
+        if (self.is_active) {
+            self.orbit.update_view(&self.camera);
+        }
         return self.is_active;
     }
 
