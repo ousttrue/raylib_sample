@@ -1,4 +1,4 @@
-project('tinygizmo', 'c', 'cpp', default_options: ['cpp_std=c++20'])
+project('tinygizmo', 'c', 'cpp', default_options: ['cpp_std=c++latest'])
 
 cc = meson.get_compiler('c')
 winmm_lib = cc.find_library('winmm', required: true)

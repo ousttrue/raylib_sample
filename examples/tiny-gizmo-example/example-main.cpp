@@ -1,14 +1,17 @@
 ﻿// This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
+#include "teapot.h"
+
 #include "tiny-gizmo.hpp"
+#include <linalg.h>
+
 #include <raylib.h>
 #include <raylib/external/glad.h>
 #include <rlgl.h>
 
-#include "teapot.h"
 #include <chrono>
 #include <iostream>
-#include <linalg.h>
+#include <span>
 
 static inline uint64_t get_local_time_ns() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -16,41 +19,110 @@ static inline uint64_t get_local_time_ns() {
       .count();
 }
 
-tinygizmo::geometry_mesh make_teapot() {
-  tinygizmo::geometry_mesh mesh;
-  for (int i = 0; i < 4974; i += 6) {
-    tinygizmo::geometry_vertex v;
-    v.position = minalg::float3(teapot_vertices[i + 0], teapot_vertices[i + 1],
-                                teapot_vertices[i + 2]);
-    v.normal = minalg::float3(teapot_vertices[i + 3], teapot_vertices[i + 4],
-                              teapot_vertices[i + 5]);
-    mesh.vertices.push_back(v);
+struct Drawable {
+  Model model = {};
+
+  // Generate a simple triangle mesh from code
+  template <typename V, typename I>
+  void load(std::span<const V> vertices, std::span<const I> indices, bool dynamic) {
+
+    Mesh mesh = {0};
+
+    // vertices
+    mesh.vertexCount = vertices.size();
+    mesh.vertices = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
+    // mesh.normals = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
+    mesh.colors =
+        (unsigned char *)MemAlloc(mesh.vertexCount * 4 * sizeof(unsigned char));
+    auto pos = 0;
+    // auto nom = 0;
+    auto col = 0;
+    for (auto &v : vertices) {
+      mesh.vertices[pos++] = v.position.x;
+      mesh.vertices[pos++] = v.position.y;
+      mesh.vertices[pos++] = v.position.z;
+
+      // mesh.normals[nom++] = v.normal.x;
+      // mesh.normals[nom++] = v.normal.y;
+      // mesh.normals[nom++] = v.normal.z;
+
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.x * 255);
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.y * 255);
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.z * 255);
+      mesh.colors[col++] = 255;
+    }
+
+    mesh.triangleCount = indices.size() / 3;
+    mesh.indices = (unsigned short *)MemAlloc(mesh.triangleCount * 3 *
+                                              sizeof(unsigned short));
+    auto index = 0;
+    for (auto &i : indices) {
+      mesh.indices[index++] = i;
+    }
+
+    // Upload mesh data from CPU (RAM) to GPU (VRAM) memory
+    UploadMesh(&mesh, dynamic);
+    this->model = LoadModelFromMesh(mesh);
   }
-  for (int i = 0; i < 4680; i += 3)
-    mesh.triangles.push_back(minalg::uint3(teapot_triangles[i + 0],
-                                           teapot_triangles[i + 1],
-                                           teapot_triangles[i + 2]));
-  return mesh;
-}
+
+  void draw(const float m[16]) {
+    rlPushMatrix();
+    // c.rlTranslatef(m.m12, m.m13, m.m14);
+    rlMultMatrixf(m);
+    // DrawCube({}, 0.5, 0.5, 0.5, YELLOW);
+    DrawModel(this->model, {0, 0, 0}, 1.0f, WHITE);
+    // c.DrawCylinderWires(.{}, 0, 2.0, 2, 4, c.DARKBLUE);
+    rlPopMatrix();
+  }
+};
 
 struct camera {
-  float yfov, near_clip, far_clip;
+  float yfov;
+  float near_clip;
+  float far_clip;
   linalg::aliases::float3 position;
-  float pitch, yaw;
-  linalg::aliases::float4 get_orientation() const {
+  Camera3D camera;
+  float pitch;
+  float yaw;
+
+  linalg::aliases::float4 rotation() const {
     return qmul(rotation_quat(linalg::aliases::float3(0, 1, 0), yaw),
                 rotation_quat(linalg::aliases::float3(1, 0, 0), pitch));
   }
+
   linalg::aliases::float4x4 get_view_matrix() const {
-    return mul(rotation_matrix(qconj(get_orientation())),
+    return mul(rotation_matrix(qconj(rotation())),
                translation_matrix(-position));
   }
+
   linalg::aliases::float4x4
   get_projection_matrix(const float aspectRatio) const {
     return linalg::perspective_matrix(yfov, aspectRatio, near_clip, far_clip);
   }
+
   linalg::aliases::float4x4 get_viewproj_matrix(const float aspectRatio) const {
     return mul(get_projection_matrix(aspectRatio), get_view_matrix());
+  }
+
+  void shift(float timestep) {
+    auto bf = IsKeyDown(KEY_W);
+    auto bl = IsKeyDown(KEY_A);
+    auto bb = IsKeyDown(KEY_S);
+    auto br = IsKeyDown(KEY_D);
+
+    auto orientation = this->rotation();
+    linalg::aliases::float3 move;
+    if (bf)
+      move -= qzdir(orientation);
+    if (bl)
+      move -= qxdir(orientation);
+    if (bb)
+      move += qzdir(orientation);
+    if (br)
+      move += qxdir(orientation);
+    if (length2(move) > 0) {
+      this->position += normalize(move) * (timestep * 10);
+    }
   }
 };
 
@@ -81,71 +153,13 @@ ray get_ray_from_pixel(const linalg::aliases::float2 &pixel,
   return {cam.position, p1.xyz() * p0.w - p0.xyz() * p1.w};
 }
 
-struct Drawable {
-  Model model = {};
-
-  // Generate a simple triangle mesh from code
-  void load(const tinygizmo::geometry_mesh &geometry, bool dynamic) {
-
-    Mesh mesh = {0};
-    mesh.triangleCount = geometry.triangles.size();
-    mesh.vertexCount = geometry.vertices.size();
-    mesh.vertices = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
-    mesh.normals = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
-    mesh.colors =
-        (unsigned char *)MemAlloc(mesh.vertexCount * 4 * sizeof(unsigned char));
-
-    auto pos = 0;
-    auto nom = 0;
-    auto col = 0;
-    for (auto &v : geometry.vertices) {
-      mesh.vertices[pos++] = v.position.x;
-      mesh.vertices[pos++] = v.position.y;
-      mesh.vertices[pos++] = v.position.z;
-
-      mesh.normals[nom++] = v.normal.x;
-      mesh.normals[nom++] = v.normal.y;
-      mesh.normals[nom++] = v.normal.z;
-
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.x * 255);
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.y * 255);
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.z * 255);
-      mesh.colors[col++] = 255;
-    }
-
-    mesh.indices = (unsigned short *)MemAlloc(mesh.triangleCount * 3 *
-                                              sizeof(unsigned short));
-    auto index = 0;
-    for (auto &t : geometry.triangles) {
-      mesh.indices[index++] = t.x;
-      mesh.indices[index++] = t.y;
-      mesh.indices[index++] = t.z;
-    }
-
-    // Upload mesh data from CPU (RAM) to GPU (VRAM) memory
-    UploadMesh(&mesh, dynamic);
-    this->model = LoadModelFromMesh(mesh);
-  }
-
-  void draw(const float m[16]) {
-    rlPushMatrix();
-    // c.rlTranslatef(m.m12, m.m13, m.m14);
-    rlMultMatrixf(m);
-    // DrawCube({}, 0.5, 0.5, 0.5, YELLOW);
-    DrawModel(this->model, {0, 0, 0}, 1.0f, WHITE);
-    // c.DrawCylinderWires(.{}, 0, 2.0, 2, 4, c.DARKBLUE);
-    rlPopMatrix();
-  }
+struct TeapotVertex
+{
+  Vector3 position;
+  Vector3 color;
 };
 
 int main(int argc, char *argv[]) {
-  bool ml = {};
-  bool mr = {};
-  bool bf = {};
-  bool bl = {};
-  bool bb = {};
-  bool br = {};
-
   camera cam = {};
   cam.yfov = 1.0f;
   cam.near_clip = 0.01f;
@@ -156,28 +170,22 @@ int main(int argc, char *argv[]) {
   tinygizmo::gizmo_context gizmo_ctx;
 
   InitWindow(1280, 800, "tiny-gizmo-example-app");
-  // GLenum err = glewInit();
-  // if (GLEW_OK != err) {
-  //   /* Problem: glewInit failed, something is seriously wrong. */
-  //   fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
-  //   return 1;
-  // }
 
   auto teapot = Drawable{};
   {
-    auto teapot_mesh = make_teapot();
-    teapot.load(teapot_mesh, false);
+    // auto teapot_mesh = make_teapot();
+    teapot.load<TeapotVertex, uint32_t>(
+        {(TeapotVertex*)teapot_vertices.data(), teapot_vertices.size()/6},
+        teapot_triangles, false);
   }
 
   auto gizmo = Drawable{};
 
   gizmo_ctx.render = [&](const tinygizmo::geometry_mesh &r) {
     // upload_mesh(r, gizmoEditorMesh);
-    gizmo.load(r, true);
-    // draw_mesh(wireframeShader, gizmoEditorMesh, cam.position,
-    //           cam.get_viewproj_matrix((float)GetScreenWidth() /
-    //                                   (float)GetScreenHeight()),
-    // identity4x4);
+    gizmo.load<tinygizmo::geometry_vertex, uint32_t>(
+        r.vertices,
+        {&r.triangles[0].x, r.triangles.size() * 3}, true);
     float identity[] = {
         1, 0, 0, 0, //
         0, 1, 0, 0, //
@@ -219,14 +227,10 @@ int main(int argc, char *argv[]) {
     gizmo_state.hotkey_translate = IsKeyDown(KEY_T);
     gizmo_state.hotkey_rotate = IsKeyDown(KEY_R);
     gizmo_state.hotkey_scale = IsKeyDown(KEY_S);
-    bf = IsKeyDown(KEY_W);
-    bl = IsKeyDown(KEY_A);
-    bb = IsKeyDown(KEY_S);
-    br = IsKeyDown(KEY_D);
     // mouse
     gizmo_state.mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    ml = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    mr = IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
+    auto ml = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    auto mr = IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
     auto position = GetMousePosition();
     auto deltaCursorMotion =
         minalg::float2(position.x, position.y) - lastCursor;
@@ -236,22 +240,11 @@ int main(int argc, char *argv[]) {
       cam.pitch -= deltaCursorMotion.y * 0.01f;
     }
     if (mr) {
-      const linalg::aliases::float4 orientation = cam.get_orientation();
-      linalg::aliases::float3 move;
-      if (bf)
-        move -= qzdir(orientation);
-      if (bl)
-        move -= qxdir(orientation);
-      if (bb)
-        move += qzdir(orientation);
-      if (br)
-        move += qxdir(orientation);
-      if (length2(move) > 0)
-        cam.position += normalize(move) * (timestep * 10);
+      cam.shift(timestep);
     }
 
     // gizmo
-    auto cameraOrientation = cam.get_orientation();
+    auto cameraOrientation = cam.rotation();
     const auto rayDir =
         get_ray_from_pixel({lastCursor.x, lastCursor.y}, {0, 0, w, h}, cam)
             .direction;

@@ -15,15 +15,7 @@ const Scene = struct {
 
         for (self.cameras) |camera| {
             if (camera != current) {
-                const m = c.MatrixInvert(c.GetCameraViewMatrix(camera));
-                const r = c.MatrixRotateX(90.0 * c.DEG2RAD);
-                const t = c.MatrixTranspose(c.MatrixMultiply(r, m));
-                c.rlPushMatrix();
-                // c.rlTranslatef(m.m12, m.m13, m.m14);
-                c.rlMultMatrixf(&t.m0);
-                // c.DrawCube(.{}, 0.5, 0.5, 0.5, c.YELLOW);
-                c.DrawCylinderWires(.{}, 0, 2.0, 2, 4, c.DARKBLUE);
-                c.rlPopMatrix();
+                c.DrawLine3D(camera.position, camera.target, c.DARKBLUE);
             }
         }
 
@@ -36,10 +28,20 @@ const Scene = struct {
     }
 };
 
+fn dolly(camera: *c.Camera3D) void {
+    const wheel = c.GetMouseWheelMoveV();
+    if (wheel.y > 0) {
+        const distance = c.Vector3Distance(camera.target, camera.position);
+        c.CameraMoveToTarget(camera, distance * 0.9 - distance);
+    } else if (wheel.y < 0) {
+        const distance = c.Vector3Distance(camera.target, camera.position);
+        c.CameraMoveToTarget(camera, distance * 1.1 - distance);
+    }
+}
+
 const OribtCamera = struct {
     yawDegree: i32 = 0,
-    pitchDegree: i32 = -40,
-    distance: f32 = 10,
+    pitchDegree: i32 = 40,
     shiftX: f32 = 0,
     shiftY: f32 = 0,
 
@@ -53,16 +55,6 @@ const OribtCamera = struct {
         const delta = c.GetMouseDelta();
         var active = false;
 
-        // mouse wheel
-        const wheel = c.GetMouseWheelMoveV();
-        if (wheel.y > 0) {
-            self.distance *= 0.9;
-            active = true;
-        } else if (wheel.y < 0) {
-            self.distance *= 1.1;
-            active = true;
-        }
-
         // camera shift
         if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
             const speed = distance * std.math.tan(fovy * 0.5) * 2.0 / rect.height;
@@ -74,7 +66,7 @@ const OribtCamera = struct {
         // yaw pitch
         if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
             self.yawDegree -= @intFromFloat(delta.x);
-            self.pitchDegree -= @intFromFloat(delta.y);
+            self.pitchDegree += @intFromFloat(delta.y);
             if (self.pitchDegree > 89) {
                 self.pitchDegree = 89;
             } else if (self.pitchDegree < -89) {
@@ -86,39 +78,38 @@ const OribtCamera = struct {
         return active;
     }
 
-    fn update_view(self: *@This(), camera: *c.Camera3D) void {
+    fn update_view(self: @This(), camera: *c.Camera3D) void {
+        const distance = c.Vector3Distance(camera.target, camera.position);
         const pitch = c.MatrixRotateX(
             @as(f32, @floatFromInt(self.pitchDegree)) * c.DEG2RAD,
         );
         const yaw = c.MatrixRotateY(
-            @as(f32, @floatFromInt(-self.yawDegree)) * c.DEG2RAD,
+            @as(f32, @floatFromInt(self.yawDegree)) * c.DEG2RAD,
         );
         const translation = c.MatrixTranslate(
-            -self.shiftX,
-            -self.shiftY,
-            --self.distance,
+            self.shiftX,
+            self.shiftY,
+            -distance,
         );
 
-        const view = c.MatrixMultiply(
-            c.MatrixMultiply(yaw, pitch),
+        const camera_transform = c.MatrixMultiply(
             translation,
+            c.MatrixMultiply(pitch, yaw),
         );
-
-        const viewInverse = c.MatrixInvert(view);
 
         camera.position = .{
-            .x = viewInverse.m12,
-            .y = viewInverse.m13,
-            .z = viewInverse.m14,
+            .x = camera_transform.m12,
+            .y = camera_transform.m13,
+            .z = camera_transform.m14,
         };
         const forward = c.Vector3{
-            .x = viewInverse.m8,
-            .y = viewInverse.m9,
-            .z = viewInverse.m10,
+            .x = camera_transform.m8,
+            .y = camera_transform.m9,
+            .z = camera_transform.m10,
         };
         camera.target = c.Vector3Add(
             camera.position,
-            c.Vector3Scale(forward, self.distance),
+            c.Vector3Scale(forward, distance),
         );
     }
 };
@@ -162,6 +153,8 @@ const View = struct {
     }
 
     fn process(self: *Self) bool {
+        dolly(&self.camera);
+
         const distance = c.Vector3Distance(self.camera.target, self.camera.position);
         self.is_active = self.orbit.MouseUpdateCamera(
             distance,
@@ -183,12 +176,11 @@ const View = struct {
         if (self.is_active) {
             c.DrawText(
                 c.TextFormat(
-                    "yaw: %d, pitch: %d, shift: %.3f, %.3f, distance: %.3f",
+                    "yaw: %d, pitch: %d, shift: %.3f, %.3f",
                     self.orbit.yawDegree,
                     self.orbit.pitchDegree,
                     self.orbit.shiftX,
                     self.orbit.shiftY,
-                    self.orbit.distance,
                 ),
                 0,
                 0,
