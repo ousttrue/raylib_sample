@@ -1,160 +1,20 @@
 ﻿// This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
+#include <raylib/external/glad.h>
+
+#include "gizmo.h"
+
+#include "camera.h"
+#include "drawable.h"
 #include "teapot.h"
 
-#include "tiny-gizmo.hpp"
-#include <linalg.h>
-
-#include <raylib.h>
-#include <raylib/external/glad.h>
+#include <raymath.h>
 #include <rlgl.h>
 
 #include <chrono>
-#include <iostream>
 #include <span>
 
-static inline uint64_t get_local_time_ns() {
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             std::chrono::high_resolution_clock::now().time_since_epoch())
-      .count();
-}
-
-struct Drawable {
-  Model model = {};
-
-  // Generate a simple triangle mesh from code
-  template <typename V, typename I>
-  void load(std::span<const V> vertices, std::span<const I> indices, bool dynamic) {
-
-    Mesh mesh = {0};
-
-    // vertices
-    mesh.vertexCount = vertices.size();
-    mesh.vertices = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
-    // mesh.normals = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
-    mesh.colors =
-        (unsigned char *)MemAlloc(mesh.vertexCount * 4 * sizeof(unsigned char));
-    auto pos = 0;
-    // auto nom = 0;
-    auto col = 0;
-    for (auto &v : vertices) {
-      mesh.vertices[pos++] = v.position.x;
-      mesh.vertices[pos++] = v.position.y;
-      mesh.vertices[pos++] = v.position.z;
-
-      // mesh.normals[nom++] = v.normal.x;
-      // mesh.normals[nom++] = v.normal.y;
-      // mesh.normals[nom++] = v.normal.z;
-
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.x * 255);
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.y * 255);
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.z * 255);
-      mesh.colors[col++] = 255;
-    }
-
-    mesh.triangleCount = indices.size() / 3;
-    mesh.indices = (unsigned short *)MemAlloc(mesh.triangleCount * 3 *
-                                              sizeof(unsigned short));
-    auto index = 0;
-    for (auto &i : indices) {
-      mesh.indices[index++] = i;
-    }
-
-    // Upload mesh data from CPU (RAM) to GPU (VRAM) memory
-    UploadMesh(&mesh, dynamic);
-    this->model = LoadModelFromMesh(mesh);
-  }
-
-  void draw(const float m[16]) {
-    rlPushMatrix();
-    // c.rlTranslatef(m.m12, m.m13, m.m14);
-    rlMultMatrixf(m);
-    // DrawCube({}, 0.5, 0.5, 0.5, YELLOW);
-    DrawModel(this->model, {0, 0, 0}, 1.0f, WHITE);
-    // c.DrawCylinderWires(.{}, 0, 2.0, 2, 4, c.DARKBLUE);
-    rlPopMatrix();
-  }
-};
-
-struct camera {
-  float yfov;
-  float near_clip;
-  float far_clip;
-  linalg::aliases::float3 position;
-  Camera3D camera;
-  float pitch;
-  float yaw;
-
-  linalg::aliases::float4 rotation() const {
-    return qmul(rotation_quat(linalg::aliases::float3(0, 1, 0), yaw),
-                rotation_quat(linalg::aliases::float3(1, 0, 0), pitch));
-  }
-
-  linalg::aliases::float4x4 get_view_matrix() const {
-    return mul(rotation_matrix(qconj(rotation())),
-               translation_matrix(-position));
-  }
-
-  linalg::aliases::float4x4
-  get_projection_matrix(const float aspectRatio) const {
-    return linalg::perspective_matrix(yfov, aspectRatio, near_clip, far_clip);
-  }
-
-  linalg::aliases::float4x4 get_viewproj_matrix(const float aspectRatio) const {
-    return mul(get_projection_matrix(aspectRatio), get_view_matrix());
-  }
-
-  void shift(float timestep) {
-    auto bf = IsKeyDown(KEY_W);
-    auto bl = IsKeyDown(KEY_A);
-    auto bb = IsKeyDown(KEY_S);
-    auto br = IsKeyDown(KEY_D);
-
-    auto orientation = this->rotation();
-    linalg::aliases::float3 move;
-    if (bf)
-      move -= qzdir(orientation);
-    if (bl)
-      move -= qxdir(orientation);
-    if (bb)
-      move += qzdir(orientation);
-    if (br)
-      move += qxdir(orientation);
-    if (length2(move) > 0) {
-      this->position += normalize(move) * (timestep * 10);
-    }
-  }
-};
-
-struct ray {
-  linalg::aliases::float3 origin;
-  linalg::aliases::float3 direction;
-};
-
-struct rect {
-  int x0, y0, x1, y1;
-  int width() const { return x1 - x0; }
-  int height() const { return y1 - y0; }
-  linalg::aliases::int2 dims() const { return {width(), height()}; }
-  float aspect_ratio() const { return (float)width() / height(); }
-};
-
-// Returns a world-space ray through the given pixel, originating at the camera
-ray get_ray_from_pixel(const linalg::aliases::float2 &pixel,
-                       const rect &viewport, const camera &cam) {
-  const float x = 2 * (pixel.x - viewport.x0) / viewport.width() - 1,
-              y = 1 - 2 * (pixel.y - viewport.y0) / viewport.height();
-  const linalg::aliases::float4x4 inv_view_proj =
-      inverse(cam.get_viewproj_matrix(viewport.aspect_ratio()));
-  const linalg::aliases::float4 p0 = mul(inv_view_proj,
-                                         linalg::aliases::float4(x, y, -1, 1)),
-                                p1 = mul(inv_view_proj,
-                                         linalg::aliases::float4(x, y, +1, 1));
-  return {cam.position, p1.xyz() * p0.w - p0.xyz() * p1.w};
-}
-
-struct TeapotVertex
-{
+struct TeapotVertex {
   Vector3 position;
   Vector3 color;
 };
@@ -166,44 +26,21 @@ int main(int argc, char *argv[]) {
   cam.far_clip = 32.0f;
   cam.position = {0, 1.5f, 4};
 
-  tinygizmo::gizmo_application_state gizmo_state;
-  tinygizmo::gizmo_context gizmo_ctx;
-
   InitWindow(1280, 800, "tiny-gizmo-example-app");
 
   auto teapot = Drawable{};
   {
-    // auto teapot_mesh = make_teapot();
     teapot.load<TeapotVertex, uint32_t>(
-        {(TeapotVertex*)teapot_vertices.data(), teapot_vertices.size()/6},
+        {(TeapotVertex *)teapot_vertices.data(), teapot_vertices.size() / 6},
         teapot_triangles, false);
   }
 
-  auto gizmo = Drawable{};
-
-  gizmo_ctx.render = [&](const tinygizmo::geometry_mesh &r) {
-    // upload_mesh(r, gizmoEditorMesh);
-    gizmo.load<tinygizmo::geometry_vertex, uint32_t>(
-        r.vertices,
-        {&r.triangles[0].x, r.triangles.size() * 3}, true);
-    float identity[] = {
-        1, 0, 0, 0, //
-        0, 1, 0, 0, //
-        0, 0, 1, 0, //
-        0, 0, 0, 1, //
-    };
-    gizmo.draw(identity);
-  };
-
-  minalg::float2 lastCursor;
-
   tinygizmo::rigid_transform xform_a;
   xform_a.position = {-2, 0, 0};
-
-  tinygizmo::rigid_transform xform_a_last;
-
   tinygizmo::rigid_transform xform_b;
-  xform_b.position = {+2, 0, 0};
+  xform_b.position = {2, 0, 0};
+
+  Gizmo gizmo;
 
   auto t0 = std::chrono::high_resolution_clock::now();
   while (!WindowShouldClose()) {
@@ -214,27 +51,9 @@ int main(int argc, char *argv[]) {
     float timestep = std::chrono::duration<float>(t1 - t0).count();
     t0 = t1;
 
-    BeginDrawing();
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_CULL_FACE);
-    ClearBackground(RAYWHITE);
-
-    // keyboard
-    gizmo_state.hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL);
-    gizmo_state.hotkey_local = IsKeyDown(KEY_L);
-    gizmo_state.hotkey_translate = IsKeyDown(KEY_T);
-    gizmo_state.hotkey_rotate = IsKeyDown(KEY_R);
-    gizmo_state.hotkey_scale = IsKeyDown(KEY_S);
     // mouse
-    gizmo_state.mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    auto ml = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     auto mr = IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
-    auto position = GetMousePosition();
-    auto deltaCursorMotion =
-        minalg::float2(position.x, position.y) - lastCursor;
-    lastCursor = minalg::float2(position.x, position.y);
+    auto deltaCursorMotion = GetMouseDelta();
     if (mr) {
       cam.yaw -= deltaCursorMotion.x * 0.01f;
       cam.pitch -= deltaCursorMotion.y * 0.01f;
@@ -244,29 +63,20 @@ int main(int argc, char *argv[]) {
     }
 
     // gizmo
-    auto cameraOrientation = cam.rotation();
-    const auto rayDir =
-        get_ray_from_pixel({lastCursor.x, lastCursor.y}, {0, 0, w, h}, cam)
-            .direction;
-    // Gizmo input interaction state populated via win->on_input(...) callback
-    // above. Update app parameters:
-    gizmo_state.viewport_size =
-        minalg::float2(static_cast<float>(w), static_cast<float>(h));
-    gizmo_state.cam.near_clip = cam.near_clip;
-    gizmo_state.cam.far_clip = cam.far_clip;
-    gizmo_state.cam.yfov = cam.yfov;
-    gizmo_state.cam.position =
-        minalg::float3(cam.position.x, cam.position.y, cam.position.z);
-    gizmo_state.cam.orientation =
-        minalg::float4(cameraOrientation.x, cameraOrientation.y,
-                       cameraOrientation.z, cameraOrientation.w);
-    gizmo_state.ray_origin =
-        minalg::float3(cam.position.x, cam.position.y, cam.position.z);
-    gizmo_state.ray_direction = minalg::float3(rayDir.x, rayDir.y, rayDir.z);
-    // gizmo_state.screenspace_scale = 80.f; // optional flag to draw the gizmos
-    // at a constant screen-space scale
+    gizmo.new_frame();
+    xform_a = gizmo.transform("first-example-gizmo", xform_a);
+    auto ma = xform_a.matrix();
+    xform_b = gizmo.transform("second-example-gizmo", xform_b);
+    auto mb = xform_b.matrix();
 
     // render
+    BeginDrawing();
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_CULL_FACE);
+    ClearBackground(RAYWHITE);
+
     {
       auto proj = cam.get_projection_matrix(aspect);
       rlMatrixMode(RL_PROJECTION); // Switch to projection matrix
@@ -279,30 +89,17 @@ int main(int argc, char *argv[]) {
       rlMultMatrixf(&view.x.x);
 
       // teapot
-      auto ma = xform_a.matrix();
-      teapot.draw(&ma.x.x);
-      auto mb = xform_b.matrix();
-      teapot.draw(&mb.x.x);
+      teapot.draw(MatrixTranspose(*(Matrix *)&ma));
+      teapot.draw(MatrixTranspose(*(Matrix *)&mb));
+
       DrawGrid(10, 1.0);
 
-      // gizmo
-      glClear(GL_DEPTH_BUFFER_BIT);
-      gizmo_ctx.update(gizmo_state);
-
-      if (transform_gizmo("first-example-gizmo", gizmo_ctx, xform_a)) {
-        std::cout << get_local_time_ns() << " - " << "First Gizmo Hovered..."
-                  << std::endl;
-        if (xform_a != xform_a_last)
-          std::cout << get_local_time_ns() << " - " << "First Gizmo Changed..."
-                    << std::endl;
-        xform_a_last = xform_a;
-      }
-
-      transform_gizmo("second-example-gizmo", gizmo_ctx, xform_b);
-      gizmo_ctx.draw();
+      gizmo.draw();
 
       EndDrawing();
     }
   }
+
+  CloseWindow();
   return EXIT_SUCCESS;
 }
