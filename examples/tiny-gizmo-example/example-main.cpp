@@ -72,19 +72,6 @@ struct Drawable {
 struct Gizmo {
   tinygizmo::gizmo_application_state gizmo_state;
   tinygizmo::gizmo_context gizmo_ctx;
-  Drawable gizmo;
-
-  Gizmo() {
-    gizmo_ctx.render = [this](const tinygizmo::geometry_mesh &r) {
-      // upload_mesh(r, gizmoEditorMesh);
-      if (r.vertices.empty()) {
-        return;
-      }
-      this->gizmo.load<tinygizmo::geometry_vertex, uint32_t>(
-          r.vertices, {&r.triangles[0].x, r.triangles.size() * 3}, true);
-      gizmo.draw(MatrixIdentity());
-    };
-  }
 
   void new_frame(const Ray &ray, int width, int height, float fovy) {
     // mouse
@@ -122,13 +109,8 @@ struct Gizmo {
     tinygizmo::transform_gizmo({name.begin(), name.end()}, gizmo_ctx, t);
     return t;
   }
-
-  void draw() {
-    glClear(GL_DEPTH_BUFFER_BIT);
-    gizmo_ctx.draw();
-  }
 };
-struct TeapotVertex {
+struct Vertex {
   Vector3 position;
   Vector3 color;
 };
@@ -214,8 +196,8 @@ int main(int argc, char *argv[]) {
 
   auto teapot = Drawable{};
   {
-    teapot.load<TeapotVertex, uint32_t>(
-        {(TeapotVertex *)teapot_vertices, _countof(teapot_vertices) / 6},
+    teapot.load<Vertex, uint32_t>(
+        {(Vertex *)teapot_vertices, _countof(teapot_vertices) / 6},
         teapot_triangles, false);
   }
 
@@ -224,8 +206,12 @@ int main(int argc, char *argv[]) {
   tinygizmo::rigid_transform xform_b;
   xform_b.position = {2, 0, 0};
 
-  Gizmo gizmo;
   OrbitCamera orbit;
+
+  Gizmo gizmo;
+  std::vector<tinygizmo::geometry_vertex> gizmo_vertices;
+  std::vector<uint32_t> gizmo_indices;
+  Drawable gizmo_mesh;
 
   while (!WindowShouldClose()) {
     auto w = GetScreenWidth();
@@ -252,6 +238,29 @@ int main(int argc, char *argv[]) {
     xform_b = gizmo.transform("second-example-gizmo", xform_b);
     auto mb = xform_b.matrix();
 
+    // update gizmo mesh
+    gizmo_vertices.clear();
+    gizmo_indices.clear();
+    auto drawlist = gizmo.gizmo_ctx.drawlist();
+    for (auto &m : drawlist) {
+      uint32_t numVerts = (uint32_t)gizmo_vertices.size();
+      auto it = gizmo_vertices.insert(
+          gizmo_vertices.end(), m.mesh.vertices.begin(), m.mesh.vertices.end());
+      for (auto &t : m.mesh.triangles) {
+        gizmo_indices.push_back(numVerts + t.x);
+        gizmo_indices.push_back(numVerts + t.y);
+        gizmo_indices.push_back(numVerts + t.z);
+      }
+      for (; it != gizmo_vertices.end(); ++it) {
+        // Take the color and shove it into a per-vertex attribute
+        it->color = m.color;
+      }
+    }
+    if (gizmo_vertices.size()) {
+      gizmo_mesh.load<tinygizmo::geometry_vertex, uint32_t>(
+          gizmo_vertices, gizmo_indices, true);
+    }
+
     // render
     BeginDrawing();
     glEnable(GL_DEPTH_TEST);
@@ -265,10 +274,11 @@ int main(int argc, char *argv[]) {
       // teapot
       teapot.draw(MatrixTranspose(*(Matrix *)&ma));
       teapot.draw(MatrixTranspose(*(Matrix *)&mb));
-
       DrawGrid(10, 1.0);
 
-      gizmo.draw();
+      // draw gizmo
+      glClear(GL_DEPTH_BUFFER_BIT);
+      gizmo_mesh.draw(MatrixIdentity());
     }
     EndMode3D();
     EndDrawing();
