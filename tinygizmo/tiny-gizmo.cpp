@@ -27,7 +27,7 @@ void flush_to_zero(float3 &f) {
     f.z = 0.f;
 }
 
-// 32 bit Fowler–Noll–Vo Hash
+// 32 bit Fowler-Noll-Vo Hash
 uint32_t hash_fnv1a(const std::string &str) {
   static const uint32_t fnv1aBase32 = 0x811C9DC5u;
   static const uint32_t fnv1aPrime32 = 0x01000193u;
