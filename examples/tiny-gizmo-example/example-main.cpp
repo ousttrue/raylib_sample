@@ -7,6 +7,14 @@
 #include "orbit_camera.h"
 #include "teapot.h"
 #include <rlgl.h>
+#include <vector>
+
+static Matrix TRS(const float *t, const float *r, const float *s) {
+  return MatrixMultiply(
+      MatrixMultiply(MatrixScale(s[0], s[1], s[2]),
+                     QuaternionToMatrix({r[0], r[1], r[2], r[3]})),
+      MatrixTranslate(t[0], t[1], t[2]));
+}
 
 struct Drawable {
   Model model = {};
@@ -80,10 +88,12 @@ int main(int argc, char *argv[]) {
         teapot_triangles, false);
   }
 
-  tinygizmo::rigid_transform xform_a;
-  xform_a.position = {-2, 0, 0};
-  tinygizmo::rigid_transform xform_b;
-  xform_b.position = {2, 0, 0};
+  Vector3 a_t = {-2, 0, 0};
+  Quaternion a_r = {0, 0, 0, 1};
+  Vector3 a_s = {1, 1, 1};
+  Vector3 b_t = {2, 0, 0};
+  Quaternion b_r = {0, 0, 0, 1};
+  Vector3 b_s = {1, 1, 1};
 
   OrbitCamera orbit;
   Camera3D camera{
@@ -95,8 +105,6 @@ int main(int argc, char *argv[]) {
   };
 
   tinygizmo::gizmo_context gizmo_ctx;
-  std::vector<tinygizmo::geometry_vertex> gizmo_vertices;
-  std::vector<uint32_t> gizmo_indices;
   Drawable gizmo_mesh;
 
   while (!WindowShouldClose()) {
@@ -132,49 +140,22 @@ int main(int argc, char *argv[]) {
         // optional flag to draw the gizmos at a constant screen-space scale
         // gizmo_state.screenspace_scale = 80.f;
         // camera projection
-        .viewport_size =
-            minalg::float2(static_cast<float>(w), static_cast<float>(h)),
-        .ray_origin =
-            minalg::float3(ray.position.x, ray.position.y, ray.position.z),
-        .ray_direction =
-            minalg::float3(ray.direction.x, ray.direction.y, ray.direction.z),
-        .cam =
-            {
-                .yfov = 1.0f,
-                .near_clip = 0.01f,
-                .far_clip = 32.0f,
-                .position = minalg::float3(ray.position.x, ray.position.y,
-                                           ray.position.z),
-                .orientation = minalg::float4(rot.x, rot.y, rot.z, rot.w),
-            },
+        .viewport_size = {static_cast<float>(w), static_cast<float>(h)},
+        .ray_origin = {ray.position.x, ray.position.y, ray.position.z},
+        .ray_direction = {ray.direction.x, ray.direction.y, ray.direction.z},
+        .cam_yfov = 1.0f,
+        .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
     };
     gizmo_ctx.update(gizmo_state);
-    tinygizmo::transform_gizmo("first-example-gizmo", gizmo_ctx, xform_a);
-    auto ma = xform_a.matrix();
-    tinygizmo::transform_gizmo("second-example-gizmo", gizmo_ctx, xform_b);
-    auto mb = xform_b.matrix();
-    auto drawlist = gizmo_ctx.drawlist();
+    gizmo_ctx.transform_gizmo("first-example-gizmo", &a_t.x, &a_r.x, &a_s.x);
+    // auto ma = xform_a.matrix();
+    gizmo_ctx.transform_gizmo("second-example-gizmo", &b_t.x, &b_r.x, &b_s.x);
+    // auto mb = xform_b.matrix();
+    auto [vertices, indices] = gizmo_ctx.drawlist();
 
     // update gizmo mesh
-    gizmo_vertices.clear();
-    gizmo_indices.clear();
-    for (auto &m : drawlist) {
-      uint32_t numVerts = (uint32_t)gizmo_vertices.size();
-      auto it = gizmo_vertices.insert(
-          gizmo_vertices.end(), m.mesh.vertices.begin(), m.mesh.vertices.end());
-      for (auto &t : m.mesh.triangles) {
-        gizmo_indices.push_back(numVerts + t.x);
-        gizmo_indices.push_back(numVerts + t.y);
-        gizmo_indices.push_back(numVerts + t.z);
-      }
-      for (; it != gizmo_vertices.end(); ++it) {
-        // Take the color and shove it into a per-vertex attribute
-        it->color = m.color;
-      }
-    }
-    if (gizmo_vertices.size()) {
-      gizmo_mesh.load<tinygizmo::geometry_vertex, uint32_t>(
-          gizmo_vertices, gizmo_indices, true);
+    if (vertices.size() && indices.size()) {
+      gizmo_mesh.load<tinygizmo::vertex, uint32_t>(vertices, indices, true);
     }
 
     // render
@@ -188,8 +169,8 @@ int main(int argc, char *argv[]) {
     BeginMode3D(camera);
     {
       // teapot
-      teapot.draw(MatrixTranspose(*(Matrix *)&ma));
-      teapot.draw(MatrixTranspose(*(Matrix *)&mb));
+      teapot.draw(TRS(&a_t.x, &a_r.x, &a_s.x));
+      teapot.draw(TRS(&b_t.x, &b_r.x, &b_s.x));
       DrawGrid(10, 1.0);
 
       // draw gizmo

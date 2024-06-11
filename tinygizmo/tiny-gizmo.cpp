@@ -2,6 +2,7 @@
 // For more information, please refer to <http://unlicense.org>
 
 #include "tiny-gizmo.hpp"
+#include "minalg.hpp"
 
 #include <assert.h>
 #include <map>
@@ -9,8 +10,24 @@
 #include <string>
 #include <vector>
 
-using namespace minalg;
-using namespace tinygizmo;
+minalg::float3 to_minalg(const tinygizmo::float3 &v) { return {v.x, v.y, v.z}; }
+minalg::float4 to_minalg(const tinygizmo::float4 &v) {
+  return {v.x, v.y, v.z, v.w};
+}
+
+struct vertex {
+  minalg::float3 position;
+  minalg::float3 normal;
+  minalg::float4 color;
+};
+struct geometry_mesh {
+  std::vector<vertex> vertices;
+  std::vector<minalg::uint3> triangles;
+};
+struct gizmo_renderable {
+  geometry_mesh mesh;
+  minalg::float4 color;
+};
 
 ///////////////////////
 //   Utility Math    //
@@ -18,7 +35,7 @@ using namespace tinygizmo;
 
 static const float tau = 6.28318530718f;
 
-void flush_to_zero(float3 &f) {
+void flush_to_zero(minalg::float3 &f) {
   if (std::abs(f.x) < 0.02f)
     f.x = 0.f;
   if (std::abs(f.y) < 0.02f)
@@ -41,19 +58,19 @@ uint32_t hash_fnv1a(const std::string &str) {
   return result;
 }
 
-float3 snap(const float3 &value, const float snap) {
+minalg::float3 snap(const minalg::float3 &value, const float snap) {
   if (snap > 0.0f)
-    return float3(floor(value / snap) * snap);
+    return minalg::float3(floor(value / snap) * snap);
   return value;
 }
 
-float4 make_rotation_quat_axis_angle(const float3 &axis, float angle) {
+minalg::float4 make_rotation_quat_axis_angle(const minalg::float3 &axis,
+                                             float angle) {
   return {axis * std::sin(angle / 2), std::cos(angle / 2)};
 }
 
-float4 make_rotation_quat_between_vectors_snapped(const float3 &from,
-                                                  const float3 &to,
-                                                  const float angle) {
+minalg::float4 make_rotation_quat_between_vectors_snapped(
+    const minalg::float3 &from, const minalg::float3 &to, const float angle) {
   auto a = normalize(from);
   auto b = normalize(to);
   auto snappedAcos = std::floor(std::acos(dot(a, b)) / angle) * angle;
@@ -66,11 +83,49 @@ template <typename T> T clamp(const T &val, const T &min, const T &max) {
 
 struct gizmo_mesh_component {
   geometry_mesh mesh;
-  float4 base_color, highlight_color;
+  minalg::float4 base_color, highlight_color;
 };
 
+struct rigid_transform {
+  rigid_transform() {}
+  rigid_transform(const minalg::float4 &orientation,
+                  const minalg::float3 &position, const minalg::float3 &scale)
+      : orientation(orientation), position(position), scale(scale) {}
+  rigid_transform(const minalg::float4 &orientation,
+                  const minalg::float3 &position, float scale)
+      : orientation(orientation), position(position), scale(scale) {}
+  rigid_transform(const minalg::float4 &orientation,
+                  const minalg::float3 &position)
+      : orientation(orientation), position(position) {}
+
+  minalg::float4 orientation{0, 0, 0, 1};
+  minalg::float3 position{0, 0, 0};
+  minalg::float3 scale{1, 1, 1};
+
+  bool uniform_scale() const {
+    return scale.x == scale.y && scale.x == scale.z;
+  }
+  minalg::float4x4 matrix() const {
+    return {{qxdir(orientation) * scale.x, 0},
+            {qydir(orientation) * scale.y, 0},
+            {qzdir(orientation) * scale.z, 0},
+            {position, 1}};
+  }
+  minalg::float3 transform_vector(const minalg::float3 &vec) const {
+    return qrot(orientation, vec * scale);
+  }
+  minalg::float3 transform_point(const minalg::float3 &p) const {
+    return position + transform_vector(p);
+  }
+  minalg::float3 detransform_point(const minalg::float3 &p) const {
+    return detransform_vector(p - position);
+  }
+  minalg::float3 detransform_vector(const minalg::float3 &vec) const {
+    return qrot(qinv(orientation), vec) / scale;
+  }
+};
 struct ray {
-  float3 origin, direction;
+  minalg::float3 origin, direction;
 };
 ray transform(const rigid_transform &p, const ray &r) {
   return {p.transform_point(r.origin), p.transform_vector(r.direction)};
@@ -78,12 +133,14 @@ ray transform(const rigid_transform &p, const ray &r) {
 ray detransform(const rigid_transform &p, const ray &r) {
   return {p.detransform_point(r.origin), p.detransform_vector(r.direction)};
 }
-float3 transform_coord(const float4x4 &transform, const float3 &coord) {
-  auto r = mul(transform, float4(coord, 1));
+minalg::float3 transform_coord(const minalg::float4x4 &transform,
+                               const minalg::float3 &coord) {
+  auto r = mul(transform, minalg::float4(coord, 1));
   return (r.xyz() / r.w);
 }
-float3 transform_vector(const float4x4 &transform, const float3 &vector) {
-  return mul(transform, float4(vector, 0)).xyz();
+minalg::float3 transform_vector(const minalg::float4x4 &transform,
+                                const minalg::float3 &vector) {
+  return mul(transform, minalg::float4(vector, 0)).xyz();
 }
 void transform(const float scale, ray &r) {
   r.origin *= scale;
@@ -98,17 +155,19 @@ void detransform(const float scale, ray &r) {
 // Ray-Geometry Intersection Functions //
 /////////////////////////////////////////
 
-bool intersect_ray_plane(const ray &ray, const float4 &plane, float *hit_t) {
+bool intersect_ray_plane(const ray &ray, const minalg::float4 &plane,
+                         float *hit_t) {
   float denom = dot(plane.xyz(), ray.direction);
   if (std::abs(denom) == 0)
     return false;
   if (hit_t)
-    *hit_t = -dot(plane, float4(ray.origin, 1)) / denom;
+    *hit_t = -dot(plane, minalg::float4(ray.origin, 1)) / denom;
   return true;
 }
 
-bool intersect_ray_triangle(const ray &ray, const float3 &v0, const float3 &v1,
-                            const float3 &v2, float *hit_t) {
+bool intersect_ray_triangle(const ray &ray, const minalg::float3 &v0,
+                            const minalg::float3 &v1, const minalg::float3 &v2,
+                            float *hit_t) {
   auto e1 = v1 - v0, e2 = v2 - v0, h = cross(ray.direction, e2);
   auto a = dot(e1, h);
   if (std::abs(a) == 0)
@@ -165,9 +224,9 @@ void compute_normals(geometry_mesh &mesh) {
   for (uint32_t i = 0; i < uniqueVertIndices.size(); ++i) {
     if (uniqueVertIndices[i] == 0) {
       uniqueVertIndices[i] = i + 1;
-      const float3 v0 = mesh.vertices[i].position;
+      auto v0 = mesh.vertices[i].position;
       for (auto j = i + 1; j < mesh.vertices.size(); ++j) {
-        const float3 v1 = mesh.vertices[j].position;
+        auto v1 = mesh.vertices[j].position;
         if (length2(v1 - v0) < NORMAL_EPSILON) {
           uniqueVertIndices[j] = uniqueVertIndices[i];
         }
@@ -181,10 +240,10 @@ void compute_normals(geometry_mesh &mesh) {
     idx1 = uniqueVertIndices[t.y] - 1;
     idx2 = uniqueVertIndices[t.z] - 1;
 
-    geometry_vertex &v0 = mesh.vertices[idx0], &v1 = mesh.vertices[idx1],
-                    &v2 = mesh.vertices[idx2];
-    const float3 n =
-        cross(v1.position - v0.position, v2.position - v0.position);
+    auto &v0 = mesh.vertices[idx0];
+    auto &v1 = mesh.vertices[idx1];
+    auto &v2 = mesh.vertices[idx2];
+    auto n = cross(v1.position - v0.position, v2.position - v0.position);
     v0.normal += n;
     v1.normal += n;
     v2.normal += n;
@@ -192,12 +251,12 @@ void compute_normals(geometry_mesh &mesh) {
 
   for (uint32_t i = 0; i < mesh.vertices.size(); ++i)
     mesh.vertices[i].normal = mesh.vertices[uniqueVertIndices[i] - 1].normal;
-  for (geometry_vertex &v : mesh.vertices)
+  for (auto &v : mesh.vertices)
     v.normal = normalize(v.normal);
 }
 
-geometry_mesh make_box_geometry(const float3 &min_bounds,
-                                const float3 &max_bounds) {
+geometry_mesh make_box_geometry(const minalg::float3 &min_bounds,
+                                const minalg::float3 &max_bounds) {
   const auto a = min_bounds, b = max_bounds;
   geometry_mesh mesh;
   mesh.vertices = {
@@ -220,15 +279,17 @@ geometry_mesh make_box_geometry(const float3 &min_bounds,
   return mesh;
 }
 
-geometry_mesh make_cylinder_geometry(const float3 &axis, const float3 &arm1,
-                                     const float3 &arm2, uint32_t slices) {
+geometry_mesh make_cylinder_geometry(const minalg::float3 &axis,
+                                     const minalg::float3 &arm1,
+                                     const minalg::float3 &arm2,
+                                     uint32_t slices) {
   // Generated curved surface
   geometry_mesh mesh;
 
   for (uint32_t i = 0; i <= slices; ++i) {
     const float tex_s = static_cast<float>(i) / slices,
                 angle = (float)(i % slices) * tau / slices;
-    const float3 arm = arm1 * std::cos(angle) + arm2 * std::sin(angle);
+    auto arm = arm1 * std::cos(angle) + arm2 * std::sin(angle);
     mesh.vertices.push_back({arm, normalize(arm)});
     mesh.vertices.push_back({arm + axis, normalize(arm)});
   }
@@ -242,7 +303,7 @@ geometry_mesh make_cylinder_geometry(const float3 &axis, const float3 &arm1,
   for (uint32_t i = 0; i < slices; ++i) {
     const float angle = static_cast<float>(i % slices) * tau / slices,
                 c = std::cos(angle), s = std::sin(angle);
-    const float3 arm = arm1 * c + arm2 * s;
+    auto arm = arm1 * c + arm2 * s;
     mesh.vertices.push_back({arm + axis, normalize(axis)});
     mesh.vertices.push_back({arm, -normalize(axis)});
   }
@@ -253,18 +314,19 @@ geometry_mesh make_cylinder_geometry(const float3 &axis, const float3 &arm1,
   return mesh;
 }
 
-geometry_mesh make_lathed_geometry(const float3 &axis, const float3 &arm1,
-                                   const float3 &arm2, int slices,
-                                   const std::vector<float2> &points,
+geometry_mesh make_lathed_geometry(const minalg::float3 &axis,
+                                   const minalg::float3 &arm1,
+                                   const minalg::float3 &arm2, int slices,
+                                   const std::vector<minalg::float2> &points,
                                    const float eps = 0.0f) {
   geometry_mesh mesh;
   for (int i = 0; i <= slices; ++i) {
     const float angle = (static_cast<float>(i % slices) * tau / slices) +
                         (tau / 8.f),
                 c = std::cos(angle), s = std::sin(angle);
-    const float3x2 mat = {axis, arm1 * c + arm2 * s};
+    const minalg::float3x2 mat = {axis, arm1 * c + arm2 * s};
     for (auto &p : points)
-      mesh.vertices.push_back({mul(mat, p) + eps, float3(0.f)});
+      mesh.vertices.push_back({mul(mat, p) + eps, minalg::float3(0.f)});
 
     if (i > 0) {
       for (uint32_t j = 1; j < (uint32_t)points.size(); ++j) {
@@ -306,20 +368,23 @@ enum class interact {
 struct interaction_state {
   bool active{
       false}; // Flag to indicate if the gizmo is being actively manipulated
-  bool hover{false};        // Flag to indicate if the gizmo is being hovered
-  float3 original_position; // Original position of an object being manipulated
-                            // with a gizmo
-  float4 original_orientation; // Original orientation of an object being
-                               // manipulated with a gizmo
-  float3 original_scale; // Original scale of an object being manipulated with a
-                         // gizmo
-  float3 click_offset; // Offset from position of grabbed object to coordinates
-                       // of clicked point
-  interact interaction_mode; // Currently active component
+  bool hover{false}; // Flag to indicate if the gizmo is being hovered
+  minalg::float3 original_position;    // Original position of an object being
+                                       // manipulated with a gizmo
+  minalg::float4 original_orientation; // Original orientation of an object
+                                       // being manipulated with a gizmo
+  minalg::float3 original_scale;       // Original scale of an object being
+                                       // manipulated with a gizmo
+  minalg::float3 click_offset; // Offset from position of grabbed object to
+                               // coordinates of clicked point
+  interact interaction_mode;   // Currently active component
 };
 
-struct gizmo_context::gizmo_context_impl {
+struct tinygizmo::gizmo_context::gizmo_context_impl {
   gizmo_context *ctx;
+
+  std::vector<tinygizmo::vertex> vertices;
+  std::vector<uint32_t> indices;
 
   gizmo_context_impl(gizmo_context *ctx);
 
@@ -343,13 +408,15 @@ struct gizmo_context::gizmo_context_impl {
   void update(const gizmo_application_state &state);
 };
 
-gizmo_context::gizmo_context_impl::gizmo_context_impl(gizmo_context *ctx)
+tinygizmo::gizmo_context::gizmo_context_impl::gizmo_context_impl(
+    gizmo_context *ctx)
     : ctx(ctx) {
-  std::vector<float2> arrow_points = {
+  std::vector<minalg::float2> arrow_points = {
       {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
-  std::vector<float2> mace_points = {{0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f},
-                                     {1, 0.1f},  {1.25f, 0.1f},  {1.25f, 0}};
-  std::vector<float2> ring_points = {
+  std::vector<minalg::float2> mace_points = {{0.25f, 0},    {0.25f, 0.05f},
+                                             {1, 0.05f},    {1, 0.1f},
+                                             {1.25f, 0.1f}, {1.25f, 0}};
+  std::vector<minalg::float2> ring_points = {
       {+0.025f, 1},    {-0.025f, 1},    {-0.025f, 1},    {-0.025f, 1.1f},
       {-0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1}};
   mesh_components[interact::translate_x] = {
@@ -408,7 +475,7 @@ gizmo_context::gizmo_context_impl::gizmo_context_impl(gizmo_context *ctx)
       {0, 0, 1, 1.f}};
 }
 
-void gizmo_context::gizmo_context_impl::update(
+void tinygizmo::gizmo_context::gizmo_context_impl::update(
     const gizmo_application_state &state) {
   active_state = state;
   local_toggle = (!last_state.hotkey_local && active_state.hotkey_local &&
@@ -424,17 +491,18 @@ void gizmo_context::gizmo_context_impl::update(
 
 // This will calculate a scale constant based on the number of screenspace
 // pixels passed as pixel_scale.
-float scale_screenspace(gizmo_context::gizmo_context_impl &g,
-                        const float3 position, const float pixel_scale) {
-  float dist = length(position - g.active_state.cam.position);
-  return std::tan(g.active_state.cam.yfov) * dist *
+float scale_screenspace(tinygizmo::gizmo_context::gizmo_context_impl &g,
+                        const minalg::float3 position,
+                        const float pixel_scale) {
+  float dist = length(position - to_minalg(g.active_state.ray_origin));
+  return std::tan(g.active_state.cam_yfov) * dist *
          (pixel_scale / g.active_state.viewport_size.y);
 }
 
 // The only purpose of this is readability: to reduce the total column width of
 // the intersect(...) statements in every gizmo
-bool intersect(gizmo_context::gizmo_context_impl &g, const ray &r, interact i,
-               float &t, const float best_t) {
+bool intersect(tinygizmo::gizmo_context::gizmo_context_impl &g, const ray &r,
+               interact i, float &t, const float best_t) {
   if (intersect_ray_mesh(r, g.mesh_components[i].mesh, &t) && t < best_t)
     return true;
   return false;
@@ -445,27 +513,34 @@ bool intersect(gizmo_context::gizmo_context_impl &g, const ray &r, interact i,
 ///////////////////////////////////
 
 void axis_rotation_dragger(const uint32_t id,
-                           gizmo_context::gizmo_context_impl &g,
-                           const float3 &axis, const float3 &center,
-                           const float4 &start_orientation,
-                           float4 &orientation) {
+                           tinygizmo::gizmo_context::gizmo_context_impl &g,
+                           const minalg::float3 &axis,
+                           const minalg::float3 &center,
+                           const minalg::float4 &start_orientation,
+                           minalg::float4 &orientation) {
   interaction_state &interaction = g.gizmos[id];
 
   if (g.active_state.mouse_left) {
     rigid_transform original_pose = {start_orientation,
                                      interaction.original_position};
-    float3 the_axis = original_pose.transform_vector(axis);
-    float4 the_plane = {the_axis, -dot(the_axis, interaction.click_offset)};
-    const ray r = {g.active_state.ray_origin, g.active_state.ray_direction};
+    auto the_axis = original_pose.transform_vector(axis);
+    minalg::float4 the_plane = {the_axis,
+                                -dot(the_axis, interaction.click_offset)};
+    const ray r = {
+        to_minalg(g.active_state.ray_origin),
+        to_minalg(g.active_state.ray_direction),
+    };
 
     float t;
     if (intersect_ray_plane(r, the_plane, &t)) {
-      float3 center_of_rotation =
+      minalg::float3 center_of_rotation =
           interaction.original_position +
           the_axis * dot(the_axis, interaction.click_offset -
                                        interaction.original_position);
-      float3 arm1 = normalize(interaction.click_offset - center_of_rotation);
-      float3 arm2 = normalize(r.origin + r.direction * t - center_of_rotation);
+      minalg::float3 arm1 =
+          normalize(interaction.click_offset - center_of_rotation);
+      minalg::float3 arm2 =
+          normalize(r.origin + r.direction * t - center_of_rotation);
 
       float d = dot(arm1, arm2);
       if (d > 0.999f) {
@@ -492,8 +567,9 @@ void axis_rotation_dragger(const uint32_t id,
 }
 
 void plane_translation_dragger(const uint32_t id,
-                               gizmo_context::gizmo_context_impl &g,
-                               const float3 &plane_normal, float3 &point) {
+                               tinygizmo::gizmo_context::gizmo_context_impl &g,
+                               const minalg::float3 &plane_normal,
+                               minalg::float3 &point) {
   interaction_state &interaction = g.gizmos[id];
 
   // Mouse clicked
@@ -502,8 +578,11 @@ void plane_translation_dragger(const uint32_t id,
 
   if (g.active_state.mouse_left) {
     // Define the plane to contain the original position of the object
-    const float3 plane_point = interaction.original_position;
-    const ray r = {g.active_state.ray_origin, g.active_state.ray_direction};
+    auto plane_point = interaction.original_position;
+    const ray r = {
+        to_minalg(g.active_state.ray_origin),
+        to_minalg(g.active_state.ray_direction),
+    };
 
     // If an intersection exists between the ray and the plane, place the object
     // at that point
@@ -523,16 +602,17 @@ void plane_translation_dragger(const uint32_t id,
 }
 
 void axis_translation_dragger(const uint32_t id,
-                              gizmo_context::gizmo_context_impl &g,
-                              const float3 &axis, float3 &point) {
+                              tinygizmo::gizmo_context::gizmo_context_impl &g,
+                              const minalg::float3 &axis,
+                              minalg::float3 &point) {
   interaction_state &interaction = g.gizmos[id];
 
   if (g.active_state.mouse_left) {
     // First apply a plane translation dragger with a plane that contains the
     // desired axis and is oriented to face the camera
-    const float3 plane_tangent =
-        cross(axis, point - g.active_state.cam.position);
-    const float3 plane_normal = cross(axis, plane_tangent);
+    const minalg::float3 plane_tangent =
+        cross(axis, point - to_minalg(g.active_state.ray_origin));
+    const minalg::float3 plane_normal = cross(axis, plane_tangent);
     plane_translation_dragger(id, g, plane_normal, point);
 
     // Constrain object motion to be along the desired axis
@@ -546,10 +626,11 @@ void axis_translation_dragger(const uint32_t id,
 ///////////////////////////////
 
 void position_gizmo(const std::string &name,
-                    gizmo_context::gizmo_context_impl &g,
-                    const float4 &orientation, float3 &position) {
+                    tinygizmo::gizmo_context::gizmo_context_impl &g,
+                    const minalg::float4 &orientation,
+                    minalg::float3 &position) {
   rigid_transform p = rigid_transform(
-      g.local_toggle ? orientation : float4(0, 0, 0, 1), position);
+      g.local_toggle ? orientation : minalg::float4(0, 0, 0, 1), position);
   const float draw_scale =
       (g.active_state.screenspace_scale > 0.f)
           ? scale_screenspace(g, p.position, g.active_state.screenspace_scale)
@@ -562,8 +643,10 @@ void position_gizmo(const std::string &name,
 
   {
     interact updated_state = interact::none;
-    auto ray = detransform(
-        p, {g.active_state.ray_origin, g.active_state.ray_direction});
+    auto ray = detransform(p, {
+                                  to_minalg(g.active_state.ray_origin),
+                                  to_minalg(g.active_state.ray_direction),
+                              });
     detransform(draw_scale, ray);
 
     float best_t = std::numeric_limits<float>::infinity(), t;
@@ -613,7 +696,7 @@ void position_gizmo(const std::string &name,
         (best_t == std::numeric_limits<float>::infinity()) ? false : true;
   }
 
-  std::vector<float3> axes;
+  std::vector<minalg::float3> axes;
   if (g.local_toggle)
     axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
   else
@@ -642,7 +725,8 @@ void position_gizmo(const std::string &name,
       break;
     case interact::translate_xyz:
       plane_translation_dragger(
-          id, g, -minalg::qzdir(g.active_state.cam.orientation), position);
+          id, g, -minalg::qzdir(to_minalg(g.active_state.cam_orientation)),
+          position);
       break;
     }
     position -= g.gizmos[id].click_offset;
@@ -658,8 +742,8 @@ void position_gizmo(const std::string &name,
       interact::translate_yz, interact::translate_zx, interact::translate_xy,
       interact::translate_xyz};
 
-  float4x4 modelMatrix = p.matrix();
-  float4x4 scaleMatrix = scaling_matrix(float3(draw_scale));
+  minalg::float4x4 modelMatrix = p.matrix();
+  minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
   modelMatrix = mul(modelMatrix, scaleMatrix);
 
   for (auto c : draw_interactions) {
@@ -679,12 +763,13 @@ void position_gizmo(const std::string &name,
 }
 
 void orientation_gizmo(const std::string &name,
-                       gizmo_context::gizmo_context_impl &g,
-                       const float3 &center, float4 &orientation) {
+                       tinygizmo::gizmo_context::gizmo_context_impl &g,
+                       const minalg::float3 &center,
+                       minalg::float4 &orientation) {
   assert(length2(orientation) > float(1e-6));
 
   rigid_transform p =
-      rigid_transform(g.local_toggle ? orientation : float4(0, 0, 0, 1),
+      rigid_transform(g.local_toggle ? orientation : minalg::float4(0, 0, 0, 1),
                       center); // Orientation is local by default
   const float draw_scale =
       (g.active_state.screenspace_scale > 0.f)
@@ -699,8 +784,10 @@ void orientation_gizmo(const std::string &name,
   {
     interact updated_state = interact::none;
 
-    auto ray = detransform(
-        p, {g.active_state.ray_origin, g.active_state.ray_direction});
+    auto ray = detransform(p, {
+                                  to_minalg(g.active_state.ray_origin),
+                                  to_minalg(g.active_state.ray_direction),
+                              });
     detransform(draw_scale, ray);
     float best_t = std::numeric_limits<float>::infinity(), t;
 
@@ -731,10 +818,11 @@ void orientation_gizmo(const std::string &name,
     }
   }
 
-  float3 activeAxis;
+  minalg::float3 activeAxis;
   if (g.gizmos[id].active) {
-    const float4 starting_orientation =
-        g.local_toggle ? g.gizmos[id].original_orientation : float4(0, 0, 0, 1);
+    const minalg::float4 starting_orientation =
+        g.local_toggle ? g.gizmos[id].original_orientation
+                       : minalg::float4(0, 0, 0, 1);
     switch (g.gizmos[id].interaction_mode) {
     case interact::rotate_x:
       axis_rotation_dragger(id, g, {1, 0, 0}, center, starting_orientation,
@@ -759,8 +847,8 @@ void orientation_gizmo(const std::string &name,
     g.gizmos[id].active = false;
   }
 
-  float4x4 modelMatrix = p.matrix();
-  float4x4 scaleMatrix = scaling_matrix(float3(draw_scale));
+  minalg::float4x4 modelMatrix = p.matrix();
+  minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
   modelMatrix = mul(modelMatrix, scaleMatrix);
 
   std::vector<interact> draw_interactions;
@@ -793,19 +881,19 @@ void orientation_gizmo(const std::string &name,
     interaction_state &interaction = g.gizmos[id];
 
     // Create orthonormal basis for drawing the arrow
-    float3 a = qrot(p.orientation,
-                    interaction.click_offset - interaction.original_position);
-    float3 zDir = normalize(activeAxis), xDir = normalize(cross(a, zDir)),
-           yDir = cross(zDir, xDir);
+    minalg::float3 a = qrot(p.orientation, interaction.click_offset -
+                                               interaction.original_position);
+    minalg::float3 zDir = normalize(activeAxis),
+                   xDir = normalize(cross(a, zDir)), yDir = cross(zDir, xDir);
 
     // Ad-hoc geometry
-    std::initializer_list<float2> arrow_points = {
+    std::initializer_list<minalg::float2> arrow_points = {
         {0.0f, 0.f}, {0.0f, 0.05f}, {0.8f, 0.05f}, {0.9f, 0.10f}, {1.0f, 0}};
     auto geo = make_lathed_geometry(yDir, xDir, zDir, 32, arrow_points);
 
     gizmo_renderable r;
     r.mesh = geo;
-    r.color = float4(1);
+    r.color = minalg::float4(1);
     for (auto &v : r.mesh.vertices) {
       v.position = transform_coord(modelMatrix, v.position);
       v.normal = transform_vector(modelMatrix, v.normal);
@@ -819,21 +907,25 @@ void orientation_gizmo(const std::string &name,
 }
 
 void axis_scale_dragger(const uint32_t &id,
-                        gizmo_context::gizmo_context_impl &g,
-                        const float3 &axis, const float3 &center, float3 &scale,
+                        tinygizmo::gizmo_context::gizmo_context_impl &g,
+                        const minalg::float3 &axis,
+                        const minalg::float3 &center, minalg::float3 &scale,
                         const bool uniform) {
   interaction_state &interaction = g.gizmos[id];
 
   if (g.active_state.mouse_left) {
-    const float3 plane_tangent =
-        cross(axis, center - g.active_state.cam.position);
-    const float3 plane_normal = cross(axis, plane_tangent);
+    const minalg::float3 plane_tangent =
+        cross(axis, center - to_minalg(g.active_state.ray_origin));
+    const minalg::float3 plane_normal = cross(axis, plane_tangent);
 
-    float3 distance;
+    minalg::float3 distance;
     if (g.active_state.mouse_left) {
       // Define the plane to contain the original position of the object
-      const float3 plane_point = center;
-      const ray ray = {g.active_state.ray_origin, g.active_state.ray_direction};
+      const minalg::float3 plane_point = center;
+      const ray ray = {
+          to_minalg(g.active_state.ray_origin),
+          to_minalg(g.active_state.ray_direction),
+      };
 
       // If an intersection exists between the ray and the plane, place the
       // object at that point
@@ -848,24 +940,26 @@ void axis_scale_dragger(const uint32_t &id,
       distance = ray.origin + ray.direction * t;
     }
 
-    float3 offset_on_axis = (distance - interaction.click_offset) * axis;
+    minalg::float3 offset_on_axis =
+        (distance - interaction.click_offset) * axis;
     flush_to_zero(offset_on_axis);
-    float3 new_scale = interaction.original_scale + offset_on_axis;
+    minalg::float3 new_scale = interaction.original_scale + offset_on_axis;
 
     if (uniform)
-      scale = float3(clamp(dot(distance, new_scale), 0.01f, 1000.f));
+      scale = minalg::float3(clamp(dot(distance, new_scale), 0.01f, 1000.f));
     else
-      scale = float3(clamp(new_scale.x, 0.01f, 1000.f),
-                     clamp(new_scale.y, 0.01f, 1000.f),
-                     clamp(new_scale.z, 0.01f, 1000.f));
+      scale = minalg::float3(clamp(new_scale.x, 0.01f, 1000.f),
+                             clamp(new_scale.y, 0.01f, 1000.f),
+                             clamp(new_scale.z, 0.01f, 1000.f));
     if (g.active_state.snap_scale)
       scale = snap(scale, g.active_state.snap_scale);
   }
 }
 
-void scale_gizmo(const std::string &name, gizmo_context::gizmo_context_impl &g,
-                 const float4 &orientation, const float3 &center,
-                 float3 &scale) {
+void scale_gizmo(const std::string &name,
+                 tinygizmo::gizmo_context::gizmo_context_impl &g,
+                 const minalg::float4 &orientation,
+                 const minalg::float3 &center, minalg::float3 &scale) {
   rigid_transform p = rigid_transform(orientation, center);
   const float draw_scale =
       (g.active_state.screenspace_scale > 0.f)
@@ -878,8 +972,10 @@ void scale_gizmo(const std::string &name, gizmo_context::gizmo_context_impl &g,
 
   {
     interact updated_state = interact::none;
-    auto ray = detransform(
-        p, {g.active_state.ray_origin, g.active_state.ray_direction});
+    auto ray = detransform(p, {
+                                  to_minalg(g.active_state.ray_origin),
+                                  to_minalg(g.active_state.ray_direction),
+                              });
     detransform(draw_scale, ray);
     float best_t = std::numeric_limits<float>::infinity(), t;
     if (intersect(g, ray, interact::scale_x, t, best_t)) {
@@ -930,8 +1026,8 @@ void scale_gizmo(const std::string &name, gizmo_context::gizmo_context_impl &g,
     }
   }
 
-  float4x4 modelMatrix = p.matrix();
-  float4x4 scaleMatrix = scaling_matrix(float3(draw_scale));
+  minalg::float4x4 modelMatrix = p.matrix();
+  minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
   modelMatrix = mul(modelMatrix, scaleMatrix);
 
   std::vector<interact> draw_components{interact::scale_x, interact::scale_y,
@@ -957,43 +1053,86 @@ void scale_gizmo(const std::string &name, gizmo_context::gizmo_context_impl &g,
 // Public Gizmo Implementations //
 //////////////////////////////////
 
-gizmo_context::gizmo_context() { impl.reset(new gizmo_context_impl(this)); };
-gizmo_context::~gizmo_context() {}
-void gizmo_context::update(const gizmo_application_state &state) {
+tinygizmo::gizmo_context::gizmo_context() {
+  impl.reset(new gizmo_context_impl(this));
+};
+tinygizmo::gizmo_context::~gizmo_context() {}
+void tinygizmo::gizmo_context::update(const gizmo_application_state &state) {
   impl->update(state);
 }
-std::span<gizmo_renderable> gizmo_context::drawlist() {
+std::tuple<std::span<tinygizmo::vertex>, std::span<uint32_t>>
+tinygizmo::gizmo_context::drawlist() {
   impl->last_state = impl->active_state;
-  return impl->drawlist;
-}
-transform_mode gizmo_context::get_mode() const { return impl->mode; }
+  impl->vertices.clear();
+  impl->indices.clear();
 
-bool tinygizmo::transform_gizmo(const std::string &name, gizmo_context &g,
-                                rigid_transform &t) {
-  bool activated = false;
-
-  if (g.impl->active_state.hotkey_ctrl == true) {
-    if (g.impl->last_state.hotkey_translate == false &&
-        g.impl->active_state.hotkey_translate == true)
-      g.impl->mode = transform_mode::translate;
-    else if (g.impl->last_state.hotkey_rotate == false &&
-             g.impl->active_state.hotkey_rotate == true)
-      g.impl->mode = transform_mode::rotate;
-    else if (g.impl->last_state.hotkey_scale == false &&
-             g.impl->active_state.hotkey_scale == true)
-      g.impl->mode = transform_mode::scale;
+  for (auto &m : impl->drawlist) {
+    uint32_t numVerts = (uint32_t)impl->vertices.size();
+    auto it = impl->vertices.insert(
+        impl->vertices.end(), (tinygizmo::vertex *)m.mesh.vertices.data(),
+        (tinygizmo::vertex *)m.mesh.vertices.data() + m.mesh.vertices.size());
+    for (auto &t : m.mesh.triangles) {
+      impl->indices.push_back(numVerts + t.x);
+      impl->indices.push_back(numVerts + t.y);
+      impl->indices.push_back(numVerts + t.z);
+    }
+    for (; it != impl->vertices.end(); ++it) {
+      // Take the color and shove it into a per-vertex attribute
+      it->color = {m.color.x, m.color.y, m.color.z, m.color.w};
+    }
   }
 
-  if (g.impl->mode == transform_mode::translate)
-    position_gizmo(name, *g.impl, t.orientation, t.position);
-  else if (g.impl->mode == transform_mode::rotate)
-    orientation_gizmo(name, *g.impl, t.position, t.orientation);
-  else if (g.impl->mode == transform_mode::scale)
-    scale_gizmo(name, *g.impl, t.orientation, t.position, t.scale);
+  return {impl->vertices, impl->indices};
+}
+tinygizmo::transform_mode tinygizmo::gizmo_context::get_mode() const {
+  return impl->mode;
+}
 
-  const interaction_state s = g.impl->gizmos[hash_fnv1a(name)];
+bool tinygizmo::gizmo_context::transform_gizmo(const std::string &name,
+                                               float *position, float *rotation,
+                                               float *scale) {
+
+  bool activated = false;
+
+  if (this->impl->active_state.hotkey_ctrl == true) {
+    if (this->impl->last_state.hotkey_translate == false &&
+        this->impl->active_state.hotkey_translate == true)
+      this->impl->mode = transform_mode::translate;
+    else if (this->impl->last_state.hotkey_rotate == false &&
+             this->impl->active_state.hotkey_rotate == true)
+      this->impl->mode = transform_mode::rotate;
+    else if (this->impl->last_state.hotkey_scale == false &&
+             this->impl->active_state.hotkey_scale == true)
+      this->impl->mode = transform_mode::scale;
+  }
+
+  rigid_transform t;
+  t.position = {position[0], position[1], position[2]};
+  t.orientation = {rotation[0], rotation[1], rotation[2], rotation[3]};
+  t.scale = {scale[0], scale[1], scale[2]};
+
+  if (this->impl->mode == transform_mode::translate)
+    position_gizmo(name, *this->impl, t.orientation, t.position);
+  else if (this->impl->mode == transform_mode::rotate)
+    orientation_gizmo(name, *this->impl, t.position, t.orientation);
+  else if (this->impl->mode == transform_mode::scale)
+    scale_gizmo(name, *this->impl, t.orientation, t.position, t.scale);
+
+  const interaction_state s = this->impl->gizmos[hash_fnv1a(name)];
   if (s.hover == true || s.active == true)
     activated = true;
 
+  if (activated) {
+    position[0] = t.position.x;
+    position[1] = t.position.y;
+    position[2] = t.position.z;
+    rotation[0] = t.orientation.x;
+    rotation[1] = t.orientation.y;
+    rotation[2] = t.orientation.z;
+    rotation[3] = t.orientation.w;
+    scale[0] = t.scale.x;
+    scale[1] = t.scale.y;
+    scale[2] = t.scale.z;
+  }
   return activated;
 }
