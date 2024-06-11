@@ -607,7 +607,8 @@ void axis_scale_dragger(const uint32_t &id, gizmo_context_impl &g,
 
 void scale_gizmo(bool local_toggle, const std::string &name,
                  gizmo_context_impl &g, const minalg::float4 &orientation,
-                 const minalg::float3 &center, minalg::float3 &scale) {
+                 const minalg::float3 &center, minalg::float3 &scale,
+                 bool uniform) {
   rigid_transform p = rigid_transform(orientation, center);
   const float draw_scale =
       (g.active_state.screenspace_scale > 0.f)
@@ -660,16 +661,13 @@ void scale_gizmo(bool local_toggle, const std::string &name,
   if (g.gizmos[id].active) {
     switch (g.gizmos[id].interaction_mode) {
     case interact::scale_x:
-      axis_scale_dragger(id, g, {1, 0, 0}, center, scale,
-                         g.active_state.hotkey_ctrl);
+      axis_scale_dragger(id, g, {1, 0, 0}, center, scale, uniform);
       break;
     case interact::scale_y:
-      axis_scale_dragger(id, g, {0, 1, 0}, center, scale,
-                         g.active_state.hotkey_ctrl);
+      axis_scale_dragger(id, g, {0, 1, 0}, center, scale, uniform);
       break;
     case interact::scale_z:
-      axis_scale_dragger(id, g, {0, 0, 1}, center, scale,
-                         g.active_state.hotkey_ctrl);
+      axis_scale_dragger(id, g, {0, 0, 1}, center, scale, uniform);
       break;
     }
   }
@@ -702,11 +700,11 @@ void scale_gizmo(bool local_toggle, const std::string &name,
 //////////////////////////////////
 gizmo_context::gizmo_context() { impl.reset(new gizmo_context_impl(this)); };
 gizmo_context::~gizmo_context() {}
-void gizmo_context::update(const gizmo_application_state &state) {
+void gizmo_context::begin_frame(const gizmo_application_state &state) {
   impl->update(state);
 }
 std::tuple<std::span<draw_vertex>, std::span<uint32_t>>
-gizmo_context::drawlist() {
+gizmo_context::end_frame() {
   impl->last_state = impl->active_state;
   impl->vertices.clear();
   impl->indices.clear();
@@ -731,94 +729,80 @@ gizmo_context::drawlist() {
 }
 
 bool gizmo_context::position_gizmo(bool local_toggle, const std::string &name,
-                                   float *position, float *rotation,
-                                   float *scale) {
-  rigid_transform t;
-  t.position = {position[0], position[1], position[2]};
-  t.orientation = {rotation[0], rotation[1], rotation[2], rotation[3]};
-  t.scale = {scale[0], scale[1], scale[2]};
+                                   float *t, float *r) {
+  minalg::float3 position{t[0], t[1], t[2]};
+  minalg::float4 rotation{r[0], r[1], r[2], r[3]};
 
-  tinygizmo::position_gizmo(local_toggle, name, *this->impl, t.orientation,
-                            t.position);
+  tinygizmo::position_gizmo(local_toggle, name, *this->impl, rotation,
+                            position);
 
   bool activated = false;
-  auto s = this->impl->gizmos[hash_fnv1a(name)];
-  if (s.hover == true || s.active == true) {
+  auto x = this->impl->gizmos[hash_fnv1a(name)];
+  if (x.hover == true || x.active == true) {
     activated = true;
   }
   if (activated) {
-    position[0] = t.position.x;
-    position[1] = t.position.y;
-    position[2] = t.position.z;
-    rotation[0] = t.orientation.x;
-    rotation[1] = t.orientation.y;
-    rotation[2] = t.orientation.z;
-    rotation[3] = t.orientation.w;
-    scale[0] = t.scale.x;
-    scale[1] = t.scale.y;
-    scale[2] = t.scale.z;
+    position[0] = position.x;
+    position[1] = position.y;
+    position[2] = position.z;
+    rotation[0] = rotation.x;
+    rotation[1] = rotation.y;
+    rotation[2] = rotation.z;
+    rotation[3] = rotation.w;
   }
   return activated;
 }
 
 bool gizmo_context::orientation_gizmo(bool local_toggle,
-                                      const std::string &name, float *position,
-                                      float *rotation, float *scale) {
-  rigid_transform t;
-  t.position = {position[0], position[1], position[2]};
-  t.orientation = {rotation[0], rotation[1], rotation[2], rotation[3]};
-  t.scale = {scale[0], scale[1], scale[2]};
-
-  tinygizmo::orientation_gizmo(local_toggle, name, *this->impl, t.position,
-                               t.orientation);
-
+                                      const std::string &name, float *t,
+                                      float *r) {
+  minalg::float3 position{t[0], t[1], t[2]};
+  minalg::float4 orientation{r[0], r[1], r[2], r[3]};
+  tinygizmo::orientation_gizmo(local_toggle, name, *this->impl, position,
+                               orientation);
   bool activated = false;
-  auto s = this->impl->gizmos[hash_fnv1a(name)];
-  if (s.hover == true || s.active == true) {
+  auto x = this->impl->gizmos[hash_fnv1a(name)];
+  if (x.hover == true || x.active == true) {
     activated = true;
   }
   if (activated) {
-    position[0] = t.position.x;
-    position[1] = t.position.y;
-    position[2] = t.position.z;
-    rotation[0] = t.orientation.x;
-    rotation[1] = t.orientation.y;
-    rotation[2] = t.orientation.z;
-    rotation[3] = t.orientation.w;
-    scale[0] = t.scale.x;
-    scale[1] = t.scale.y;
-    scale[2] = t.scale.z;
+    t[0] = position.x;
+    t[1] = position.y;
+    t[2] = position.z;
+    r[0] = orientation.x;
+    r[1] = orientation.y;
+    r[2] = orientation.z;
+    r[3] = orientation.w;
   }
   return activated;
 }
 
-bool gizmo_context::scale_gizmo(bool local_toggle, const std::string &name,
-                                float *position, float *rotation,
-                                float *scale) {
-  rigid_transform t;
-  t.position = {position[0], position[1], position[2]};
-  t.orientation = {rotation[0], rotation[1], rotation[2], rotation[3]};
-  t.scale = {scale[0], scale[1], scale[2]};
+bool gizmo_context::scale_gizmo(bool local_toggle, bool uniform,
+                                const std::string &name, float *t, float *r,
+                                float *s) {
+  minalg::float3 position = {t[0], t[1], t[2]};
+  minalg::float4 orientation = {r[0], r[1], r[2], r[3]};
+  minalg::float3 scale = {s[0], s[1], s[2]};
 
-  tinygizmo::scale_gizmo(local_toggle, name, *this->impl, t.orientation,
-                         t.position, t.scale);
+  tinygizmo::scale_gizmo(local_toggle, name, *this->impl, orientation, position,
+                         scale, uniform);
 
   bool activated = false;
-  auto s = this->impl->gizmos[hash_fnv1a(name)];
-  if (s.hover == true || s.active == true) {
+  auto x = this->impl->gizmos[hash_fnv1a(name)];
+  if (x.hover == true || x.active == true) {
     activated = true;
   }
   if (activated) {
-    position[0] = t.position.x;
-    position[1] = t.position.y;
-    position[2] = t.position.z;
-    rotation[0] = t.orientation.x;
-    rotation[1] = t.orientation.y;
-    rotation[2] = t.orientation.z;
-    rotation[3] = t.orientation.w;
-    scale[0] = t.scale.x;
-    scale[1] = t.scale.y;
-    scale[2] = t.scale.z;
+    t[0] = position.x;
+    t[1] = position.y;
+    t[2] = position.z;
+    r[0] = orientation.x;
+    r[1] = orientation.y;
+    r[2] = orientation.z;
+    r[3] = orientation.w;
+    s[0] = scale.x;
+    s[1] = scale.y;
+    s[2] = scale.z;
   }
   return activated;
 }

@@ -37,18 +37,21 @@ enum class transform_mode { translate, rotate, scale };
 
 struct gizmo_application_state {
   bool mouse_left{false};
-  bool hotkey_ctrl{false};
-  float screenspace_scale{
-      0.f}; // If > 0.f, the gizmos are drawn scale-invariant with a screenspace
-            // value defined here
-  float snap_translation{
-      0.f};                 // World-scale units used for snapping translation
-  float snap_scale{0.f};    // World-scale units used for snapping scale
-  float snap_rotation{0.f}; // Radians used for snapping rotation quaternions
-                            // (i.e. PI/8 or PI/16)
-  float2 viewport_size;     // 3d viewport used to render the view
-  float3 ray_origin;        // world-space ray origin (i.e. the camera position)
-  float3 ray_direction;     // world-space ray direction
+  // If > 0.f, the gizmos are drawn scale-invariant with a screenspace value
+  // defined here
+  float screenspace_scale{0.f};
+  // World-scale units used for snapping translation
+  float snap_translation{0.f};
+  // World-scale units used for snapping scale
+  float snap_scale{0.f};
+  // Radians used for snapping rotation quaternions (i.e. PI/8 or PI/16)
+  float snap_rotation{0.f};
+  // 3d viewport used to render the view
+  float2 viewport_size;
+  // world-space ray origin (i.e. the camera position)
+  float3 ray_origin;
+  // world-space ray direction
+  float3 ray_direction;
   float cam_yfov;
   float4 cam_orientation;
 };
@@ -60,17 +63,15 @@ struct gizmo_context {
   gizmo_context();
   ~gizmo_context();
 
-  void update(const gizmo_application_state
-                  &state); // Clear geometry buffer and update internal
-                           // `gizmo_application_state` data
-  std::tuple<std::span<draw_vertex>, std::span<uint32_t>> drawlist();
-
+  // Clear geometry buffer and update internal `gizmo_application_state` data
+  void begin_frame(const gizmo_application_state &state);
   bool position_gizmo(bool local_toggle, const std::string &name,
-                      float *position, float *orientation, float *scale);
+                      float *position, float *orientation);
   bool orientation_gizmo(bool local_toggle, const std::string &name,
-                         float *position, float *orientation, float *scale);
-  bool scale_gizmo(bool local_toggle, const std::string &name, float *position,
-                   float *orientation, float *scale);
+                         float *position, float *orientation);
+  bool scale_gizmo(bool local_toggle, bool uniform, const std::string &name,
+                   float *position, float *orientation, float *scale);
+  std::tuple<std::span<draw_vertex>, std::span<uint32_t>> end_frame();
 };
 
 } // namespace tinygizmo

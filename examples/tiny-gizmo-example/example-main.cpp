@@ -15,15 +15,15 @@ enum class transform_mode {
   scale,
 };
 bool transform_gizmo(tinygizmo::gizmo_context *gizmo, transform_mode mode,
-                     bool local_toggle, const std::string &name, float *t,
-                     float *r, float *s) {
+                     bool local_toggle, bool uniform, const std::string &name,
+                     float *t, float *r, float *s) {
   switch (mode) {
   case transform_mode::translate:
-    return gizmo->position_gizmo(local_toggle, name, t, r, s);
+    return gizmo->position_gizmo(local_toggle, name, t, r);
   case transform_mode::rotate:
-    return gizmo->orientation_gizmo(local_toggle, name, t, r, s);
+    return gizmo->orientation_gizmo(local_toggle, name, t, r);
   case transform_mode::scale:
-    return gizmo->scale_gizmo(local_toggle, name, t, r, s);
+    return gizmo->scale_gizmo(local_toggle, uniform, name, t, r, s);
   }
 }
 
@@ -96,6 +96,7 @@ struct Vertex {
 };
 
 struct hotkey {
+  bool hotkey_ctrl{false};
   bool hotkey_translate{false};
   bool hotkey_rotate{false};
   bool hotkey_scale{false};
@@ -160,9 +161,6 @@ int main(int argc, char *argv[]) {
     // mouse
     tinygizmo::gizmo_application_state active_state{
         .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
-        // trs
-        // keyboard
-        .hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL),
         // optional flag to draw the gizmos at a constant screen-space scale
         // gizmo_state.screenspace_scale = 80.f;
         // camera projection
@@ -174,13 +172,14 @@ int main(int argc, char *argv[]) {
     };
 
     hotkey active_hotkey = {
+        .hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL),
         .hotkey_translate = IsKeyDown(KEY_T),
         .hotkey_rotate = IsKeyDown(KEY_R),
         .hotkey_scale = IsKeyDown(KEY_S),
         .hotkey_local = IsKeyDown(KEY_L),
     };
 
-    if (active_state.hotkey_ctrl == true) {
+    if (active_hotkey.hotkey_ctrl == true) {
       if (last_state.hotkey_translate == false &&
           active_hotkey.hotkey_translate == true)
         mode = transform_mode::translate;
@@ -196,18 +195,15 @@ int main(int argc, char *argv[]) {
                          : local_toggle;
     }
 
-    gizmo_ctx.update(active_state);
+    gizmo_ctx.begin_frame(active_state);
     last_state = active_hotkey;
-
-    transform_gizmo(&gizmo_ctx, mode, local_toggle, "first-example-gizmo",
-                    &a_t.x, &a_r.x, &a_s.x);
-    transform_gizmo(&gizmo_ctx, mode, local_toggle, "second-example-gizmo",
-                    &b_t.x, &b_r.x, &b_s.x);
-
-    auto [vertices, indices] = gizmo_ctx.drawlist();
-
-    // update gizmo mesh
+    transform_gizmo(&gizmo_ctx, mode, local_toggle, active_hotkey.hotkey_ctrl,
+                    "first-example-gizmo", &a_t.x, &a_r.x, &a_s.x);
+    transform_gizmo(&gizmo_ctx, mode, local_toggle, active_hotkey.hotkey_ctrl,
+                    "second-example-gizmo", &b_t.x, &b_r.x, &b_s.x);
+    auto [vertices, indices] = gizmo_ctx.end_frame();
     if (vertices.size() && indices.size()) {
+      // update gizmo mesh
       gizmo_mesh.load<tinygizmo::draw_vertex, uint32_t>(vertices, indices,
                                                         true);
     }
