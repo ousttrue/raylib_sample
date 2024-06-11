@@ -15,334 +15,6 @@ minalg::float4 to_minalg(const tinygizmo::float4 &v) {
   return {v.x, v.y, v.z, v.w};
 }
 
-struct vertex {
-  minalg::float3 position;
-  minalg::float3 normal;
-  minalg::float4 color;
-};
-struct geometry_mesh {
-  std::vector<vertex> vertices;
-  std::vector<minalg::uint3> triangles;
-};
-struct gizmo_renderable {
-  geometry_mesh mesh;
-  minalg::float4 color;
-};
-
-///////////////////////
-//   Utility Math    //
-///////////////////////
-
-static const float tau = 6.28318530718f;
-
-void flush_to_zero(minalg::float3 &f) {
-  if (std::abs(f.x) < 0.02f)
-    f.x = 0.f;
-  if (std::abs(f.y) < 0.02f)
-    f.y = 0.f;
-  if (std::abs(f.z) < 0.02f)
-    f.z = 0.f;
-}
-
-// 32 bit Fowler-Noll-Vo Hash
-uint32_t hash_fnv1a(const std::string &str) {
-  static const uint32_t fnv1aBase32 = 0x811C9DC5u;
-  static const uint32_t fnv1aPrime32 = 0x01000193u;
-
-  uint32_t result = fnv1aBase32;
-
-  for (auto &c : str) {
-    result ^= static_cast<uint32_t>(c);
-    result *= fnv1aPrime32;
-  }
-  return result;
-}
-
-minalg::float3 snap(const minalg::float3 &value, const float snap) {
-  if (snap > 0.0f)
-    return minalg::float3(floor(value / snap) * snap);
-  return value;
-}
-
-minalg::float4 make_rotation_quat_axis_angle(const minalg::float3 &axis,
-                                             float angle) {
-  return {axis * std::sin(angle / 2), std::cos(angle / 2)};
-}
-
-minalg::float4 make_rotation_quat_between_vectors_snapped(
-    const minalg::float3 &from, const minalg::float3 &to, const float angle) {
-  auto a = normalize(from);
-  auto b = normalize(to);
-  auto snappedAcos = std::floor(std::acos(dot(a, b)) / angle) * angle;
-  return make_rotation_quat_axis_angle(normalize(cross(a, b)), snappedAcos);
-}
-
-template <typename T> T clamp(const T &val, const T &min, const T &max) {
-  return std::min(std::max(val, min), max);
-}
-
-struct gizmo_mesh_component {
-  geometry_mesh mesh;
-  minalg::float4 base_color, highlight_color;
-};
-
-struct rigid_transform {
-  rigid_transform() {}
-  rigid_transform(const minalg::float4 &orientation,
-                  const minalg::float3 &position, const minalg::float3 &scale)
-      : orientation(orientation), position(position), scale(scale) {}
-  rigid_transform(const minalg::float4 &orientation,
-                  const minalg::float3 &position, float scale)
-      : orientation(orientation), position(position), scale(scale) {}
-  rigid_transform(const minalg::float4 &orientation,
-                  const minalg::float3 &position)
-      : orientation(orientation), position(position) {}
-
-  minalg::float4 orientation{0, 0, 0, 1};
-  minalg::float3 position{0, 0, 0};
-  minalg::float3 scale{1, 1, 1};
-
-  bool uniform_scale() const {
-    return scale.x == scale.y && scale.x == scale.z;
-  }
-  minalg::float4x4 matrix() const {
-    return {{qxdir(orientation) * scale.x, 0},
-            {qydir(orientation) * scale.y, 0},
-            {qzdir(orientation) * scale.z, 0},
-            {position, 1}};
-  }
-  minalg::float3 transform_vector(const minalg::float3 &vec) const {
-    return qrot(orientation, vec * scale);
-  }
-  minalg::float3 transform_point(const minalg::float3 &p) const {
-    return position + transform_vector(p);
-  }
-  minalg::float3 detransform_point(const minalg::float3 &p) const {
-    return detransform_vector(p - position);
-  }
-  minalg::float3 detransform_vector(const minalg::float3 &vec) const {
-    return qrot(qinv(orientation), vec) / scale;
-  }
-};
-struct ray {
-  minalg::float3 origin, direction;
-};
-ray transform(const rigid_transform &p, const ray &r) {
-  return {p.transform_point(r.origin), p.transform_vector(r.direction)};
-}
-ray detransform(const rigid_transform &p, const ray &r) {
-  return {p.detransform_point(r.origin), p.detransform_vector(r.direction)};
-}
-minalg::float3 transform_coord(const minalg::float4x4 &transform,
-                               const minalg::float3 &coord) {
-  auto r = mul(transform, minalg::float4(coord, 1));
-  return (r.xyz() / r.w);
-}
-minalg::float3 transform_vector(const minalg::float4x4 &transform,
-                                const minalg::float3 &vector) {
-  return mul(transform, minalg::float4(vector, 0)).xyz();
-}
-void transform(const float scale, ray &r) {
-  r.origin *= scale;
-  r.direction *= scale;
-}
-void detransform(const float scale, ray &r) {
-  r.origin /= scale;
-  r.direction /= scale;
-}
-
-/////////////////////////////////////////
-// Ray-Geometry Intersection Functions //
-/////////////////////////////////////////
-
-bool intersect_ray_plane(const ray &ray, const minalg::float4 &plane,
-                         float *hit_t) {
-  float denom = dot(plane.xyz(), ray.direction);
-  if (std::abs(denom) == 0)
-    return false;
-  if (hit_t)
-    *hit_t = -dot(plane, minalg::float4(ray.origin, 1)) / denom;
-  return true;
-}
-
-bool intersect_ray_triangle(const ray &ray, const minalg::float3 &v0,
-                            const minalg::float3 &v1, const minalg::float3 &v2,
-                            float *hit_t) {
-  auto e1 = v1 - v0, e2 = v2 - v0, h = cross(ray.direction, e2);
-  auto a = dot(e1, h);
-  if (std::abs(a) == 0)
-    return false;
-
-  float f = 1 / a;
-  auto s = ray.origin - v0;
-  auto u = f * dot(s, h);
-  if (u < 0 || u > 1)
-    return false;
-
-  auto q = cross(s, e1);
-  auto v = f * dot(ray.direction, q);
-  if (v < 0 || u + v > 1)
-    return false;
-
-  auto t = f * dot(e2, q);
-  if (t < 0)
-    return false;
-
-  if (hit_t)
-    *hit_t = t;
-  return true;
-}
-
-bool intersect_ray_mesh(const ray &ray, const geometry_mesh &mesh,
-                        float *hit_t) {
-  float best_t = std::numeric_limits<float>::infinity(), t;
-  int32_t best_tri = -1;
-  for (auto &tri : mesh.triangles) {
-    if (intersect_ray_triangle(ray, mesh.vertices[tri[0]].position,
-                               mesh.vertices[tri[1]].position,
-                               mesh.vertices[tri[2]].position, &t) &&
-        t < best_t) {
-      best_t = t;
-      best_tri = uint32_t(&tri - mesh.triangles.data());
-    }
-  }
-  if (best_tri == -1)
-    return false;
-  if (hit_t)
-    *hit_t = best_t;
-  return true;
-}
-
-///////////////////////////////
-// Geometry + Mesh Utilities //
-///////////////////////////////
-
-void compute_normals(geometry_mesh &mesh) {
-  static const double NORMAL_EPSILON = 0.0001;
-
-  std::vector<uint32_t> uniqueVertIndices(mesh.vertices.size(), 0);
-  for (uint32_t i = 0; i < uniqueVertIndices.size(); ++i) {
-    if (uniqueVertIndices[i] == 0) {
-      uniqueVertIndices[i] = i + 1;
-      auto v0 = mesh.vertices[i].position;
-      for (auto j = i + 1; j < mesh.vertices.size(); ++j) {
-        auto v1 = mesh.vertices[j].position;
-        if (length2(v1 - v0) < NORMAL_EPSILON) {
-          uniqueVertIndices[j] = uniqueVertIndices[i];
-        }
-      }
-    }
-  }
-
-  uint32_t idx0, idx1, idx2;
-  for (auto &t : mesh.triangles) {
-    idx0 = uniqueVertIndices[t.x] - 1;
-    idx1 = uniqueVertIndices[t.y] - 1;
-    idx2 = uniqueVertIndices[t.z] - 1;
-
-    auto &v0 = mesh.vertices[idx0];
-    auto &v1 = mesh.vertices[idx1];
-    auto &v2 = mesh.vertices[idx2];
-    auto n = cross(v1.position - v0.position, v2.position - v0.position);
-    v0.normal += n;
-    v1.normal += n;
-    v2.normal += n;
-  }
-
-  for (uint32_t i = 0; i < mesh.vertices.size(); ++i)
-    mesh.vertices[i].normal = mesh.vertices[uniqueVertIndices[i] - 1].normal;
-  for (auto &v : mesh.vertices)
-    v.normal = normalize(v.normal);
-}
-
-geometry_mesh make_box_geometry(const minalg::float3 &min_bounds,
-                                const minalg::float3 &max_bounds) {
-  const auto a = min_bounds, b = max_bounds;
-  geometry_mesh mesh;
-  mesh.vertices = {
-      {{a.x, a.y, a.z}, {-1, 0, 0}}, {{a.x, a.y, b.z}, {-1, 0, 0}},
-      {{a.x, b.y, b.z}, {-1, 0, 0}}, {{a.x, b.y, a.z}, {-1, 0, 0}},
-      {{b.x, a.y, a.z}, {+1, 0, 0}}, {{b.x, b.y, a.z}, {+1, 0, 0}},
-      {{b.x, b.y, b.z}, {+1, 0, 0}}, {{b.x, a.y, b.z}, {+1, 0, 0}},
-      {{a.x, a.y, a.z}, {0, -1, 0}}, {{b.x, a.y, a.z}, {0, -1, 0}},
-      {{b.x, a.y, b.z}, {0, -1, 0}}, {{a.x, a.y, b.z}, {0, -1, 0}},
-      {{a.x, b.y, a.z}, {0, +1, 0}}, {{a.x, b.y, b.z}, {0, +1, 0}},
-      {{b.x, b.y, b.z}, {0, +1, 0}}, {{b.x, b.y, a.z}, {0, +1, 0}},
-      {{a.x, a.y, a.z}, {0, 0, -1}}, {{a.x, b.y, a.z}, {0, 0, -1}},
-      {{b.x, b.y, a.z}, {0, 0, -1}}, {{b.x, a.y, a.z}, {0, 0, -1}},
-      {{a.x, a.y, b.z}, {0, 0, +1}}, {{b.x, a.y, b.z}, {0, 0, +1}},
-      {{b.x, b.y, b.z}, {0, 0, +1}}, {{a.x, b.y, b.z}, {0, 0, +1}},
-  };
-  mesh.triangles = {{0, 1, 2},    {0, 2, 3},    {4, 5, 6},    {4, 6, 7},
-                    {8, 9, 10},   {8, 10, 11},  {12, 13, 14}, {12, 14, 15},
-                    {16, 17, 18}, {16, 18, 19}, {20, 21, 22}, {20, 22, 23}};
-  return mesh;
-}
-
-geometry_mesh make_cylinder_geometry(const minalg::float3 &axis,
-                                     const minalg::float3 &arm1,
-                                     const minalg::float3 &arm2,
-                                     uint32_t slices) {
-  // Generated curved surface
-  geometry_mesh mesh;
-
-  for (uint32_t i = 0; i <= slices; ++i) {
-    const float tex_s = static_cast<float>(i) / slices,
-                angle = (float)(i % slices) * tau / slices;
-    auto arm = arm1 * std::cos(angle) + arm2 * std::sin(angle);
-    mesh.vertices.push_back({arm, normalize(arm)});
-    mesh.vertices.push_back({arm + axis, normalize(arm)});
-  }
-  for (uint32_t i = 0; i < slices; ++i) {
-    mesh.triangles.push_back({i * 2, i * 2 + 2, i * 2 + 3});
-    mesh.triangles.push_back({i * 2, i * 2 + 3, i * 2 + 1});
-  }
-
-  // Generate caps
-  uint32_t base = (uint32_t)mesh.vertices.size();
-  for (uint32_t i = 0; i < slices; ++i) {
-    const float angle = static_cast<float>(i % slices) * tau / slices,
-                c = std::cos(angle), s = std::sin(angle);
-    auto arm = arm1 * c + arm2 * s;
-    mesh.vertices.push_back({arm + axis, normalize(axis)});
-    mesh.vertices.push_back({arm, -normalize(axis)});
-  }
-  for (uint32_t i = 2; i < slices; ++i) {
-    mesh.triangles.push_back({base, base + i * 2 - 2, base + i * 2});
-    mesh.triangles.push_back({base + 1, base + i * 2 + 1, base + i * 2 - 1});
-  }
-  return mesh;
-}
-
-geometry_mesh make_lathed_geometry(const minalg::float3 &axis,
-                                   const minalg::float3 &arm1,
-                                   const minalg::float3 &arm2, int slices,
-                                   const std::vector<minalg::float2> &points,
-                                   const float eps = 0.0f) {
-  geometry_mesh mesh;
-  for (int i = 0; i <= slices; ++i) {
-    const float angle = (static_cast<float>(i % slices) * tau / slices) +
-                        (tau / 8.f),
-                c = std::cos(angle), s = std::sin(angle);
-    const minalg::float3x2 mat = {axis, arm1 * c + arm2 * s};
-    for (auto &p : points)
-      mesh.vertices.push_back({mul(mat, p) + eps, minalg::float3(0.f)});
-
-    if (i > 0) {
-      for (uint32_t j = 1; j < (uint32_t)points.size(); ++j) {
-        uint32_t i0 = (i - 1) * uint32_t(points.size()) + (j - 1);
-        uint32_t i1 = (i - 0) * uint32_t(points.size()) + (j - 1);
-        uint32_t i2 = (i - 0) * uint32_t(points.size()) + (j - 0);
-        uint32_t i3 = (i - 1) * uint32_t(points.size()) + (j - 0);
-        mesh.triangles.push_back({i0, i1, i2});
-        mesh.triangles.push_back({i0, i2, i3});
-      }
-    }
-  }
-  compute_normals(mesh);
-  return mesh;
-}
-
 //////////////////////////////////
 // Gizmo Context Implementation //
 //////////////////////////////////
@@ -380,10 +52,11 @@ struct interaction_state {
   interact interaction_mode;   // Currently active component
 };
 
-struct tinygizmo::gizmo_context::gizmo_context_impl {
+namespace tinygizmo {
+struct gizmo_context_impl {
   gizmo_context *ctx;
 
-  std::vector<tinygizmo::vertex> vertices;
+  std::vector<draw_vertex> vertices;
   std::vector<uint32_t> indices;
 
   gizmo_context_impl(gizmo_context *ctx);
@@ -407,9 +80,9 @@ struct tinygizmo::gizmo_context::gizmo_context_impl {
   // Public methods
   void update(const gizmo_application_state &state);
 };
+} // namespace tinygizmo
 
-tinygizmo::gizmo_context::gizmo_context_impl::gizmo_context_impl(
-    gizmo_context *ctx)
+tinygizmo::gizmo_context_impl::gizmo_context_impl(gizmo_context *ctx)
     : ctx(ctx) {
   std::vector<minalg::float2> arrow_points = {
       {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
@@ -475,7 +148,7 @@ tinygizmo::gizmo_context::gizmo_context_impl::gizmo_context_impl(
       {0, 0, 1, 1.f}};
 }
 
-void tinygizmo::gizmo_context::gizmo_context_impl::update(
+void tinygizmo::gizmo_context_impl::update(
     const gizmo_application_state &state) {
   active_state = state;
   local_toggle = (!last_state.hotkey_local && active_state.hotkey_local &&
@@ -491,7 +164,7 @@ void tinygizmo::gizmo_context::gizmo_context_impl::update(
 
 // This will calculate a scale constant based on the number of screenspace
 // pixels passed as pixel_scale.
-float scale_screenspace(tinygizmo::gizmo_context::gizmo_context_impl &g,
+float scale_screenspace(tinygizmo::gizmo_context_impl &g,
                         const minalg::float3 position,
                         const float pixel_scale) {
   float dist = length(position - to_minalg(g.active_state.ray_origin));
@@ -501,8 +174,8 @@ float scale_screenspace(tinygizmo::gizmo_context::gizmo_context_impl &g,
 
 // The only purpose of this is readability: to reduce the total column width of
 // the intersect(...) statements in every gizmo
-bool intersect(tinygizmo::gizmo_context::gizmo_context_impl &g, const ray &r,
-               interact i, float &t, const float best_t) {
+bool intersect(tinygizmo::gizmo_context_impl &g, const ray &r, interact i,
+               float &t, const float best_t) {
   if (intersect_ray_mesh(r, g.mesh_components[i].mesh, &t) && t < best_t)
     return true;
   return false;
@@ -512,8 +185,7 @@ bool intersect(tinygizmo::gizmo_context::gizmo_context_impl &g, const ray &r,
 // Private Gizmo Implementations //
 ///////////////////////////////////
 
-void axis_rotation_dragger(const uint32_t id,
-                           tinygizmo::gizmo_context::gizmo_context_impl &g,
+void axis_rotation_dragger(const uint32_t id, tinygizmo::gizmo_context_impl &g,
                            const minalg::float3 &axis,
                            const minalg::float3 &center,
                            const minalg::float4 &start_orientation,
@@ -567,7 +239,7 @@ void axis_rotation_dragger(const uint32_t id,
 }
 
 void plane_translation_dragger(const uint32_t id,
-                               tinygizmo::gizmo_context::gizmo_context_impl &g,
+                               tinygizmo::gizmo_context_impl &g,
                                const minalg::float3 &plane_normal,
                                minalg::float3 &point) {
   interaction_state &interaction = g.gizmos[id];
@@ -602,7 +274,7 @@ void plane_translation_dragger(const uint32_t id,
 }
 
 void axis_translation_dragger(const uint32_t id,
-                              tinygizmo::gizmo_context::gizmo_context_impl &g,
+                              tinygizmo::gizmo_context_impl &g,
                               const minalg::float3 &axis,
                               minalg::float3 &point) {
   interaction_state &interaction = g.gizmos[id];
@@ -625,8 +297,7 @@ void axis_translation_dragger(const uint32_t id,
 //   Gizmo Implementations   //
 ///////////////////////////////
 
-void position_gizmo(const std::string &name,
-                    tinygizmo::gizmo_context::gizmo_context_impl &g,
+void position_gizmo(const std::string &name, tinygizmo::gizmo_context_impl &g,
                     const minalg::float4 &orientation,
                     minalg::float3 &position) {
   rigid_transform p = rigid_transform(
@@ -763,7 +434,7 @@ void position_gizmo(const std::string &name,
 }
 
 void orientation_gizmo(const std::string &name,
-                       tinygizmo::gizmo_context::gizmo_context_impl &g,
+                       tinygizmo::gizmo_context_impl &g,
                        const minalg::float3 &center,
                        minalg::float4 &orientation) {
   assert(length2(orientation) > float(1e-6));
@@ -906,8 +577,7 @@ void orientation_gizmo(const std::string &name,
     orientation = p.orientation;
 }
 
-void axis_scale_dragger(const uint32_t &id,
-                        tinygizmo::gizmo_context::gizmo_context_impl &g,
+void axis_scale_dragger(const uint32_t &id, tinygizmo::gizmo_context_impl &g,
                         const minalg::float3 &axis,
                         const minalg::float3 &center, minalg::float3 &scale,
                         const bool uniform) {
@@ -956,8 +626,7 @@ void axis_scale_dragger(const uint32_t &id,
   }
 }
 
-void scale_gizmo(const std::string &name,
-                 tinygizmo::gizmo_context::gizmo_context_impl &g,
+void scale_gizmo(const std::string &name, tinygizmo::gizmo_context_impl &g,
                  const minalg::float4 &orientation,
                  const minalg::float3 &center, minalg::float3 &scale) {
   rigid_transform p = rigid_transform(orientation, center);
@@ -1052,16 +721,14 @@ void scale_gizmo(const std::string &name,
 //////////////////////////////////
 // Public Gizmo Implementations //
 //////////////////////////////////
-
-tinygizmo::gizmo_context::gizmo_context() {
-  impl.reset(new gizmo_context_impl(this));
-};
-tinygizmo::gizmo_context::~gizmo_context() {}
-void tinygizmo::gizmo_context::update(const gizmo_application_state &state) {
+namespace tinygizmo {
+gizmo_context::gizmo_context() { impl.reset(new gizmo_context_impl(this)); };
+gizmo_context::~gizmo_context() {}
+void gizmo_context::update(const gizmo_application_state &state) {
   impl->update(state);
 }
-std::tuple<std::span<tinygizmo::vertex>, std::span<uint32_t>>
-tinygizmo::gizmo_context::drawlist() {
+std::tuple<std::span<draw_vertex>, std::span<uint32_t>>
+gizmo_context::drawlist() {
   impl->last_state = impl->active_state;
   impl->vertices.clear();
   impl->indices.clear();
@@ -1069,8 +736,8 @@ tinygizmo::gizmo_context::drawlist() {
   for (auto &m : impl->drawlist) {
     uint32_t numVerts = (uint32_t)impl->vertices.size();
     auto it = impl->vertices.insert(
-        impl->vertices.end(), (tinygizmo::vertex *)m.mesh.vertices.data(),
-        (tinygizmo::vertex *)m.mesh.vertices.data() + m.mesh.vertices.size());
+        impl->vertices.end(), (draw_vertex *)m.mesh.vertices.data(),
+        (draw_vertex *)m.mesh.vertices.data() + m.mesh.vertices.size());
     for (auto &t : m.mesh.triangles) {
       impl->indices.push_back(numVerts + t.x);
       impl->indices.push_back(numVerts + t.y);
@@ -1084,13 +751,10 @@ tinygizmo::gizmo_context::drawlist() {
 
   return {impl->vertices, impl->indices};
 }
-tinygizmo::transform_mode tinygizmo::gizmo_context::get_mode() const {
-  return impl->mode;
-}
+transform_mode gizmo_context::get_mode() const { return impl->mode; }
 
-bool tinygizmo::gizmo_context::transform_gizmo(const std::string &name,
-                                               float *position, float *rotation,
-                                               float *scale) {
+bool gizmo_context::transform_gizmo(const std::string &name, float *position,
+                                    float *rotation, float *scale) {
 
   bool activated = false;
 
@@ -1136,3 +800,4 @@ bool tinygizmo::gizmo_context::transform_gizmo(const std::string &name,
   }
   return activated;
 }
+} // namespace tinygizmo

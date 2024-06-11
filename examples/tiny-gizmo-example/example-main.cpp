@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
 
     // update gizmo mesh
     if (vertices.size() && indices.size()) {
-      gizmo_mesh.load<tinygizmo::vertex, uint32_t>(vertices, indices, true);
+      gizmo_mesh.load<tinygizmo::draw_vertex, uint32_t>(vertices, indices, true);
     }
 
     // render

@@ -27,6 +27,12 @@ struct uint3 {
   unsigned int y;
   unsigned int z;
 };
+struct draw_vertex {
+  float3 position;
+  float3 normal;
+  float4 color;
+};
+
 enum class transform_mode { translate, rotate, scale };
 
 struct gizmo_application_state {
@@ -51,14 +57,8 @@ struct gizmo_application_state {
   float4 cam_orientation;
 };
 
-struct vertex {
-  float3 position;
-  float3 normal;
-  float4 color;
-};
-
+struct gizmo_context_impl;
 struct gizmo_context {
-  struct gizmo_context_impl;
   std::unique_ptr<gizmo_context_impl> impl;
 
   gizmo_context();
@@ -67,7 +67,7 @@ struct gizmo_context {
   void update(const gizmo_application_state
                   &state); // Clear geometry buffer and update internal
                            // `gizmo_application_state` data
-  std::tuple<std::span<vertex>, std::span<uint32_t>> drawlist();
+  std::tuple<std::span<draw_vertex>, std::span<uint32_t>> drawlist();
   transform_mode get_mode()
       const; // Return the active mode being used by `transform_gizmo(...)`
 
