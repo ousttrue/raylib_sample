@@ -2,19 +2,132 @@
 // For more information, please refer to <http://unlicense.org>
 #include <raylib/external/glad.h>
 
-#include "gizmo.h"
+#include <tiny-gizmo.hpp>
 
-// #include "camera.h"
-#include "drawable.h"
 #include "teapot.h"
 
+#include <raylib.h>
 #include <raymath.h>
 #include <rcamera.h>
 #include <rlgl.h>
-
-#include <chrono>
 #include <span>
+#include <string_view>
 
+struct Drawable {
+  Model model = {};
+
+  // Generate a simple triangle mesh from code
+  template <typename V, typename I>
+  void load(std::span<const V> vertices, std::span<const I> indices,
+            bool dynamic) {
+
+    Mesh mesh = {0};
+
+    // vertices
+    mesh.vertexCount = vertices.size();
+    mesh.vertices = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
+    // mesh.normals = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
+    mesh.colors =
+        (unsigned char *)MemAlloc(mesh.vertexCount * 4 * sizeof(unsigned char));
+    auto pos = 0;
+    // auto nom = 0;
+    auto col = 0;
+    for (auto &v : vertices) {
+      mesh.vertices[pos++] = v.position.x;
+      mesh.vertices[pos++] = v.position.y;
+      mesh.vertices[pos++] = v.position.z;
+
+      // mesh.normals[nom++] = v.normal.x;
+      // mesh.normals[nom++] = v.normal.y;
+      // mesh.normals[nom++] = v.normal.z;
+
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.x * 255);
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.y * 255);
+      mesh.colors[col++] = static_cast<unsigned char>(v.color.z * 255);
+      mesh.colors[col++] = 255;
+    }
+
+    mesh.triangleCount = indices.size() / 3;
+    mesh.indices = (unsigned short *)MemAlloc(mesh.triangleCount * 3 *
+                                              sizeof(unsigned short));
+    auto index = 0;
+    for (auto &i : indices) {
+      mesh.indices[index++] = i;
+    }
+
+    // Upload mesh data from CPU (RAM) to GPU (VRAM) memory
+    UploadMesh(&mesh, dynamic);
+    this->model = LoadModelFromMesh(mesh);
+  }
+
+  void draw(const Matrix &_m) {
+    rlPushMatrix();
+    auto m = MatrixTranspose(_m);
+    rlMultMatrixf(&m.m0);
+    DrawModel(this->model, {0, 0, 0}, 1.0f, WHITE);
+    rlPopMatrix();
+  }
+};
+
+struct Gizmo {
+  tinygizmo::gizmo_application_state gizmo_state;
+  tinygizmo::gizmo_context gizmo_ctx;
+  Drawable gizmo;
+
+  Gizmo() {
+    gizmo_ctx.render = [this](const tinygizmo::geometry_mesh &r) {
+      // upload_mesh(r, gizmoEditorMesh);
+      if (r.vertices.empty()) {
+        return;
+      }
+      this->gizmo.load<tinygizmo::geometry_vertex, uint32_t>(
+          r.vertices, {&r.triangles[0].x, r.triangles.size() * 3}, true);
+      gizmo.draw(MatrixIdentity());
+    };
+  }
+
+  void new_frame(const Ray &ray, int width, int height, float fovy) {
+    // mouse
+    gizmo_state.mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    // keyboard
+    gizmo_state.hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL);
+    gizmo_state.hotkey_local = IsKeyDown(KEY_L);
+    gizmo_state.hotkey_translate = IsKeyDown(KEY_T);
+    gizmo_state.hotkey_rotate = IsKeyDown(KEY_R);
+    gizmo_state.hotkey_scale = IsKeyDown(KEY_S);
+    // camera projection
+    gizmo_state.viewport_size =
+        minalg::float2(static_cast<float>(width), static_cast<float>(height));
+    gizmo_state.cam.near_clip = 0.01f;
+    gizmo_state.cam.far_clip = 32.0f;
+    gizmo_state.cam.yfov = 1.0f;
+    // camer view
+    gizmo_state.cam.position =
+        minalg::float3(ray.position.x, ray.position.y, ray.position.z);
+    auto rot =
+        QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
+    gizmo_state.cam.orientation = minalg::float4(rot.x, rot.y, rot.z, rot.w);
+    gizmo_state.ray_origin = gizmo_state.cam.position;
+    gizmo_state.ray_direction =
+        minalg::float3(ray.direction.x, ray.direction.y, ray.direction.z);
+    // optional flag to draw the gizmos at a constant screen-space scale
+    // gizmo_state.screenspace_scale = 80.f;
+    gizmo_ctx.update(gizmo_state);
+  }
+
+  tinygizmo::rigid_transform
+  transform(const std::string_view name,
+            const tinygizmo::rigid_transform &transform) {
+    auto t = transform;
+    tinygizmo::transform_gizmo({name.begin(), name.end()}, gizmo_ctx, t);
+    return t;
+  }
+
+  void draw() {
+    glClear(GL_DEPTH_BUFFER_BIT);
+    gizmo_ctx.draw();
+  }
+};
 struct TeapotVertex {
   Vector3 position;
   Vector3 color;
@@ -102,7 +215,7 @@ int main(int argc, char *argv[]) {
   auto teapot = Drawable{};
   {
     teapot.load<TeapotVertex, uint32_t>(
-        {(TeapotVertex *)teapot_vertices.data(), teapot_vertices.size() / 6},
+        {(TeapotVertex *)teapot_vertices, _countof(teapot_vertices) / 6},
         teapot_triangles, false);
   }
 
@@ -114,40 +227,26 @@ int main(int argc, char *argv[]) {
   Gizmo gizmo;
   OrbitCamera orbit;
 
-  auto t0 = std::chrono::high_resolution_clock::now();
   while (!WindowShouldClose()) {
-    // auto w = GetScreenWidth();
-    // auto h = GetScreenHeight();
-    // auto aspect = static_cast<float>(w) / static_cast<float>(h);
-    // auto t1 = std::chrono::high_resolution_clock::now();
-    // float timestep = std::chrono::duration<float>(t1 - t0).count();
-    // t0 = t1;
+    auto w = GetScreenWidth();
+    auto h = GetScreenHeight();
 
     // mouse
-    // auto mr = IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
-    // auto deltaCursorMotion = GetMouseDelta();
-    // if (mr) {
-    //   yaw -= deltaCursorMotion.x * 0.01f;
-    //   pitch -= deltaCursorMotion.y * 0.01f;
-    // }
-    // if (mr) {
-    //   cam.shift(timestep);
-    // }
     dolly(&camera);
     auto distance = Vector3Distance(camera.target, camera.position);
-    orbit.MouseUpdateCamera(distance, camera.fovy,
-                            {
-                                0,
-                                0,
-                                static_cast<float>(GetScreenWidth()),
-                                static_cast<float>(GetScreenHeight()),
-                            });
-    // if (self.is_active) {
-    orbit.update_view(&camera);
-    // }
+    if (orbit.MouseUpdateCamera(distance, camera.fovy,
+                                {
+                                    0,
+                                    0,
+                                    static_cast<float>(w),
+                                    static_cast<float>(h),
+                                })) {
+      orbit.update_view(&camera);
+    }
 
     // gizmo
-    gizmo.new_frame();
+    auto ray = GetMouseRay(GetMousePosition(), camera);
+    gizmo.new_frame(ray, w, h, camera.fovy * DEG2RAD);
     xform_a = gizmo.transform("first-example-gizmo", xform_a);
     auto ma = xform_a.matrix();
     xform_b = gizmo.transform("second-example-gizmo", xform_b);
