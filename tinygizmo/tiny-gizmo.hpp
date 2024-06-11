@@ -37,10 +37,6 @@ enum class transform_mode { translate, rotate, scale };
 
 struct gizmo_application_state {
   bool mouse_left{false};
-  bool hotkey_translate{false};
-  bool hotkey_rotate{false};
-  bool hotkey_scale{false};
-  bool hotkey_local{false};
   bool hotkey_ctrl{false};
   float screenspace_scale{
       0.f}; // If > 0.f, the gizmos are drawn scale-invariant with a screenspace
@@ -69,8 +65,12 @@ struct gizmo_context {
                            // `gizmo_application_state` data
   std::tuple<std::span<draw_vertex>, std::span<uint32_t>> drawlist();
 
-  bool transform_gizmo(transform_mode mode, const std::string &name,
-                       float *position, float *orientation, float *scale);
+  bool position_gizmo(bool local_toggle, const std::string &name,
+                      float *position, float *orientation, float *scale);
+  bool orientation_gizmo(bool local_toggle, const std::string &name,
+                         float *position, float *orientation, float *scale);
+  bool scale_gizmo(bool local_toggle, const std::string &name, float *position,
+                   float *orientation, float *scale);
 };
 
 } // namespace tinygizmo

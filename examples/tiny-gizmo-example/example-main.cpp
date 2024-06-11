@@ -9,6 +9,24 @@
 #include <rlgl.h>
 #include <vector>
 
+enum class transform_mode {
+  translate,
+  rotate,
+  scale,
+};
+bool transform_gizmo(tinygizmo::gizmo_context *gizmo, transform_mode mode,
+                     bool local_toggle, const std::string &name, float *t,
+                     float *r, float *s) {
+  switch (mode) {
+  case transform_mode::translate:
+    return gizmo->position_gizmo(local_toggle, name, t, r, s);
+  case transform_mode::rotate:
+    return gizmo->orientation_gizmo(local_toggle, name, t, r, s);
+  case transform_mode::scale:
+    return gizmo->scale_gizmo(local_toggle, name, t, r, s);
+  }
+}
+
 static Matrix TRS(const float *t, const float *r, const float *s) {
   return MatrixMultiply(
       MatrixMultiply(MatrixScale(s[0], s[1], s[2]),
@@ -77,6 +95,13 @@ struct Vertex {
   Vector3 color;
 };
 
+struct hotkey {
+  bool hotkey_translate{false};
+  bool hotkey_rotate{false};
+  bool hotkey_scale{false};
+  bool hotkey_local{false};
+};
+
 int main(int argc, char *argv[]) {
 
   InitWindow(1280, 800, "tiny-gizmo-example-app");
@@ -105,10 +130,12 @@ int main(int argc, char *argv[]) {
   };
 
   tinygizmo::gizmo_context gizmo_ctx;
-  auto mode = tinygizmo::transform_mode::translate;
+  auto mode = transform_mode::translate;
+  // State to describe if the gizmo should use transform-local math
+  bool local_toggle{true};
   Drawable gizmo_mesh;
 
-  tinygizmo::gizmo_application_state last_state{0};
+  hotkey last_state{0};
 
   while (!WindowShouldClose()) {
     auto w = GetScreenWidth();
@@ -134,11 +161,7 @@ int main(int argc, char *argv[]) {
     tinygizmo::gizmo_application_state active_state{
         .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
         // trs
-        .hotkey_translate = IsKeyDown(KEY_T),
-        .hotkey_rotate = IsKeyDown(KEY_R),
-        .hotkey_scale = IsKeyDown(KEY_S),
         // keyboard
-        .hotkey_local = IsKeyDown(KEY_L),
         .hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL),
         // optional flag to draw the gizmos at a constant screen-space scale
         // gizmo_state.screenspace_scale = 80.f;
@@ -150,26 +173,37 @@ int main(int argc, char *argv[]) {
         .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
     };
 
+    hotkey active_hotkey = {
+        .hotkey_translate = IsKeyDown(KEY_T),
+        .hotkey_rotate = IsKeyDown(KEY_R),
+        .hotkey_scale = IsKeyDown(KEY_S),
+        .hotkey_local = IsKeyDown(KEY_L),
+    };
+
     if (active_state.hotkey_ctrl == true) {
       if (last_state.hotkey_translate == false &&
-          active_state.hotkey_translate == true)
-        mode = tinygizmo::transform_mode::translate;
+          active_hotkey.hotkey_translate == true)
+        mode = transform_mode::translate;
       else if (last_state.hotkey_rotate == false &&
-               active_state.hotkey_rotate == true)
-        mode = tinygizmo::transform_mode::rotate;
+               active_hotkey.hotkey_rotate == true)
+        mode = transform_mode::rotate;
       else if (last_state.hotkey_scale == false &&
-               active_state.hotkey_scale == true)
-        mode = tinygizmo::transform_mode::scale;
-    }
-    gizmo_ctx.update(active_state);
-    last_state = active_state;
+               active_hotkey.hotkey_scale == true)
+        mode = transform_mode::scale;
 
-    gizmo_ctx.transform_gizmo(mode, "first-example-gizmo", &a_t.x, &a_r.x,
-                              &a_s.x);
-    // auto ma = xform_a.matrix();
-    gizmo_ctx.transform_gizmo(mode, "second-example-gizmo", &b_t.x, &b_r.x,
-                              &b_s.x);
-    // auto mb = xform_b.matrix();
+      local_toggle = (!last_state.hotkey_local && active_hotkey.hotkey_local)
+                         ? !local_toggle
+                         : local_toggle;
+    }
+
+    gizmo_ctx.update(active_state);
+    last_state = active_hotkey;
+
+    transform_gizmo(&gizmo_ctx, mode, local_toggle, "first-example-gizmo",
+                    &a_t.x, &a_r.x, &a_s.x);
+    transform_gizmo(&gizmo_ctx, mode, local_toggle, "second-example-gizmo",
+                    &b_t.x, &b_r.x, &b_s.x);
+
     auto [vertices, indices] = gizmo_ctx.drawlist();
 
     // update gizmo mesh

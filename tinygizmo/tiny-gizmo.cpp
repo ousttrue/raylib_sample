@@ -64,8 +64,6 @@ struct gizmo_context_impl {
 
   gizmo_application_state active_state;
   gizmo_application_state last_state;
-  bool local_toggle{
-      true}; // State to describe if the gizmo should use transform-local math
   bool has_clicked{false}; // State to describe if the user has pressed the left
                            // mouse button during the last frame
   bool has_released{false}; // State to describe if the user has released the
@@ -139,10 +137,6 @@ struct gizmo_context_impl {
 
   void update(const gizmo_application_state &state) {
     active_state = state;
-    local_toggle = (!last_state.hotkey_local && active_state.hotkey_local &&
-                    active_state.hotkey_ctrl)
-                       ? !local_toggle
-                       : local_toggle;
     has_clicked =
         (!last_state.mouse_left && active_state.mouse_left) ? true : false;
     has_released =
@@ -283,11 +277,11 @@ void axis_translation_dragger(const uint32_t id, gizmo_context_impl &g,
 //   Gizmo Implementations   //
 ///////////////////////////////
 
-void position_gizmo(const std::string &name, gizmo_context_impl &g,
-                    const minalg::float4 &orientation,
+void position_gizmo(bool local_toggle, const std::string &name,
+                    gizmo_context_impl &g, const minalg::float4 &orientation,
                     minalg::float3 &position) {
   rigid_transform p = rigid_transform(
-      g.local_toggle ? orientation : minalg::float4(0, 0, 0, 1), position);
+      local_toggle ? orientation : minalg::float4(0, 0, 0, 1), position);
   const float draw_scale =
       (g.active_state.screenspace_scale > 0.f)
           ? scale_screenspace(g, p.position, g.active_state.screenspace_scale)
@@ -342,8 +336,8 @@ void position_gizmo(const std::string &name, gizmo_context_impl &g,
       if (g.gizmos[id].interaction_mode != interact::none) {
         transform(draw_scale, ray);
         g.gizmos[id].click_offset =
-            g.local_toggle ? p.transform_vector(ray.origin + ray.direction * t)
-                           : ray.origin + ray.direction * t;
+            local_toggle ? p.transform_vector(ray.origin + ray.direction * t)
+                         : ray.origin + ray.direction * t;
         g.gizmos[id].active = true;
       } else
         g.gizmos[id].active = false;
@@ -354,7 +348,7 @@ void position_gizmo(const std::string &name, gizmo_context_impl &g,
   }
 
   std::vector<minalg::float3> axes;
-  if (g.local_toggle)
+  if (local_toggle)
     axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
   else
     axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
@@ -419,13 +413,13 @@ void position_gizmo(const std::string &name, gizmo_context_impl &g,
   }
 }
 
-void orientation_gizmo(const std::string &name, gizmo_context_impl &g,
-                       const minalg::float3 &center,
+void orientation_gizmo(bool local_toggle, const std::string &name,
+                       gizmo_context_impl &g, const minalg::float3 &center,
                        minalg::float4 &orientation) {
   assert(length2(orientation) > float(1e-6));
 
   rigid_transform p =
-      rigid_transform(g.local_toggle ? orientation : minalg::float4(0, 0, 0, 1),
+      rigid_transform(local_toggle ? orientation : minalg::float4(0, 0, 0, 1),
                       center); // Orientation is local by default
   const float draw_scale =
       (g.active_state.screenspace_scale > 0.f)
@@ -477,8 +471,8 @@ void orientation_gizmo(const std::string &name, gizmo_context_impl &g,
   minalg::float3 activeAxis;
   if (g.gizmos[id].active) {
     const minalg::float4 starting_orientation =
-        g.local_toggle ? g.gizmos[id].original_orientation
-                       : minalg::float4(0, 0, 0, 1);
+        local_toggle ? g.gizmos[id].original_orientation
+                     : minalg::float4(0, 0, 0, 1);
     switch (g.gizmos[id].interaction_mode) {
     case interact::rotate_x:
       axis_rotation_dragger(id, g, {1, 0, 0}, center, starting_orientation,
@@ -508,7 +502,7 @@ void orientation_gizmo(const std::string &name, gizmo_context_impl &g,
   modelMatrix = mul(modelMatrix, scaleMatrix);
 
   std::vector<interact> draw_interactions;
-  if (!g.local_toggle && g.gizmos[id].interaction_mode != interact::none)
+  if (!local_toggle && g.gizmos[id].interaction_mode != interact::none)
     draw_interactions = {g.gizmos[id].interaction_mode};
   else
     draw_interactions = {interact::rotate_x, interact::rotate_y,
@@ -532,7 +526,7 @@ void orientation_gizmo(const std::string &name, gizmo_context_impl &g,
   // For non-local transformations, we only present one rotation ring
   // and draw an arrow from the center of the gizmo to indicate the degree of
   // rotation
-  if (g.local_toggle == false &&
+  if (local_toggle == false &&
       g.gizmos[id].interaction_mode != interact::none) {
     interaction_state &interaction = g.gizmos[id];
 
@@ -557,7 +551,7 @@ void orientation_gizmo(const std::string &name, gizmo_context_impl &g,
     g.drawlist.push_back(r);
 
     orientation = qmul(p.orientation, interaction.original_orientation);
-  } else if (g.local_toggle == true &&
+  } else if (local_toggle == true &&
              g.gizmos[id].interaction_mode != interact::none)
     orientation = p.orientation;
 }
@@ -611,8 +605,8 @@ void axis_scale_dragger(const uint32_t &id, gizmo_context_impl &g,
   }
 }
 
-void scale_gizmo(const std::string &name, gizmo_context_impl &g,
-                 const minalg::float4 &orientation,
+void scale_gizmo(bool local_toggle, const std::string &name,
+                 gizmo_context_impl &g, const minalg::float4 &orientation,
                  const minalg::float3 &center, minalg::float3 &scale) {
   rigid_transform p = rigid_transform(orientation, center);
   const float draw_scale =
@@ -736,26 +730,78 @@ gizmo_context::drawlist() {
   return {impl->vertices, impl->indices};
 }
 
-bool gizmo_context::transform_gizmo(transform_mode mode,
-                                    const std::string &name, float *position,
-                                    float *rotation, float *scale) {
-
+bool gizmo_context::position_gizmo(bool local_toggle, const std::string &name,
+                                   float *position, float *rotation,
+                                   float *scale) {
   rigid_transform t;
   t.position = {position[0], position[1], position[2]};
   t.orientation = {rotation[0], rotation[1], rotation[2], rotation[3]};
   t.scale = {scale[0], scale[1], scale[2]};
 
-  switch (mode) {
-  case transform_mode::translate:
-    position_gizmo(name, *this->impl, t.orientation, t.position);
-    break;
-  case transform_mode::rotate:
-    orientation_gizmo(name, *this->impl, t.position, t.orientation);
-    break;
-  case transform_mode::scale:
-    scale_gizmo(name, *this->impl, t.orientation, t.position, t.scale);
-    break;
+  tinygizmo::position_gizmo(local_toggle, name, *this->impl, t.orientation,
+                            t.position);
+
+  bool activated = false;
+  auto s = this->impl->gizmos[hash_fnv1a(name)];
+  if (s.hover == true || s.active == true) {
+    activated = true;
   }
+  if (activated) {
+    position[0] = t.position.x;
+    position[1] = t.position.y;
+    position[2] = t.position.z;
+    rotation[0] = t.orientation.x;
+    rotation[1] = t.orientation.y;
+    rotation[2] = t.orientation.z;
+    rotation[3] = t.orientation.w;
+    scale[0] = t.scale.x;
+    scale[1] = t.scale.y;
+    scale[2] = t.scale.z;
+  }
+  return activated;
+}
+
+bool gizmo_context::orientation_gizmo(bool local_toggle,
+                                      const std::string &name, float *position,
+                                      float *rotation, float *scale) {
+  rigid_transform t;
+  t.position = {position[0], position[1], position[2]};
+  t.orientation = {rotation[0], rotation[1], rotation[2], rotation[3]};
+  t.scale = {scale[0], scale[1], scale[2]};
+
+  tinygizmo::orientation_gizmo(local_toggle, name, *this->impl, t.position,
+                               t.orientation);
+
+  bool activated = false;
+  auto s = this->impl->gizmos[hash_fnv1a(name)];
+  if (s.hover == true || s.active == true) {
+    activated = true;
+  }
+  if (activated) {
+    position[0] = t.position.x;
+    position[1] = t.position.y;
+    position[2] = t.position.z;
+    rotation[0] = t.orientation.x;
+    rotation[1] = t.orientation.y;
+    rotation[2] = t.orientation.z;
+    rotation[3] = t.orientation.w;
+    scale[0] = t.scale.x;
+    scale[1] = t.scale.y;
+    scale[2] = t.scale.z;
+  }
+  return activated;
+}
+
+bool gizmo_context::scale_gizmo(bool local_toggle, const std::string &name,
+                                float *position, float *rotation,
+                                float *scale) {
+  rigid_transform t;
+  t.position = {position[0], position[1], position[2]};
+  t.orientation = {rotation[0], rotation[1], rotation[2], rotation[3]};
+  t.scale = {scale[0], scale[1], scale[2]};
+
+  tinygizmo::scale_gizmo(local_toggle, name, *this->impl, t.orientation,
+                         t.position, t.scale);
 
   bool activated = false;
   auto s = this->impl->gizmos[hash_fnv1a(name)];
