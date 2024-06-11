@@ -105,7 +105,10 @@ int main(int argc, char *argv[]) {
   };
 
   tinygizmo::gizmo_context gizmo_ctx;
+  auto mode = tinygizmo::transform_mode::translate;
   Drawable gizmo_mesh;
+
+  tinygizmo::gizmo_application_state last_state{0};
 
   while (!WindowShouldClose()) {
     auto w = GetScreenWidth();
@@ -128,7 +131,7 @@ int main(int argc, char *argv[]) {
     auto rot =
         QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
     // mouse
-    tinygizmo::gizmo_application_state gizmo_state{
+    tinygizmo::gizmo_application_state active_state{
         .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
         // trs
         .hotkey_translate = IsKeyDown(KEY_T),
@@ -146,16 +149,33 @@ int main(int argc, char *argv[]) {
         .cam_yfov = 1.0f,
         .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
     };
-    gizmo_ctx.update(gizmo_state);
-    gizmo_ctx.transform_gizmo("first-example-gizmo", &a_t.x, &a_r.x, &a_s.x);
+
+    if (active_state.hotkey_ctrl == true) {
+      if (last_state.hotkey_translate == false &&
+          active_state.hotkey_translate == true)
+        mode = tinygizmo::transform_mode::translate;
+      else if (last_state.hotkey_rotate == false &&
+               active_state.hotkey_rotate == true)
+        mode = tinygizmo::transform_mode::rotate;
+      else if (last_state.hotkey_scale == false &&
+               active_state.hotkey_scale == true)
+        mode = tinygizmo::transform_mode::scale;
+    }
+    gizmo_ctx.update(active_state);
+    last_state = active_state;
+
+    gizmo_ctx.transform_gizmo(mode, "first-example-gizmo", &a_t.x, &a_r.x,
+                              &a_s.x);
     // auto ma = xform_a.matrix();
-    gizmo_ctx.transform_gizmo("second-example-gizmo", &b_t.x, &b_r.x, &b_s.x);
+    gizmo_ctx.transform_gizmo(mode, "second-example-gizmo", &b_t.x, &b_r.x,
+                              &b_s.x);
     // auto mb = xform_b.matrix();
     auto [vertices, indices] = gizmo_ctx.drawlist();
 
     // update gizmo mesh
     if (vertices.size() && indices.size()) {
-      gizmo_mesh.load<tinygizmo::draw_vertex, uint32_t>(vertices, indices, true);
+      gizmo_mesh.load<tinygizmo::draw_vertex, uint32_t>(vertices, indices,
+                                                        true);
     }
 
     // render

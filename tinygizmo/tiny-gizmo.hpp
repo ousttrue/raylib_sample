@@ -68,11 +68,9 @@ struct gizmo_context {
                   &state); // Clear geometry buffer and update internal
                            // `gizmo_application_state` data
   std::tuple<std::span<draw_vertex>, std::span<uint32_t>> drawlist();
-  transform_mode get_mode()
-      const; // Return the active mode being used by `transform_gizmo(...)`
 
-  bool transform_gizmo(const std::string &name, float *position,
-                       float *orientation, float *scale);
+  bool transform_gizmo(transform_mode mode, const std::string &name,
+                       float *position, float *orientation, float *scale);
 };
 
 } // namespace tinygizmo
