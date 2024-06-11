@@ -10,14 +10,10 @@
 #include <string>
 #include <vector>
 
-minalg::float3 to_minalg(const tinygizmo::float3 &v) { return {v.x, v.y, v.z}; }
-minalg::float4 to_minalg(const tinygizmo::float4 &v) {
-  return {v.x, v.y, v.z, v.w};
-}
+namespace tinygizmo {
 
-//////////////////////////////////
-// Gizmo Context Implementation //
-//////////////////////////////////
+minalg::float3 to_minalg(const float3 &v) { return {v.x, v.y, v.z}; }
+minalg::float4 to_minalg(const float4 &v) { return {v.x, v.y, v.z, v.w}; }
 
 enum class interact {
   none,
@@ -52,14 +48,14 @@ struct interaction_state {
   interact interaction_mode;   // Currently active component
 };
 
-namespace tinygizmo {
+//////////////////////////////////
+// Gizmo Context Implementation //
+//////////////////////////////////
 struct gizmo_context_impl {
   gizmo_context *ctx;
 
   std::vector<draw_vertex> vertices;
   std::vector<uint32_t> indices;
-
-  gizmo_context_impl(gizmo_context *ctx);
 
   std::map<interact, gizmo_mesh_component> mesh_components;
   std::vector<gizmo_renderable> drawlist;
@@ -78,94 +74,88 @@ struct gizmo_context_impl {
                             // left mouse button during the last frame
 
   // Public methods
-  void update(const gizmo_application_state &state);
+  gizmo_context_impl(gizmo_context *ctx) : ctx(ctx) {
+    std::vector<minalg::float2> arrow_points = {
+        {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
+    std::vector<minalg::float2> mace_points = {{0.25f, 0},    {0.25f, 0.05f},
+                                               {1, 0.05f},    {1, 0.1f},
+                                               {1.25f, 0.1f}, {1.25f, 0}};
+    std::vector<minalg::float2> ring_points = {
+        {+0.025f, 1},    {-0.025f, 1},    {-0.025f, 1},    {-0.025f, 1.1f},
+        {-0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1}};
+    mesh_components[interact::translate_x] = {
+        make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16, arrow_points),
+        {1, 0.5f, 0.5f, 1.f},
+        {1, 0, 0, 1.f}};
+    mesh_components[interact::translate_y] = {
+        make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16, arrow_points),
+        {0.5f, 1, 0.5f, 1.f},
+        {0, 1, 0, 1.f}};
+    mesh_components[interact::translate_z] = {
+        make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16, arrow_points),
+        {0.5f, 0.5f, 1, 1.f},
+        {0, 0, 1, 1.f}};
+    mesh_components[interact::translate_yz] = {
+        make_box_geometry({-0.01f, 0.25, 0.25}, {0.01f, 0.75f, 0.75f}),
+        {0.5f, 1, 1, 0.5f},
+        {0, 1, 1, 0.6f}};
+    mesh_components[interact::translate_zx] = {
+        make_box_geometry({0.25, -0.01f, 0.25}, {0.75f, 0.01f, 0.75f}),
+        {1, 0.5f, 1, 0.5f},
+        {1, 0, 1, 0.6f}};
+    mesh_components[interact::translate_xy] = {
+        make_box_geometry({0.25, 0.25, -0.01f}, {0.75f, 0.75f, 0.01f}),
+        {1, 1, 0.5f, 0.5f},
+        {1, 1, 0, 0.6f}};
+    mesh_components[interact::translate_xyz] = {
+        make_box_geometry({-0.05f, -0.05f, -0.05f}, {0.05f, 0.05f, 0.05f}),
+        {0.9f, 0.9f, 0.9f, 0.25f},
+        {1, 1, 1, 0.35f}};
+    mesh_components[interact::rotate_x] = {
+        make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 32, ring_points,
+                             0.003f),
+        {1, 0.5f, 0.5f, 1.f},
+        {1, 0, 0, 1.f}};
+    mesh_components[interact::rotate_y] = {
+        make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 32, ring_points,
+                             -0.003f),
+        {0.5f, 1, 0.5f, 1.f},
+        {0, 1, 0, 1.f}};
+    mesh_components[interact::rotate_z] = {
+        make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 32, ring_points),
+        {0.5f, 0.5f, 1, 1.f},
+        {0, 0, 1, 1.f}};
+    mesh_components[interact::scale_x] = {
+        make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16, mace_points),
+        {1, 0.5f, 0.5f, 1.f},
+        {1, 0, 0, 1.f}};
+    mesh_components[interact::scale_y] = {
+        make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16, mace_points),
+        {0.5f, 1, 0.5f, 1.f},
+        {0, 1, 0, 1.f}};
+    mesh_components[interact::scale_z] = {
+        make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16, mace_points),
+        {0.5f, 0.5f, 1, 1.f},
+        {0, 0, 1, 1.f}};
+  }
+
+  void update(const gizmo_application_state &state) {
+    active_state = state;
+    local_toggle = (!last_state.hotkey_local && active_state.hotkey_local &&
+                    active_state.hotkey_ctrl)
+                       ? !local_toggle
+                       : local_toggle;
+    has_clicked =
+        (!last_state.mouse_left && active_state.mouse_left) ? true : false;
+    has_released =
+        (last_state.mouse_left && !active_state.mouse_left) ? true : false;
+    drawlist.clear();
+  }
 };
-} // namespace tinygizmo
-
-tinygizmo::gizmo_context_impl::gizmo_context_impl(gizmo_context *ctx)
-    : ctx(ctx) {
-  std::vector<minalg::float2> arrow_points = {
-      {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
-  std::vector<minalg::float2> mace_points = {{0.25f, 0},    {0.25f, 0.05f},
-                                             {1, 0.05f},    {1, 0.1f},
-                                             {1.25f, 0.1f}, {1.25f, 0}};
-  std::vector<minalg::float2> ring_points = {
-      {+0.025f, 1},    {-0.025f, 1},    {-0.025f, 1},    {-0.025f, 1.1f},
-      {-0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1}};
-  mesh_components[interact::translate_x] = {
-      make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16, arrow_points),
-      {1, 0.5f, 0.5f, 1.f},
-      {1, 0, 0, 1.f}};
-  mesh_components[interact::translate_y] = {
-      make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16, arrow_points),
-      {0.5f, 1, 0.5f, 1.f},
-      {0, 1, 0, 1.f}};
-  mesh_components[interact::translate_z] = {
-      make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16, arrow_points),
-      {0.5f, 0.5f, 1, 1.f},
-      {0, 0, 1, 1.f}};
-  mesh_components[interact::translate_yz] = {
-      make_box_geometry({-0.01f, 0.25, 0.25}, {0.01f, 0.75f, 0.75f}),
-      {0.5f, 1, 1, 0.5f},
-      {0, 1, 1, 0.6f}};
-  mesh_components[interact::translate_zx] = {
-      make_box_geometry({0.25, -0.01f, 0.25}, {0.75f, 0.01f, 0.75f}),
-      {1, 0.5f, 1, 0.5f},
-      {1, 0, 1, 0.6f}};
-  mesh_components[interact::translate_xy] = {
-      make_box_geometry({0.25, 0.25, -0.01f}, {0.75f, 0.75f, 0.01f}),
-      {1, 1, 0.5f, 0.5f},
-      {1, 1, 0, 0.6f}};
-  mesh_components[interact::translate_xyz] = {
-      make_box_geometry({-0.05f, -0.05f, -0.05f}, {0.05f, 0.05f, 0.05f}),
-      {0.9f, 0.9f, 0.9f, 0.25f},
-      {1, 1, 1, 0.35f}};
-  mesh_components[interact::rotate_x] = {
-      make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 32, ring_points,
-                           0.003f),
-      {1, 0.5f, 0.5f, 1.f},
-      {1, 0, 0, 1.f}};
-  mesh_components[interact::rotate_y] = {
-      make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 32, ring_points,
-                           -0.003f),
-      {0.5f, 1, 0.5f, 1.f},
-      {0, 1, 0, 1.f}};
-  mesh_components[interact::rotate_z] = {
-      make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 32, ring_points),
-      {0.5f, 0.5f, 1, 1.f},
-      {0, 0, 1, 1.f}};
-  mesh_components[interact::scale_x] = {
-      make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16, mace_points),
-      {1, 0.5f, 0.5f, 1.f},
-      {1, 0, 0, 1.f}};
-  mesh_components[interact::scale_y] = {
-      make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16, mace_points),
-      {0.5f, 1, 0.5f, 1.f},
-      {0, 1, 0, 1.f}};
-  mesh_components[interact::scale_z] = {
-      make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16, mace_points),
-      {0.5f, 0.5f, 1, 1.f},
-      {0, 0, 1, 1.f}};
-}
-
-void tinygizmo::gizmo_context_impl::update(
-    const gizmo_application_state &state) {
-  active_state = state;
-  local_toggle = (!last_state.hotkey_local && active_state.hotkey_local &&
-                  active_state.hotkey_ctrl)
-                     ? !local_toggle
-                     : local_toggle;
-  has_clicked =
-      (!last_state.mouse_left && active_state.mouse_left) ? true : false;
-  has_released =
-      (last_state.mouse_left && !active_state.mouse_left) ? true : false;
-  drawlist.clear();
-}
 
 // This will calculate a scale constant based on the number of screenspace
 // pixels passed as pixel_scale.
-float scale_screenspace(tinygizmo::gizmo_context_impl &g,
-                        const minalg::float3 position,
+float scale_screenspace(gizmo_context_impl &g, const minalg::float3 position,
                         const float pixel_scale) {
   float dist = length(position - to_minalg(g.active_state.ray_origin));
   return std::tan(g.active_state.cam_yfov) * dist *
@@ -174,8 +164,8 @@ float scale_screenspace(tinygizmo::gizmo_context_impl &g,
 
 // The only purpose of this is readability: to reduce the total column width of
 // the intersect(...) statements in every gizmo
-bool intersect(tinygizmo::gizmo_context_impl &g, const ray &r, interact i,
-               float &t, const float best_t) {
+bool intersect(gizmo_context_impl &g, const ray &r, interact i, float &t,
+               const float best_t) {
   if (intersect_ray_mesh(r, g.mesh_components[i].mesh, &t) && t < best_t)
     return true;
   return false;
@@ -185,7 +175,7 @@ bool intersect(tinygizmo::gizmo_context_impl &g, const ray &r, interact i,
 // Private Gizmo Implementations //
 ///////////////////////////////////
 
-void axis_rotation_dragger(const uint32_t id, tinygizmo::gizmo_context_impl &g,
+void axis_rotation_dragger(const uint32_t id, gizmo_context_impl &g,
                            const minalg::float3 &axis,
                            const minalg::float3 &center,
                            const minalg::float4 &start_orientation,
@@ -238,8 +228,7 @@ void axis_rotation_dragger(const uint32_t id, tinygizmo::gizmo_context_impl &g,
   }
 }
 
-void plane_translation_dragger(const uint32_t id,
-                               tinygizmo::gizmo_context_impl &g,
+void plane_translation_dragger(const uint32_t id, gizmo_context_impl &g,
                                const minalg::float3 &plane_normal,
                                minalg::float3 &point) {
   interaction_state &interaction = g.gizmos[id];
@@ -273,8 +262,7 @@ void plane_translation_dragger(const uint32_t id,
   }
 }
 
-void axis_translation_dragger(const uint32_t id,
-                              tinygizmo::gizmo_context_impl &g,
+void axis_translation_dragger(const uint32_t id, gizmo_context_impl &g,
                               const minalg::float3 &axis,
                               minalg::float3 &point) {
   interaction_state &interaction = g.gizmos[id];
@@ -297,7 +285,7 @@ void axis_translation_dragger(const uint32_t id,
 //   Gizmo Implementations   //
 ///////////////////////////////
 
-void position_gizmo(const std::string &name, tinygizmo::gizmo_context_impl &g,
+void position_gizmo(const std::string &name, gizmo_context_impl &g,
                     const minalg::float4 &orientation,
                     minalg::float3 &position) {
   rigid_transform p = rigid_transform(
@@ -433,8 +421,7 @@ void position_gizmo(const std::string &name, tinygizmo::gizmo_context_impl &g,
   }
 }
 
-void orientation_gizmo(const std::string &name,
-                       tinygizmo::gizmo_context_impl &g,
+void orientation_gizmo(const std::string &name, gizmo_context_impl &g,
                        const minalg::float3 &center,
                        minalg::float4 &orientation) {
   assert(length2(orientation) > float(1e-6));
@@ -577,7 +564,7 @@ void orientation_gizmo(const std::string &name,
     orientation = p.orientation;
 }
 
-void axis_scale_dragger(const uint32_t &id, tinygizmo::gizmo_context_impl &g,
+void axis_scale_dragger(const uint32_t &id, gizmo_context_impl &g,
                         const minalg::float3 &axis,
                         const minalg::float3 &center, minalg::float3 &scale,
                         const bool uniform) {
@@ -626,7 +613,7 @@ void axis_scale_dragger(const uint32_t &id, tinygizmo::gizmo_context_impl &g,
   }
 }
 
-void scale_gizmo(const std::string &name, tinygizmo::gizmo_context_impl &g,
+void scale_gizmo(const std::string &name, gizmo_context_impl &g,
                  const minalg::float4 &orientation,
                  const minalg::float3 &center, minalg::float3 &scale) {
   rigid_transform p = rigid_transform(orientation, center);
@@ -721,7 +708,6 @@ void scale_gizmo(const std::string &name, tinygizmo::gizmo_context_impl &g,
 //////////////////////////////////
 // Public Gizmo Implementations //
 //////////////////////////////////
-namespace tinygizmo {
 gizmo_context::gizmo_context() { impl.reset(new gizmo_context_impl(this)); };
 gizmo_context::~gizmo_context() {}
 void gizmo_context::update(const gizmo_application_state &state) {
