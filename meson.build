@@ -35,6 +35,7 @@ executable(
     [
         'examples/tiny-gizmo-example/example-main.cpp',
         'tinygizmo/tiny-gizmo.cpp',
+        'tinygizmo/tiny-gizmo_impl.cpp',
     ],
     include_directories: include_directories(
         'tinygizmo',

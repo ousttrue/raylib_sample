@@ -1,7 +1,6 @@
 // This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
 #pragma once
-#include <memory>
 #include <span>
 #include <string>
 
@@ -64,7 +63,7 @@ struct gizmo_result {
 
 class gizmo_context_impl;
 struct gizmo_context {
-  std::unique_ptr<gizmo_context_impl> impl;
+  gizmo_context_impl *impl;
   gizmo_context();
   ~gizmo_context();
   // Clear geometry buffer and update internal `gizmo_application_state` data
