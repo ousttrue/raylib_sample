@@ -33,8 +33,6 @@ struct draw_vertex {
   float4 color;
 };
 
-enum class transform_mode { translate, rotate, scale };
-
 struct gizmo_application_state {
   bool mouse_left{false};
   // If > 0.f, the gizmos are drawn scale-invariant with a screenspace value
@@ -56,18 +54,16 @@ struct gizmo_application_state {
   float4 cam_orientation;
 };
 
-struct gizmo_context_impl;
+class gizmo_context_impl;
 struct gizmo_context {
   std::unique_ptr<gizmo_context_impl> impl;
-
   gizmo_context();
   ~gizmo_context();
-
   // Clear geometry buffer and update internal `gizmo_application_state` data
   void begin_frame(const gizmo_application_state &state);
   bool position_gizmo(bool local_toggle, const std::string &name,
                       float *position, float *orientation);
-  bool orientation_gizmo(bool local_toggle, const std::string &name,
+  bool rotationn_gizmo(bool local_toggle, const std::string &name,
                          float *position, float *orientation);
   bool scale_gizmo(bool local_toggle, bool uniform, const std::string &name,
                    float *position, float *orientation, float *scale);

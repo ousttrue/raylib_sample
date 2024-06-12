@@ -21,7 +21,7 @@ bool transform_gizmo(tinygizmo::gizmo_context *gizmo, transform_mode mode,
   case transform_mode::translate:
     return gizmo->position_gizmo(local_toggle, name, t, r);
   case transform_mode::rotate:
-    return gizmo->orientation_gizmo(local_toggle, name, t, r);
+    return gizmo->rotationn_gizmo(local_toggle, name, t, r);
   case transform_mode::scale:
     return gizmo->scale_gizmo(local_toggle, uniform, name, t, r, s);
   }
@@ -195,18 +195,20 @@ int main(int argc, char *argv[]) {
                          : local_toggle;
     }
 
-    gizmo_ctx.begin_frame(active_state);
-    last_state = active_hotkey;
-    transform_gizmo(&gizmo_ctx, mode, local_toggle, active_hotkey.hotkey_ctrl,
-                    "first-example-gizmo", &a_t.x, &a_r.x, &a_s.x);
-    transform_gizmo(&gizmo_ctx, mode, local_toggle, active_hotkey.hotkey_ctrl,
-                    "second-example-gizmo", &b_t.x, &b_r.x, &b_s.x);
-    auto [vertices, indices] = gizmo_ctx.end_frame();
-    if (vertices.size() && indices.size()) {
-      // update gizmo mesh
-      gizmo_mesh.load<tinygizmo::draw_vertex, uint32_t>(vertices, indices,
-                                                        true);
+    {
+      gizmo_ctx.begin_frame(active_state);
+      transform_gizmo(&gizmo_ctx, mode, local_toggle, active_hotkey.hotkey_ctrl,
+                      "first-example-gizmo", &a_t.x, &a_r.x, &a_s.x);
+      transform_gizmo(&gizmo_ctx, mode, local_toggle, active_hotkey.hotkey_ctrl,
+                      "second-example-gizmo", &b_t.x, &b_r.x, &b_s.x);
+      auto [vertices, indices] = gizmo_ctx.end_frame();
+      if (vertices.size() && indices.size()) {
+        // update gizmo mesh
+        gizmo_mesh.load<tinygizmo::draw_vertex, uint32_t>(vertices, indices,
+                                                          true);
+      }
     }
+    last_state = active_hotkey;
 
     // render
     BeginDrawing();
