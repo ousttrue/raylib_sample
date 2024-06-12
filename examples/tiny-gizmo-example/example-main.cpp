@@ -7,7 +7,6 @@
 #include "orbit_camera.h"
 #include "teapot.h"
 #include <rlgl.h>
-#include <vector>
 
 enum class transform_mode {
   translate,
@@ -16,22 +15,37 @@ enum class transform_mode {
 };
 bool transform_gizmo(tinygizmo::gizmo_context *gizmo, transform_mode mode,
                      bool local_toggle, bool uniform, const std::string &name,
-                     float *t, float *r, float *s) {
+                     Vector3 &t, Quaternion &r, Vector3 &s) {
   switch (mode) {
-  case transform_mode::translate:
-    return gizmo->position_gizmo(local_toggle, name, t, r);
-  case transform_mode::rotate:
-    return gizmo->rotationn_gizmo(local_toggle, name, t, r);
-  case transform_mode::scale:
-    return gizmo->scale_gizmo(local_toggle, uniform, name, t, r, s);
+  case transform_mode::translate: {
+    auto result = gizmo->translation_gizmo(local_toggle, name, &t.x, &r.x);
+    if (result.active) {
+      t = *(Vector3 *)&result.t;
+    }
+    return result.hover || result.active;
+  }
+  case transform_mode::rotate: {
+    auto result = gizmo->rotationn_gizmo(local_toggle, name, &t.x, &r.x);
+    if (result.active) {
+      r = *(Quaternion *)&result.r;
+    }
+    return result.hover || result.active;
+  }
+  case transform_mode::scale: {
+    auto result =
+        gizmo->scale_gizmo(local_toggle, uniform, name, &t.x, &r.x, &s.x);
+    if (result.active) {
+      s = *(Vector3 *)&result.s;
+    }
+    return result.hover || result.active;
+  }
   }
 }
 
-static Matrix TRS(const float *t, const float *r, const float *s) {
+static Matrix TRS(const Vector3 &t, const Quaternion &r, const Vector3 &s) {
   return MatrixMultiply(
-      MatrixMultiply(MatrixScale(s[0], s[1], s[2]),
-                     QuaternionToMatrix({r[0], r[1], r[2], r[3]})),
-      MatrixTranslate(t[0], t[1], t[2]));
+      MatrixMultiply(MatrixScale(s.x, s.y, s.z), QuaternionToMatrix(r)),
+      MatrixTranslate(t.x, t.y, t.z));
 }
 
 struct Drawable {
@@ -198,9 +212,9 @@ int main(int argc, char *argv[]) {
     {
       gizmo_ctx.begin_frame(active_state);
       transform_gizmo(&gizmo_ctx, mode, local_toggle, active_hotkey.hotkey_ctrl,
-                      "first-example-gizmo", &a_t.x, &a_r.x, &a_s.x);
+                      "first-example-gizmo", a_t, a_r, a_s);
       transform_gizmo(&gizmo_ctx, mode, local_toggle, active_hotkey.hotkey_ctrl,
-                      "second-example-gizmo", &b_t.x, &b_r.x, &b_s.x);
+                      "second-example-gizmo", b_t, b_r, b_s);
       auto [vertices, indices] = gizmo_ctx.end_frame();
       if (vertices.size() && indices.size()) {
         // update gizmo mesh
@@ -221,8 +235,8 @@ int main(int argc, char *argv[]) {
     BeginMode3D(camera);
     {
       // teapot
-      teapot.draw(TRS(&a_t.x, &a_r.x, &a_s.x));
-      teapot.draw(TRS(&b_t.x, &b_r.x, &b_s.x));
+      teapot.draw(TRS(a_t, a_r, a_s));
+      teapot.draw(TRS(b_t, b_r, b_s));
       DrawGrid(10, 1.0);
 
       // draw gizmo

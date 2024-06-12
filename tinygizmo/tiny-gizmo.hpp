@@ -54,6 +54,14 @@ struct gizmo_application_state {
   float4 cam_orientation;
 };
 
+struct gizmo_result {
+  bool hover;
+  bool active;
+  float3 t;
+  float4 r;
+  float3 s;
+};
+
 class gizmo_context_impl;
 struct gizmo_context {
   std::unique_ptr<gizmo_context_impl> impl;
@@ -61,12 +69,13 @@ struct gizmo_context {
   ~gizmo_context();
   // Clear geometry buffer and update internal `gizmo_application_state` data
   void begin_frame(const gizmo_application_state &state);
-  bool position_gizmo(bool local_toggle, const std::string &name,
-                      float *position, float *orientation);
-  bool rotationn_gizmo(bool local_toggle, const std::string &name,
-                         float *position, float *orientation);
-  bool scale_gizmo(bool local_toggle, bool uniform, const std::string &name,
-                   float *position, float *orientation, float *scale);
+  gizmo_result translation_gizmo(bool local_toggle, const std::string &name,
+                                 const float t[3], const float r[4]);
+  gizmo_result rotationn_gizmo(bool local_toggle, const std::string &name,
+                               const float t[3], const float r[4]);
+  gizmo_result scale_gizmo(bool local_toggle, bool uniform,
+                           const std::string &name, const float t[3],
+                           const float r[4], const float s[3]);
   std::tuple<std::span<draw_vertex>, std::span<uint32_t>> end_frame();
 };
 

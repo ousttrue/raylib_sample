@@ -337,11 +337,11 @@ private:
   }
 
 public:
-  interaction_state position_gizmo(bool local_toggle, const std::string &name,
-                                   const minalg::float4 &orientation,
-                                   minalg::float3 &position) {
+  gizmo_result position_gizmo(bool local_toggle, const std::string &name,
+                              const minalg::float4 &rotation,
+                              const minalg::float3 &_position) {
     rigid_transform p = rigid_transform(
-        local_toggle ? orientation : minalg::float4(0, 0, 0, 1), position);
+        local_toggle ? rotation : minalg::float4(0, 0, 0, 1), _position);
     const float draw_scale =
         (this->active_state.screenspace_scale > 0.f)
             ? this->scale_screenspace(p.position,
@@ -414,6 +414,7 @@ public:
     else
       axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
+    minalg::float3 position = _position;
     if (this->gizmos[id].active) {
       position += this->gizmos[id].click_offset;
       switch (this->gizmos[id].interaction_mode) {
@@ -473,17 +474,24 @@ public:
       this->drawlist.push_back(r);
     }
 
-    return this->gizmos[hash_fnv1a(name)];
+    auto state = this->gizmos[hash_fnv1a(name)];
+    return {.hover = state.hover,
+            .active = state.active,
+            .t = {
+                position.x,
+                position.y,
+                position.z,
+            }};
   }
 
-  interaction_state rotation_gizmo(bool local_toggle, const std::string &name,
-                                   const minalg::float3 &center,
-                                   minalg::float4 &orientation) {
-    assert(length2(orientation) > float(1e-6));
+  gizmo_result rotation_gizmo(bool local_toggle, const std::string &name,
+                              const minalg::float3 &center,
+                              const minalg::float4 &_orientation) {
+    assert(length2(_orientation) > float(1e-6));
 
-    rigid_transform p =
-        rigid_transform(local_toggle ? orientation : minalg::float4(0, 0, 0, 1),
-                        center); // Orientation is local by default
+    rigid_transform p = rigid_transform(
+        local_toggle ? _orientation : minalg::float4(0, 0, 0, 1),
+        center); // Orientation is local by default
     const float draw_scale =
         (this->active_state.screenspace_scale > 0.f)
             ? this->scale_screenspace(p.position,
@@ -523,7 +531,7 @@ public:
         if (this->gizmos[id].interaction_mode != interact::none) {
           transform(draw_scale, ray);
           this->gizmos[id].original_position = center;
-          this->gizmos[id].original_orientation = orientation;
+          this->gizmos[id].original_orientation = _orientation;
           this->gizmos[id].click_offset =
               p.transform_point(ray.origin + ray.direction * t);
           this->gizmos[id].active = true;
@@ -587,9 +595,10 @@ public:
       this->drawlist.push_back(r);
     }
 
+    auto orientation = _orientation;
     // For non-local transformations, we only present one rotation ring
-    // and draw an arrow from the center of the gizmo to indicate the degree of
-    // rotation
+    // and draw an arrow from the center of the gizmo to indicate the degree
+    // of rotation
     if (local_toggle == false &&
         this->gizmos[id].interaction_mode != interact::none) {
       interaction_state &interaction = this->gizmos[id];
@@ -616,16 +625,25 @@ public:
 
       orientation = qmul(p.orientation, interaction.original_orientation);
     } else if (local_toggle == true &&
-               this->gizmos[id].interaction_mode != interact::none)
+               this->gizmos[id].interaction_mode != interact::none) {
       orientation = p.orientation;
+    }
 
-    return this->gizmos[hash_fnv1a(name)];
+    auto state = this->gizmos[hash_fnv1a(name)];
+    return {.hover = state.hover,
+            .active = state.active,
+            .r = {
+                orientation.x,
+                orientation.y,
+                orientation.z,
+                orientation.w,
+            }};
   }
 
-  interaction_state scale_gizmo(bool local_toggle, const std::string &name,
-                                const minalg::float4 &orientation,
-                                const minalg::float3 &center,
-                                minalg::float3 &scale, bool uniform) {
+  gizmo_result scale_gizmo(bool local_toggle, const std::string &name,
+                           const minalg::float4 &orientation,
+                           const minalg::float3 &center,
+                           const minalg::float3 &_scale, bool uniform) {
     rigid_transform p = rigid_transform(orientation, center);
     const float draw_scale =
         (this->active_state.screenspace_scale > 0.f)
@@ -662,7 +680,7 @@ public:
         this->gizmos[id].interaction_mode = updated_state;
         if (this->gizmos[id].interaction_mode != interact::none) {
           transform(draw_scale, ray);
-          this->gizmos[id].original_scale = scale;
+          this->gizmos[id].original_scale = _scale;
           this->gizmos[id].click_offset =
               p.transform_point(ray.origin + ray.direction * t);
           this->gizmos[id].active = true;
@@ -676,6 +694,7 @@ public:
       this->gizmos[id].active = false;
     }
 
+    auto scale = _scale;
     if (this->gizmos[id].active) {
       switch (this->gizmos[id].interaction_mode) {
       case interact::scale_x:
@@ -685,7 +704,7 @@ public:
         this->axis_scale_dragger(id, {0, 1, 0}, center, scale, uniform);
         break;
       case interact::scale_z:
-       this->axis_scale_dragger(id, {0, 0, 1}, center, scale, uniform);
+        this->axis_scale_dragger(id, {0, 0, 1}, center, scale, uniform);
         break;
       }
     }
@@ -712,7 +731,14 @@ public:
       this->drawlist.push_back(r);
     }
 
-    return this->gizmos[hash_fnv1a(name)];
+    auto state = this->gizmos[hash_fnv1a(name)];
+    return {.hover = state.hover,
+            .active = state.active,
+            .s = {
+                scale.x,
+                scale.y,
+                scale.z,
+            }};
   }
 };
 
@@ -731,75 +757,29 @@ gizmo_context::end_frame() {
   return impl->end_frame();
 }
 
-bool gizmo_context::position_gizmo(bool local_toggle, const std::string &name,
-                                   float *t, float *r) {
-  minalg::float3 position{t[0], t[1], t[2]};
-  minalg::float4 rotation{r[0], r[1], r[2], r[3]};
-  bool activated = false;
-  auto x = this->impl->position_gizmo(local_toggle, name, rotation, position);
-  if (x.hover == true || x.active == true) {
-    activated = true;
-  }
-  if (activated) {
-    position[0] = position.x;
-    position[1] = position.y;
-    position[2] = position.z;
-    rotation[0] = rotation.x;
-    rotation[1] = rotation.y;
-    rotation[2] = rotation.z;
-    rotation[3] = rotation.w;
-  }
-  return activated;
+gizmo_result gizmo_context::translation_gizmo(bool local_toggle,
+                                              const std::string &name,
+                                              const float t[3],
+                                              const float r[4]) {
+  return this->impl->position_gizmo(local_toggle, name, *(minalg::float4 *)r,
+                                    *(minalg::float3 *)t);
 }
 
-bool gizmo_context::rotationn_gizmo(bool local_toggle, const std::string &name,
-                                    float *t, float *r) {
-  minalg::float3 position{t[0], t[1], t[2]};
-  minalg::float4 orientation{r[0], r[1], r[2], r[3]};
-  bool activated = false;
-  auto x =
-      this->impl->rotation_gizmo(local_toggle, name, position, orientation);
-  if (x.hover == true || x.active == true) {
-    activated = true;
-  }
-  if (activated) {
-    t[0] = position.x;
-    t[1] = position.y;
-    t[2] = position.z;
-    r[0] = orientation.x;
-    r[1] = orientation.y;
-    r[2] = orientation.z;
-    r[3] = orientation.w;
-  }
-  return activated;
+gizmo_result gizmo_context::rotationn_gizmo(bool local_toggle,
+                                            const std::string &name,
+                                            const float t[3],
+                                            const float r[4]) {
+  return this->impl->rotation_gizmo(local_toggle, name, *(minalg::float3 *)t,
+                                    *(minalg::float4 *)r);
 }
 
-bool gizmo_context::scale_gizmo(bool local_toggle, bool uniform,
-                                const std::string &name, float *t, float *r,
-                                float *s) {
-  minalg::float3 position = {t[0], t[1], t[2]};
-  minalg::float4 orientation = {r[0], r[1], r[2], r[3]};
-  minalg::float3 scale = {s[0], s[1], s[2]};
-
-  bool activated = false;
-  auto x = this->impl->scale_gizmo(local_toggle, name, orientation, position,
-                                   scale, uniform);
-  if (x.hover == true || x.active == true) {
-    activated = true;
-  }
-  if (activated) {
-    t[0] = position.x;
-    t[1] = position.y;
-    t[2] = position.z;
-    r[0] = orientation.x;
-    r[1] = orientation.y;
-    r[2] = orientation.z;
-    r[3] = orientation.w;
-    s[0] = scale.x;
-    s[1] = scale.y;
-    s[2] = scale.z;
-  }
-  return activated;
+gizmo_result gizmo_context::scale_gizmo(bool local_toggle, bool uniform,
+                                        const std::string &name,
+                                        const float t[3], const float r[4],
+                                        const float s[3]) {
+  return this->impl->scale_gizmo(local_toggle, name, *(minalg::float4 *)&r,
+                                 *(minalg::float3 *)&t, *(minalg::float3 *)&s,
+                                 uniform);
 }
 
 } // namespace tinygizmo
