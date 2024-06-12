@@ -1,4 +1,4 @@
-project('tinygizmo', 'c', 'cpp', default_options: ['cpp_std=c++latest'])
+project('tinygizmo', 'c', 'cpp', default_options: ['cpp_std=c++23'])
 
 cc = meson.get_compiler('c')
 winmm_lib = cc.find_library('winmm', required: true)
@@ -30,6 +30,11 @@ raylib_dep = declare_dependency(
     link_with: raylib_lib,
 )
 
+args = []
+if cc.get_id() == 'msvc'
+    args += '/utf-8'
+endif
+
 executable(
     'tiny-gizmo-example',
     [
@@ -43,6 +48,12 @@ executable(
     dependencies: [
         raylib_dep,
     ],
-    cpp_args: ['/utf-8'],
+    cpp_args: args,
+    install: true,
+)
+
+executable(
+    'hello',
+    'hello.cpp',
     install: true,
 )

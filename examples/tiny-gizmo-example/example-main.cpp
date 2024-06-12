@@ -2,6 +2,7 @@
 // For more information, please refer to <http://unlicense.org>
 #include <raylib/external/glad.h>
 
+#include <algorithm>
 #include <tiny-gizmo.hpp>
 
 #include "orbit_camera.h"
@@ -76,9 +77,12 @@ struct Drawable {
       // mesh.normals[nom++] = v.normal.y;
       // mesh.normals[nom++] = v.normal.z;
 
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.x * 255);
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.y * 255);
-      mesh.colors[col++] = static_cast<unsigned char>(v.color.z * 255);
+      mesh.colors[col++] =
+          static_cast<unsigned char>(std::max(0.0f, v.color.x) * 255);
+      mesh.colors[col++] =
+          static_cast<unsigned char>(std::max(0.0f, v.color.y * 255));
+      mesh.colors[col++] =
+          static_cast<unsigned char>(std::max(0.0f, v.color.z * 255));
       mesh.colors[col++] = 255;
     }
 
