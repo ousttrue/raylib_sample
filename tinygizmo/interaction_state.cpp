@@ -95,7 +95,7 @@ void interaction_state::plane_translation_dragger(
   // interaction_state &interaction = this->gizmos[id];
 
   // Mouse clicked
-  if (state.has_clicked) {
+  if (state.has_clicked()) {
     this->original_position = point;
   }
 
@@ -252,7 +252,7 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
           : 1.f;
 
   // interaction_mode will only change on clicked
-  if (state.has_clicked) {
+  if (state.has_clicked()) {
     this->interaction_mode = interact::none;
   }
 
@@ -294,7 +294,7 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
       best_t = t;
     }
 
-    if (state.has_clicked) {
+    if (state.has_clicked()) {
       this->interaction_mode = updated_state;
 
       if (this->interaction_mode != interact::none) {
@@ -352,7 +352,7 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
     position -= this->click_offset;
   }
 
-  if (state.has_released) {
+  if (state.has_released()) {
     this->interaction_mode = interact::none;
     this->active = false;
   }
@@ -406,7 +406,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
           : 1.f;
 
   // interaction_mode will only change on clicked
-  if (state.has_clicked) {
+  if (state.has_clicked()) {
     this->interaction_mode = interact::none;
   }
 
@@ -433,7 +433,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
       best_t = t;
     }
 
-    if (state.has_clicked) {
+    if (state.has_clicked()) {
       this->interaction_mode = updated_state;
       if (this->interaction_mode != interact::none) {
         transform(draw_scale, ray);
@@ -472,7 +472,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
     }
   }
 
-  if (state.has_released) {
+  if (state.has_released()) {
     this->interaction_mode = interact::none;
     this->active = false;
   }
@@ -557,7 +557,7 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
                                     state.active_state.screenspace_scale)
           : 1.f;
 
-  if (state.has_clicked) {
+  if (state.has_clicked()) {
     this->interaction_mode = interact::none;
   }
 
@@ -582,7 +582,7 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
       best_t = t;
     }
 
-    if (state.has_clicked) {
+    if (state.has_clicked()) {
       this->interaction_mode = updated_state;
       if (this->interaction_mode != interact::none) {
         transform(draw_scale, ray);
@@ -594,7 +594,7 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
     }
   }
 
-  if (state.has_released) {
+  if (state.has_released()) {
     this->interaction_mode = interact::none;
     this->active = false;
   }
