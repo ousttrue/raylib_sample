@@ -17,16 +17,19 @@ enum class transform_mode {
 bool transform_gizmo(tinygizmo::gizmo_context *gizmo, transform_mode mode,
                      bool local_toggle, bool uniform, const std::string &name,
                      Vector3 &t, Quaternion &r, Vector3 &s) {
+
+  auto id = tinygizmo::hash_fnv1a(name);
+
   switch (mode) {
   case transform_mode::translate: {
-    auto result = gizmo->translation_gizmo(local_toggle, name, &t.x, &r.x);
+    auto result = gizmo->translation_gizmo(local_toggle, id, &t.x, &r.x);
     if (result.active) {
       t = *(Vector3 *)&result.t;
     }
     return result.hover || result.active;
   }
   case transform_mode::rotate: {
-    auto result = gizmo->rotationn_gizmo(local_toggle, name, &t.x, &r.x);
+    auto result = gizmo->rotationn_gizmo(local_toggle, id, &t.x, &r.x);
     if (result.active) {
       r = *(Quaternion *)&result.r;
     }
@@ -34,7 +37,7 @@ bool transform_gizmo(tinygizmo::gizmo_context *gizmo, transform_mode mode,
   }
   case transform_mode::scale: {
     auto result =
-        gizmo->scale_gizmo(local_toggle, uniform, name, &t.x, &r.x, &s.x);
+        gizmo->scale_gizmo(local_toggle, uniform, id, &t.x, &r.x, &s.x);
     if (result.active) {
       s = *(Vector3 *)&result.s;
     }

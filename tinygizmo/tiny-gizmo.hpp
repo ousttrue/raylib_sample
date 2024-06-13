@@ -6,6 +6,20 @@
 
 namespace tinygizmo {
 
+// 32 bit Fowler-Noll-Vo Hash
+inline uint32_t hash_fnv1a(std::string_view str) {
+  static const uint32_t fnv1aBase32 = 0x811C9DC5u;
+  static const uint32_t fnv1aPrime32 = 0x01000193u;
+
+  uint32_t result = fnv1aBase32;
+
+  for (auto c : str) {
+    result ^= static_cast<uint32_t>(c);
+    result *= fnv1aPrime32;
+  }
+  return result;
+}
+
 struct float2 {
   float x;
   float y;
@@ -68,13 +82,13 @@ struct gizmo_context {
   ~gizmo_context();
   // Clear geometry buffer and update internal `gizmo_application_state` data
   void begin_frame(const gizmo_application_state &state);
-  gizmo_result translation_gizmo(bool local_toggle, const std::string &name,
+  gizmo_result translation_gizmo(bool local_toggle, uint32_t id,
                                  const float t[3], const float r[4]);
-  gizmo_result rotationn_gizmo(bool local_toggle, const std::string &name,
-                               const float t[3], const float r[4]);
-  gizmo_result scale_gizmo(bool local_toggle, bool uniform,
-                           const std::string &name, const float t[3],
-                           const float r[4], const float s[3]);
+  gizmo_result rotationn_gizmo(bool local_toggle, uint32_t id, const float t[3],
+                               const float r[4]);
+  gizmo_result scale_gizmo(bool local_toggle, bool uniform, uint32_t id,
+                           const float t[3], const float r[4],
+                           const float s[3]);
   std::tuple<std::span<draw_vertex>, std::span<uint32_t>> end_frame();
 };
 

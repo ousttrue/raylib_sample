@@ -1062,20 +1062,6 @@ inline void flush_to_zero(minalg::float3 &f) {
     f.z = 0.f;
 }
 
-// 32 bit Fowler-Noll-Vo Hash
-inline uint32_t hash_fnv1a(const std::string &str) {
-  static const uint32_t fnv1aBase32 = 0x811C9DC5u;
-  static const uint32_t fnv1aPrime32 = 0x01000193u;
-
-  uint32_t result = fnv1aBase32;
-
-  for (auto &c : str) {
-    result ^= static_cast<uint32_t>(c);
-    result *= fnv1aPrime32;
-  }
-  return result;
-}
-
 inline minalg::float3 snap(const minalg::float3 &value, const float snap) {
   if (snap > 0.0f)
     return minalg::float3(floor(value / snap) * snap);
@@ -1318,8 +1304,8 @@ inline geometry_mesh make_cylinder_geometry(const minalg::float3 &axis,
   geometry_mesh mesh;
 
   for (uint32_t i = 0; i <= slices; ++i) {
-    const float tex_s = static_cast<float>(i) / slices,
-                angle = (float)(i % slices) * tau / slices;
+    // auto tex_s = static_cast<float>(i) / slices;
+    auto angle = (float)(i % slices) * tau / slices;
     auto arm = arm1 * std::cos(angle) + arm2 * std::sin(angle);
     mesh.vertices.push_back({arm, normalize(arm)});
     mesh.vertices.push_back({arm + axis, normalize(arm)});

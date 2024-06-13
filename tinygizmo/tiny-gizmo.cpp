@@ -17,27 +17,24 @@ gizmo_context::end_frame() {
   return impl->end_frame();
 }
 
-gizmo_result gizmo_context::translation_gizmo(bool local_toggle,
-                                              const std::string &name,
+gizmo_result gizmo_context::translation_gizmo(bool local_toggle, uint32_t id,
                                               const float t[3],
                                               const float r[4]) {
-  return this->impl->position_gizmo(local_toggle, name, *(minalg::float4 *)r,
+  return this->impl->position_gizmo(local_toggle, id, *(minalg::float4 *)r,
                                     *(minalg::float3 *)t);
 }
 
-gizmo_result gizmo_context::rotationn_gizmo(bool local_toggle,
-                                            const std::string &name,
+gizmo_result gizmo_context::rotationn_gizmo(bool local_toggle, uint32_t id,
                                             const float t[3],
                                             const float r[4]) {
-  return this->impl->rotation_gizmo(local_toggle, name, *(minalg::float3 *)t,
+  return this->impl->rotation_gizmo(local_toggle, id, *(minalg::float3 *)t,
                                     *(minalg::float4 *)r);
 }
 
 gizmo_result gizmo_context::scale_gizmo(bool local_toggle, bool uniform,
-                                        const std::string &name,
-                                        const float t[3], const float r[4],
-                                        const float s[3]) {
-  return this->impl->scale_gizmo(local_toggle, name, *(minalg::float4 *)&r,
+                                        uint32_t id, const float t[3],
+                                        const float r[4], const float s[3]) {
+  return this->impl->scale_gizmo(local_toggle, id, *(minalg::float4 *)&r,
                                  *(minalg::float3 *)&t, *(minalg::float3 *)&s,
                                  uniform);
 }

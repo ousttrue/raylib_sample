@@ -89,15 +89,15 @@ private:
                           const bool uniform);
 
 public:
-  gizmo_result position_gizmo(bool local_toggle, const std::string &name,
+  gizmo_result position_gizmo(bool local_toggle, uint32_t id,
                               const minalg::float4 &rotation,
                               const minalg::float3 &_position);
 
-  gizmo_result rotation_gizmo(bool local_toggle, const std::string &name,
+  gizmo_result rotation_gizmo(bool local_toggle, uint32_t id,
                               const minalg::float3 &center,
                               const minalg::float4 &_orientation);
 
-  gizmo_result scale_gizmo(bool local_toggle, const std::string &name,
+  gizmo_result scale_gizmo(bool local_toggle, uint32_t id,
                            const minalg::float4 &orientation,
                            const minalg::float3 &center,
                            const minalg::float3 &_scale, bool uniform);
