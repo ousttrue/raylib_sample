@@ -33,6 +33,8 @@ raylib_dep = declare_dependency(
 args = []
 if cc.get_id() == 'msvc'
     args += '/utf-8'
+else
+    args += '-Wno-macro-redefined'
 endif
 
 executable(
@@ -40,7 +42,7 @@ executable(
     [
         'examples/tiny-gizmo-example/example-main.cpp',
         'tinygizmo/tiny-gizmo.cpp',
-        'tinygizmo/tiny-gizmo_impl.cpp',
+        'tinygizmo/interaction_state.cpp',
     ],
     include_directories: include_directories(
         'tinygizmo',

@@ -1,8 +1,13 @@
 // This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
 #pragma once
+#include <memory>
 #include <span>
 #include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "minalg.hpp"
 
 namespace tinygizmo {
 
@@ -75,11 +80,30 @@ struct gizmo_result {
   float3 s;
 };
 
-class gizmo_context_impl;
+struct gizmo_state {
+  gizmo_application_state active_state;
+  gizmo_application_state last_state;
+
+  // State to describe if the user has pressed the left mouse button during the
+  // last frame
+  bool has_clicked = false;
+  // State to describe if the user has released the left mouse button during the
+  // last frame
+  bool has_released = false;
+
+  mutable std::vector<gizmo_renderable> drawlist;
+};
+
+struct interaction_state;
 struct gizmo_context {
-  gizmo_context_impl *impl;
-  gizmo_context();
-  ~gizmo_context();
+  gizmo_state state;
+
+  std::vector<draw_vertex> vertices;
+  std::vector<uint32_t> indices;
+
+  std::unordered_map<uint32_t, std::shared_ptr<interaction_state>> gizmos;
+  std::shared_ptr<interaction_state> get_or_create(uint32_t id);
+
   // Clear geometry buffer and update internal `gizmo_application_state` data
   void begin_frame(const gizmo_application_state &state);
   gizmo_result translation_gizmo(bool local_toggle, uint32_t id,
