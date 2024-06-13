@@ -10,16 +10,16 @@
 #include "teapot.h"
 #include <rlgl.h>
 
-struct uint3 {
-  unsigned int x;
-  unsigned int y;
-  unsigned int z;
-};
-struct draw_vertex {
-  tinygizmo::float3 position;
-  tinygizmo::float3 normal;
-  tinygizmo::float4 color;
-};
+// struct uint3 {
+//   unsigned int x;
+//   unsigned int y;
+//   unsigned int z;
+// };
+// struct draw_vertex {
+//   tinygizmo::float3 position;
+//   tinygizmo::float3 normal;
+//   tinygizmo::float4 color;
+// };
 
 enum class transform_mode {
   translate,
@@ -225,30 +225,28 @@ int main(int argc, char *argv[]) {
             },
         .last_state = last_state,
 
-        .add_drawable =
-            [&positions, &colors, &indices](const minalg::float4x4 &modelMatrix,
-                                            const geometry_mesh &mesh,
-                                            const minalg::float4 &_color) {
+        .add_world_triangle =
+            [&positions, &colors, &indices](const std::array<float, 4> &rgba,
+                                            const std::array<float, 3> &p0,
+                                            const std::array<float, 3> &p1,
+                                            const std::array<float, 3> &p2) {
               //
               auto offset = positions.size();
               Color color{
-                  static_cast<unsigned char>(std::max(0.0f, _color.x) * 255),
-                  static_cast<unsigned char>(std::max(0.0f, _color.y) * 255),
-                  static_cast<unsigned char>(std::max(0.0f, _color.z) * 255),
-                  static_cast<unsigned char>(std::max(0.0f, _color.w) * 255),
+                  static_cast<unsigned char>(std::max(0.0f, rgba[0]) * 255),
+                  static_cast<unsigned char>(std::max(0.0f, rgba[1]) * 255),
+                  static_cast<unsigned char>(std::max(0.0f, rgba[2]) * 255),
+                  static_cast<unsigned char>(std::max(0.0f, rgba[3]) * 255),
               };
-              for (auto &v : mesh.vertices) {
-                auto world = transform_coord(
-                    modelMatrix,
-                    v.position); // transform local coordinates into worldspace
-                positions.push_back({world.x, world.y, world.z});
-                colors.push_back(color);
-              }
-              for (auto &t : mesh.triangles) {
-                indices.push_back(offset + t.x);
-                indices.push_back(offset + t.y);
-                indices.push_back(offset + t.z);
-              }
+              positions.push_back({p0[0], p0[1], p0[2]});
+              positions.push_back({p1[0], p1[1], p1[2]});
+              positions.push_back({p2[0], p2[1], p2[2]});
+              colors.push_back(color);
+              colors.push_back(color);
+              colors.push_back(color);
+              indices.push_back(offset + 0);
+              indices.push_back(offset + 1);
+              indices.push_back(offset + 2);
             },
     };
 

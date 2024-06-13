@@ -1,29 +1,13 @@
 // This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
 #pragma once
+#include <array>
 #include <functional>
 #include <memory>
+#include <string>
 #include <unordered_map>
 
-#include "minalg.hpp"
-
 namespace tinygizmo {
-
-struct float2 {
-  float x;
-  float y;
-};
-struct float3 {
-  float x;
-  float y;
-  float z;
-};
-struct float4 {
-  float x;
-  float y;
-  float z;
-  float w;
-};
 
 // 32 bit Fowler-Noll-Vo Hash
 inline uint32_t hash_fnv1a(std::string_view str) {
@@ -51,22 +35,26 @@ struct gizmo_application_state {
   // Radians used for snapping rotation quaternions (i.e. PI/8 or PI/16)
   float snap_rotation = 0.f;
   // 3d viewport used to render the view
-  float2 viewport_size;
+  std::array<float, 2> viewport_size;
   // world-space ray origin (i.e. the camera position)
-  float3 ray_origin;
+  std::array<float, 3> ray_origin;
   // world-space ray direction
-  float3 ray_direction;
+  std::array<float, 3> ray_direction;
   float cam_yfov;
-  float4 cam_orientation;
+  std::array<float, 4> cam_orientation;
 };
 
 struct gizmo_result {
   bool hover;
   bool active;
-  float3 t;
-  float4 r;
-  float3 s;
+  std::array<float, 3> t;
+  std::array<float, 4> r;
+  std::array<float, 3> s;
 };
+
+using AddTriangleFunc = std::function<void(
+    const std::array<float, 4> &rgba, const std::array<float, 3> &p0,
+    const std::array<float, 3> &p1, const std::array<float, 3> &p2)>;
 
 struct gizmo_state {
   gizmo_application_state active_state;
@@ -84,9 +72,7 @@ struct gizmo_state {
     return last_state.mouse_left && !active_state.mouse_left;
   }
 
-  std::function<void(const minalg::float4x4 &, const geometry_mesh &,
-                     const minalg::float4 &)>
-      add_drawable;
+  AddTriangleFunc add_world_triangle;
 };
 
 struct interaction_state;

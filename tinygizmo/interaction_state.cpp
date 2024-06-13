@@ -1,9 +1,16 @@
 #include "interaction_state.hpp"
 
 namespace tinygizmo {
+// auto world = transform_coord(
+//     modelMatrix,
+//     v.position); // transform local coordinates into worldspace
 
-minalg::float3 to_minalg(const float3 &v) { return {v.x, v.y, v.z}; }
-minalg::float4 to_minalg(const float4 &v) { return {v.x, v.y, v.z, v.w}; }
+minalg::float3 to_minalg(const std::array<float, 3> &v) {
+  return {v[0], v[1], v[2]};
+}
+minalg::float4 to_minalg(const std::array<float, 4> &v) {
+  return {v[0], v[1], v[2], v[3]};
+}
 
 interaction_state::interaction_state() {
   std::vector<minalg::float2> arrow_points = {
@@ -86,7 +93,7 @@ float interaction_state::scale_screenspace(const gizmo_state &state,
                                            const float pixel_scale) {
   float dist = length(position - to_minalg(state.active_state.ray_origin));
   return std::tan(state.active_state.cam_yfov) * dist *
-         (pixel_scale / state.active_state.viewport_size.y);
+         (pixel_scale / state.active_state.viewport_size[1]);
 }
 
 void interaction_state::plane_translation_dragger(
@@ -238,6 +245,28 @@ void interaction_state::axis_scale_dragger(const gizmo_state &state,
   }
 }
 
+static void add_triangles(const AddTriangleFunc &add_triangle,
+                          const minalg::float4x4 &modelMatrix,
+                          const geometry_mesh &mesh,
+                          const minalg::float4 &color) {
+  for (auto &t : mesh.triangles) {
+    auto v0 = mesh.vertices[t.x];
+    auto v1 = mesh.vertices[t.y];
+    auto v2 = mesh.vertices[t.z];
+    auto p0 = transform_coord(
+        modelMatrix,
+        v0.position); // transform local coordinates into worldspace
+    auto p1 = transform_coord(
+        modelMatrix,
+        v1.position); // transform local coordinates into worldspace
+    auto p2 = transform_coord(
+        modelMatrix,
+        v2.position); // transform local coordinates into worldspace
+    add_triangle({color.x, color.y, color.z, color.w}, {p0.x, p0.y, p0.z},
+                 {p1.x, p1.y, p1.z}, {p2.x, p2.y, p2.z});
+  }
+}
+
 gizmo_result
 interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
                                   const minalg::float4 &rotation,
@@ -367,10 +396,11 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
   modelMatrix = mul(modelMatrix, scaleMatrix);
 
   for (auto c : draw_interactions) {
-    state.add_drawable(modelMatrix, this->mesh_components[c].mesh,
-                       (c == this->interaction_mode)
-                           ? this->mesh_components[c].base_color
-                           : this->mesh_components[c].highlight_color);
+    auto &mesh = this->mesh_components[c].mesh;
+    auto color = (c == this->interaction_mode)
+                     ? this->mesh_components[c].base_color
+                     : this->mesh_components[c].highlight_color;
+    add_triangles(state.add_world_triangle, modelMatrix, mesh, color);
   }
 
   return {.hover = this->hover,
@@ -481,10 +511,11 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
                          interact::rotate_z};
 
   for (auto c : draw_interactions) {
-    state.add_drawable(modelMatrix, this->mesh_components[c].mesh,
-                       (c == this->interaction_mode)
-                           ? this->mesh_components[c].base_color
-                           : this->mesh_components[c].highlight_color);
+    add_triangles(state.add_world_triangle, modelMatrix,
+                  this->mesh_components[c].mesh,
+                  (c == this->interaction_mode)
+                      ? this->mesh_components[c].base_color
+                      : this->mesh_components[c].highlight_color);
   }
 
   auto orientation = _orientation;
@@ -504,7 +535,8 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
         {0.0f, 0.f}, {0.0f, 0.05f}, {0.8f, 0.05f}, {0.9f, 0.10f}, {1.0f, 0}};
     auto geo = make_lathed_geometry(yDir, xDir, zDir, 32, arrow_points);
 
-    state.add_drawable(modelMatrix, geo, minalg::float4(1));
+    add_triangles(state.add_world_triangle, modelMatrix, geo,
+                  minalg::float4(1));
 
     orientation = qmul(p.orientation, this->original_orientation);
   } else if (local_toggle == true && this->interaction_mode != interact::none) {
@@ -602,10 +634,11 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
                                         interact::scale_z};
 
   for (auto c : draw_components) {
-    state.add_drawable(modelMatrix, this->mesh_components[c].mesh,
-                       (c == this->interaction_mode)
-                           ? this->mesh_components[c].base_color
-                           : this->mesh_components[c].highlight_color);
+    add_triangles(state.add_world_triangle, modelMatrix,
+                  this->mesh_components[c].mesh,
+                  (c == this->interaction_mode)
+                      ? this->mesh_components[c].base_color
+                      : this->mesh_components[c].highlight_color);
   }
 
   return {.hover = this->hover,
