@@ -10,47 +10,40 @@
 #include "teapot.h"
 #include <rlgl.h>
 
-// struct uint3 {
-//   unsigned int x;
-//   unsigned int y;
-//   unsigned int z;
-// };
-// struct draw_vertex {
-//   tinygizmo::float3 position;
-//   tinygizmo::float3 normal;
-//   tinygizmo::float4 color;
-// };
-
 enum class transform_mode {
   translate,
   rotate,
   scale,
 };
 bool transform_gizmo(tinygizmo::gizmo_context *gizmo,
-                     const tinygizmo::gizmo_state &state, transform_mode mode,
-                     bool local_toggle, bool uniform, const std::string &name,
-                     Vector3 &t, Quaternion &r, Vector3 &s) {
+                     const tinygizmo::gizmo_state &state,
+                     const tinygizmo::AddTriangleFunc &add_world_triangle,
+                     transform_mode mode, bool local_toggle, bool uniform,
+                     const std::string &name, Vector3 &t, Quaternion &r,
+                     Vector3 &s) {
 
   auto id = tinygizmo::hash_fnv1a(name);
 
   switch (mode) {
   case transform_mode::translate: {
-    auto result = gizmo->translation_gizmo(state, local_toggle, id, &t.x, &r.x);
+    auto result = gizmo->translation_gizmo(state, add_world_triangle,
+                                           local_toggle, id, &t.x, &r.x);
     if (result.active) {
       t = *(Vector3 *)&result.t;
     }
     return result.hover || result.active;
   }
   case transform_mode::rotate: {
-    auto result = gizmo->rotationn_gizmo(state, local_toggle, id, &t.x, &r.x);
+    auto result = gizmo->rotationn_gizmo(state, add_world_triangle,
+                                         local_toggle, id, &t.x, &r.x);
     if (result.active) {
       r = *(Quaternion *)&result.r;
     }
     return result.hover || result.active;
   }
   case transform_mode::scale: {
-    auto result =
-        gizmo->scale_gizmo(state, local_toggle, uniform, id, &t.x, &r.x, &s.x);
+    auto result = gizmo->scale_gizmo(state, add_world_triangle, local_toggle,
+                                     uniform, id, &t.x, &r.x, &s.x);
     if (result.active) {
       s = *(Vector3 *)&result.s;
     }
@@ -189,7 +182,7 @@ int main(int argc, char *argv[]) {
     auto w = GetScreenWidth();
     auto h = GetScreenHeight();
 
-    // mouse
+    // camera
     dolly(&camera);
     auto distance = Vector3Distance(camera.target, camera.position);
     orbit.MouseUpdateCamera(distance, camera.fovy,
@@ -205,50 +198,20 @@ int main(int argc, char *argv[]) {
     auto ray = GetMouseRay(GetMousePosition(), camera);
     auto rot =
         QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
-    // mouse
 
-    positions.clear();
-    colors.clear();
-    indices.clear();
-    tinygizmo::gizmo_state state{
-        .active_state =
-            {
-                .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
-                // optional flag to draw the gizmos at a constant screen-space
-                // scale gizmo_state.screenspace_scale = 80.f; camera projection
-                .viewport_size = {static_cast<float>(w), static_cast<float>(h)},
-                .ray_origin = {ray.position.x, ray.position.y, ray.position.z},
-                .ray_direction = {ray.direction.x, ray.direction.y,
-                                  ray.direction.z},
-                .cam_yfov = 1.0f,
-                .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
-            },
-        .last_state = last_state,
-
-        .add_world_triangle =
-            [&positions, &colors, &indices](const std::array<float, 4> &rgba,
-                                            const std::array<float, 3> &p0,
-                                            const std::array<float, 3> &p1,
-                                            const std::array<float, 3> &p2) {
-              //
-              auto offset = positions.size();
-              Color color{
-                  static_cast<unsigned char>(std::max(0.0f, rgba[0]) * 255),
-                  static_cast<unsigned char>(std::max(0.0f, rgba[1]) * 255),
-                  static_cast<unsigned char>(std::max(0.0f, rgba[2]) * 255),
-                  static_cast<unsigned char>(std::max(0.0f, rgba[3]) * 255),
-              };
-              positions.push_back({p0[0], p0[1], p0[2]});
-              positions.push_back({p1[0], p1[1], p1[2]});
-              positions.push_back({p2[0], p2[1], p2[2]});
-              colors.push_back(color);
-              colors.push_back(color);
-              colors.push_back(color);
-              indices.push_back(offset + 0);
-              indices.push_back(offset + 1);
-              indices.push_back(offset + 2);
-            },
-    };
+    tinygizmo::gizmo_state state(
+        {
+            .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
+            // optional flag to draw the gizmos at a constant screen-space
+            // scale gizmo_state.screenspace_scale = 80.f; camera projection
+            .viewport_size = {static_cast<float>(w), static_cast<float>(h)},
+            .ray_origin = {ray.position.x, ray.position.y, ray.position.z},
+            .ray_direction = {ray.direction.x, ray.direction.y,
+                              ray.direction.z},
+            .cam_yfov = 1.0f,
+            .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
+        },
+        last_state);
 
     hotkey active_hotkey = {
         .hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL),
@@ -275,12 +238,37 @@ int main(int argc, char *argv[]) {
     }
 
     {
+      positions.clear();
+      colors.clear();
+      indices.clear();
+      tinygizmo::AddTriangleFunc add_world_triangle =
+          [&positions, &colors, &indices](
+              const std::array<float, 4> &rgba, const std::array<float, 3> &p0,
+              const std::array<float, 3> &p1, const std::array<float, 3> &p2) {
+            //
+            auto offset = positions.size();
+            Color color{
+                static_cast<unsigned char>(std::max(0.0f, rgba[0]) * 255),
+                static_cast<unsigned char>(std::max(0.0f, rgba[1]) * 255),
+                static_cast<unsigned char>(std::max(0.0f, rgba[2]) * 255),
+                static_cast<unsigned char>(std::max(0.0f, rgba[3]) * 255),
+            };
+            positions.push_back({p0[0], p0[1], p0[2]});
+            positions.push_back({p1[0], p1[1], p1[2]});
+            positions.push_back({p2[0], p2[1], p2[2]});
+            colors.push_back(color);
+            colors.push_back(color);
+            colors.push_back(color);
+            indices.push_back(offset + 0);
+            indices.push_back(offset + 1);
+            indices.push_back(offset + 2);
+          };
 
       // gizmo_ctx.begin_frame(active_state);
-      transform_gizmo(&gizmo_ctx, state, mode, local_toggle,
+      transform_gizmo(&gizmo_ctx, state, add_world_triangle, mode, local_toggle,
                       active_hotkey.hotkey_ctrl, "first-example-gizmo", a_t,
                       a_r, a_s);
-      transform_gizmo(&gizmo_ctx, state, mode, local_toggle,
+      transform_gizmo(&gizmo_ctx, state, add_world_triangle, mode, local_toggle,
                       active_hotkey.hotkey_ctrl, "second-example-gizmo", b_t,
                       b_r, b_s);
 

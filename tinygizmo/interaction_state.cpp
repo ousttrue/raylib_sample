@@ -102,7 +102,7 @@ void interaction_state::plane_translation_dragger(
   // interaction_state &interaction = this->gizmos[id];
 
   // Mouse clicked
-  if (state.has_clicked()) {
+  if (state.has_clicked) {
     this->original_position = point;
   }
 
@@ -267,10 +267,10 @@ static void add_triangles(const AddTriangleFunc &add_triangle,
   }
 }
 
-gizmo_result
-interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
-                                  const minalg::float4 &rotation,
-                                  const minalg::float3 &_position) {
+gizmo_result interaction_state::position_gizmo(
+    const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
+    bool local_toggle, const minalg::float4 &rotation,
+    const minalg::float3 &_position) {
   rigid_transform p = rigid_transform(
       local_toggle ? rotation : minalg::float4(0, 0, 0, 1), _position);
 
@@ -281,7 +281,7 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
           : 1.f;
 
   // interaction_mode will only change on clicked
-  if (state.has_clicked()) {
+  if (state.has_clicked) {
     this->interaction_mode = interact::none;
   }
 
@@ -323,7 +323,7 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
       best_t = t;
     }
 
-    if (state.has_clicked()) {
+    if (state.has_clicked) {
       this->interaction_mode = updated_state;
 
       if (this->interaction_mode != interact::none) {
@@ -381,7 +381,7 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
     position -= this->click_offset;
   }
 
-  if (state.has_released()) {
+  if (state.has_released) {
     this->interaction_mode = interact::none;
     this->active = false;
   }
@@ -400,7 +400,7 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
     auto color = (c == this->interaction_mode)
                      ? this->mesh_components[c].base_color
                      : this->mesh_components[c].highlight_color;
-    add_triangles(state.add_world_triangle, modelMatrix, mesh, color);
+    add_triangles(add_world_triangle, modelMatrix, mesh, color);
   }
 
   return {.hover = this->hover,
@@ -412,10 +412,10 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
           }};
 }
 
-gizmo_result
-interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
-                                  const minalg::float3 &center,
-                                  const minalg::float4 &_orientation) {
+gizmo_result interaction_state::rotation_gizmo(
+    const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
+    bool local_toggle, const minalg::float3 &center,
+    const minalg::float4 &_orientation) {
   assert(length2(_orientation) > float(1e-6));
 
   rigid_transform p =
@@ -428,7 +428,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
           : 1.f;
 
   // interaction_mode will only change on clicked
-  if (state.has_clicked()) {
+  if (state.has_clicked) {
     this->interaction_mode = interact::none;
   }
 
@@ -455,7 +455,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
       best_t = t;
     }
 
-    if (state.has_clicked()) {
+    if (state.has_clicked) {
       this->interaction_mode = updated_state;
       if (this->interaction_mode != interact::none) {
         transform(draw_scale, ray);
@@ -494,7 +494,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
     }
   }
 
-  if (state.has_released()) {
+  if (state.has_released) {
     this->interaction_mode = interact::none;
     this->active = false;
   }
@@ -511,7 +511,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
                          interact::rotate_z};
 
   for (auto c : draw_interactions) {
-    add_triangles(state.add_world_triangle, modelMatrix,
+    add_triangles(add_world_triangle, modelMatrix,
                   this->mesh_components[c].mesh,
                   (c == this->interaction_mode)
                       ? this->mesh_components[c].base_color
@@ -535,8 +535,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
         {0.0f, 0.f}, {0.0f, 0.05f}, {0.8f, 0.05f}, {0.9f, 0.10f}, {1.0f, 0}};
     auto geo = make_lathed_geometry(yDir, xDir, zDir, 32, arrow_points);
 
-    add_triangles(state.add_world_triangle, modelMatrix, geo,
-                  minalg::float4(1));
+    add_triangles(add_world_triangle, modelMatrix, geo, minalg::float4(1));
 
     orientation = qmul(p.orientation, this->original_orientation);
   } else if (local_toggle == true && this->interaction_mode != interact::none) {
@@ -553,12 +552,10 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
           }};
 }
 
-gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
-                                            bool local_toggle,
-                                            const minalg::float4 &orientation,
-                                            const minalg::float3 &center,
-                                            const minalg::float3 &_scale,
-                                            bool uniform) {
+gizmo_result interaction_state::scale_gizmo(
+    const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
+    bool local_toggle, const minalg::float4 &orientation,
+    const minalg::float3 &center, const minalg::float3 &_scale, bool uniform) {
   rigid_transform p = rigid_transform(orientation, center);
   const float draw_scale =
       (state.active_state.screenspace_scale > 0.f)
@@ -566,7 +563,7 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
                                     state.active_state.screenspace_scale)
           : 1.f;
 
-  if (state.has_clicked()) {
+  if (state.has_clicked) {
     this->interaction_mode = interact::none;
   }
 
@@ -591,7 +588,7 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
       best_t = t;
     }
 
-    if (state.has_clicked()) {
+    if (state.has_clicked) {
       this->interaction_mode = updated_state;
       if (this->interaction_mode != interact::none) {
         transform(draw_scale, ray);
@@ -603,7 +600,7 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
     }
   }
 
-  if (state.has_released()) {
+  if (state.has_released) {
     this->interaction_mode = interact::none;
     this->active = false;
   }
@@ -634,7 +631,7 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
                                         interact::scale_z};
 
   for (auto c : draw_components) {
-    add_triangles(state.add_world_triangle, modelMatrix,
+    add_triangles(add_world_triangle, modelMatrix,
                   this->mesh_components[c].mesh,
                   (c == this->interaction_mode)
                       ? this->mesh_components[c].base_color

@@ -58,21 +58,18 @@ using AddTriangleFunc = std::function<void(
 
 struct gizmo_state {
   gizmo_application_state active_state;
-  gizmo_application_state last_state;
-
   // State to describe if the user has pressed the left mouse button during the
   // last frame
-  bool has_clicked() const {
-    return !last_state.mouse_left && active_state.mouse_left;
-  }
-
+  bool has_clicked;
   // State to describe if the user has released the left mouse button during the
   // last frame
-  bool has_released() const {
-    return last_state.mouse_left && !active_state.mouse_left;
-  }
+  bool has_released;
 
-  AddTriangleFunc add_world_triangle;
+  gizmo_state(const gizmo_application_state &active_state,
+              const gizmo_application_state &last_state)
+      : active_state(active_state),
+        has_clicked(!last_state.mouse_left && active_state.mouse_left),
+        has_released(last_state.mouse_left && !active_state.mouse_left) {}
 };
 
 struct interaction_state;
@@ -81,14 +78,19 @@ struct gizmo_context {
   std::shared_ptr<interaction_state> get_or_create(uint32_t id);
 
   // Clear geometry buffer and update internal `gizmo_application_state` data
-  gizmo_result translation_gizmo(const gizmo_state &state, bool local_toggle,
-                                 uint32_t id, const float t[3],
-                                 const float r[4]);
-  gizmo_result rotationn_gizmo(const gizmo_state &state, bool local_toggle,
-                               uint32_t id, const float t[3], const float r[4]);
-  gizmo_result scale_gizmo(const gizmo_state &state, bool local_toggle,
-                           bool uniform, uint32_t id, const float t[3],
-                           const float r[4], const float s[3]);
+  gizmo_result translation_gizmo(const gizmo_state &state,
+                                 const AddTriangleFunc &add_triangle,
+                                 bool local_toggle, uint32_t id,
+                                 const float t[3], const float r[4]);
+  gizmo_result rotationn_gizmo(const gizmo_state &state,
+                               const AddTriangleFunc &add_triangle,
+                               bool local_toggle, uint32_t id, const float t[3],
+                               const float r[4]);
+  gizmo_result scale_gizmo(const gizmo_state &state,
+                           const AddTriangleFunc &add_triangle,
+                           bool local_toggle, bool uniform, uint32_t id,
+                           const float t[3], const float r[4],
+                           const float s[3]);
 };
 
 } // namespace tinygizmo
