@@ -1,9 +1,9 @@
 // This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
 #pragma once
+#include <functional>
 #include <memory>
 #include <unordered_map>
-#include <vector>
 
 #include "minalg.hpp"
 
@@ -84,7 +84,9 @@ struct gizmo_state {
     return last_state.mouse_left && !active_state.mouse_left;
   }
 
-  mutable std::vector<gizmo_renderable> drawlist;
+  std::function<void(const minalg::float4x4 &, const geometry_mesh &,
+                     const minalg::float4 &)>
+      add_drawable;
 };
 
 struct interaction_state;

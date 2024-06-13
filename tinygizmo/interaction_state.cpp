@@ -367,18 +367,10 @@ interaction_state::position_gizmo(const gizmo_state &state, bool local_toggle,
   modelMatrix = mul(modelMatrix, scaleMatrix);
 
   for (auto c : draw_interactions) {
-    gizmo_renderable r;
-    r.mesh = this->mesh_components[c].mesh;
-    r.color = (c == this->interaction_mode)
-                  ? this->mesh_components[c].base_color
-                  : this->mesh_components[c].highlight_color;
-    for (auto &v : r.mesh.vertices) {
-      v.position = transform_coord(
-          modelMatrix,
-          v.position); // transform local coordinates into worldspace
-      v.normal = transform_vector(modelMatrix, v.normal);
-    }
-    state.drawlist.push_back(r);
+    state.add_drawable(modelMatrix, this->mesh_components[c].mesh,
+                       (c == this->interaction_mode)
+                           ? this->mesh_components[c].base_color
+                           : this->mesh_components[c].highlight_color);
   }
 
   return {.hover = this->hover,
@@ -489,18 +481,10 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
                          interact::rotate_z};
 
   for (auto c : draw_interactions) {
-    gizmo_renderable r;
-    r.mesh = this->mesh_components[c].mesh;
-    r.color = (c == this->interaction_mode)
-                  ? this->mesh_components[c].base_color
-                  : this->mesh_components[c].highlight_color;
-    for (auto &v : r.mesh.vertices) {
-      v.position = transform_coord(
-          modelMatrix,
-          v.position); // transform local coordinates into worldspace
-      v.normal = transform_vector(modelMatrix, v.normal);
-    }
-    state.drawlist.push_back(r);
+    state.add_drawable(modelMatrix, this->mesh_components[c].mesh,
+                       (c == this->interaction_mode)
+                           ? this->mesh_components[c].base_color
+                           : this->mesh_components[c].highlight_color);
   }
 
   auto orientation = _orientation;
@@ -520,14 +504,7 @@ interaction_state::rotation_gizmo(const gizmo_state &state, bool local_toggle,
         {0.0f, 0.f}, {0.0f, 0.05f}, {0.8f, 0.05f}, {0.9f, 0.10f}, {1.0f, 0}};
     auto geo = make_lathed_geometry(yDir, xDir, zDir, 32, arrow_points);
 
-    gizmo_renderable r;
-    r.mesh = geo;
-    r.color = minalg::float4(1);
-    for (auto &v : r.mesh.vertices) {
-      v.position = transform_coord(modelMatrix, v.position);
-      v.normal = transform_vector(modelMatrix, v.normal);
-    }
-    state.drawlist.push_back(r);
+    state.add_drawable(modelMatrix, geo, minalg::float4(1));
 
     orientation = qmul(p.orientation, this->original_orientation);
   } else if (local_toggle == true && this->interaction_mode != interact::none) {
@@ -625,18 +602,10 @@ gizmo_result interaction_state::scale_gizmo(const gizmo_state &state,
                                         interact::scale_z};
 
   for (auto c : draw_components) {
-    gizmo_renderable r;
-    r.mesh = this->mesh_components[c].mesh;
-    r.color = (c == this->interaction_mode)
-                  ? this->mesh_components[c].base_color
-                  : this->mesh_components[c].highlight_color;
-    for (auto &v : r.mesh.vertices) {
-      v.position = transform_coord(
-          modelMatrix,
-          v.position); // transform local coordinates into worldspace
-      v.normal = transform_vector(modelMatrix, v.normal);
-    }
-    state.drawlist.push_back(r);
+    state.add_drawable(modelMatrix, this->mesh_components[c].mesh,
+                       (c == this->interaction_mode)
+                           ? this->mesh_components[c].base_color
+                           : this->mesh_components[c].highlight_color);
   }
 
   return {.hover = this->hover,

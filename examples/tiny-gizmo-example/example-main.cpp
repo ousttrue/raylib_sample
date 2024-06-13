@@ -1,8 +1,8 @@
 ﻿// This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
-#include <raylib/external/glad.h>
-
 #include <algorithm>
+#include <assert.h>
+#include <raylib/external/glad.h>
 #include <span>
 #include <tiny-gizmo.hpp>
 
@@ -20,29 +20,7 @@ struct draw_vertex {
   tinygizmo::float3 normal;
   tinygizmo::float4 color;
 };
-static void end_frame(const std::vector<gizmo_renderable> &drawlist,
-                      std::vector<draw_vertex> &vertices,
-                      std::vector<uint32_t> &indices) {
-  // last_state = active_state;
-  vertices.clear();
-  indices.clear();
 
-  for (auto &m : drawlist) {
-    uint32_t numVerts = (uint32_t)vertices.size();
-    auto it = vertices.insert(
-        vertices.end(), (draw_vertex *)m.mesh.vertices.data(),
-        (draw_vertex *)m.mesh.vertices.data() + m.mesh.vertices.size());
-    for (auto &t : m.mesh.triangles) {
-      indices.push_back(numVerts + t.x);
-      indices.push_back(numVerts + t.y);
-      indices.push_back(numVerts + t.z);
-    }
-    for (; it != vertices.end(); ++it) {
-      // Take the color and shove it into a per-vertex attribute
-      it->color = {m.color.x, m.color.y, m.color.z, m.color.w};
-    }
-  }
-}
 enum class transform_mode {
   translate,
   rotate,
@@ -95,44 +73,53 @@ struct Drawable {
   void load(std::span<const V> vertices, std::span<const I> indices,
             bool dynamic) {
 
-    Mesh mesh = {0};
-
     // vertices
-    mesh.vertexCount = vertices.size();
-    mesh.vertices = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
+    auto mesh_vertices = (Vector3 *)MemAlloc(vertices.size() * sizeof(Vector3));
     // mesh.normals = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
-    mesh.colors =
-        (unsigned char *)MemAlloc(mesh.vertexCount * 4 * sizeof(unsigned char));
+    auto mesh_colors = (Color *)MemAlloc(vertices.size() * sizeof(Color));
     auto pos = 0;
     // auto nom = 0;
     auto col = 0;
     for (auto &v : vertices) {
-      mesh.vertices[pos++] = v.position.x;
-      mesh.vertices[pos++] = v.position.y;
-      mesh.vertices[pos++] = v.position.z;
+      mesh_vertices[pos++] = {
+          v.position.x,
+          v.position.y,
+          v.position.z,
+      };
 
       // mesh.normals[nom++] = v.normal.x;
       // mesh.normals[nom++] = v.normal.y;
       // mesh.normals[nom++] = v.normal.z;
 
-      mesh.colors[col++] =
-          static_cast<unsigned char>(std::max(0.0f, v.color.x) * 255);
-      mesh.colors[col++] =
-          static_cast<unsigned char>(std::max(0.0f, v.color.y * 255));
-      mesh.colors[col++] =
-          static_cast<unsigned char>(std::max(0.0f, v.color.z * 255));
-      mesh.colors[col++] = 255;
+      mesh_colors[col++] = {
+          static_cast<unsigned char>(std::max(0.0f, v.color.x) * 255),
+          static_cast<unsigned char>(std::max(0.0f, v.color.y) * 255),
+          static_cast<unsigned char>(std::max(0.0f, v.color.z) * 255),
+          255,
+      };
     }
 
-    mesh.triangleCount = indices.size() / 3;
-    mesh.indices = (unsigned short *)MemAlloc(mesh.triangleCount * 3 *
-                                              sizeof(unsigned short));
+    auto mesh_indices =
+        (unsigned short *)MemAlloc(indices.size() * sizeof(unsigned short));
     auto index = 0;
     for (auto &i : indices) {
-      mesh.indices[index++] = i;
+      mesh_indices[index++] = i;
     }
 
+    load(vertices.size(), mesh_vertices, mesh_colors, indices.size(),
+         mesh_indices, dynamic);
+  }
+
+  void load(size_t vertexCount, const Vector3 *vertices, const Color *colors,
+            size_t indexCount, const unsigned short *indices, bool dynamic) {
     // Upload mesh data from CPU (RAM) to GPU (VRAM) memory
+    Mesh mesh = {
+        .vertexCount = static_cast<int>(vertexCount),
+        .triangleCount = static_cast<int>(indexCount / 3),
+        .vertices = const_cast<float *>(&vertices[0].x),
+        .colors = const_cast<unsigned char *>(&colors[0].r),
+        .indices = const_cast<unsigned short *>(indices),
+    };
     UploadMesh(&mesh, dynamic);
     this->model = LoadModelFromMesh(mesh);
   }
@@ -194,8 +181,9 @@ int main(int argc, char *argv[]) {
 
   tinygizmo::gizmo_application_state last_state;
   hotkey last_hotkey{0};
-  std::vector<draw_vertex> vertices;
-  std::vector<uint32_t> indices;
+  std::vector<Vector3> positions;
+  std::vector<Color> colors;
+  std::vector<unsigned short> indices;
 
   while (!WindowShouldClose()) {
     auto w = GetScreenWidth();
@@ -219,6 +207,9 @@ int main(int argc, char *argv[]) {
         QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
     // mouse
 
+    positions.clear();
+    colors.clear();
+    indices.clear();
     tinygizmo::gizmo_state state{
         .active_state =
             {
@@ -233,6 +224,32 @@ int main(int argc, char *argv[]) {
                 .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
             },
         .last_state = last_state,
+
+        .add_drawable =
+            [&positions, &colors, &indices](const minalg::float4x4 &modelMatrix,
+                                            const geometry_mesh &mesh,
+                                            const minalg::float4 &_color) {
+              //
+              auto offset = positions.size();
+              Color color{
+                  static_cast<unsigned char>(std::max(0.0f, _color.x) * 255),
+                  static_cast<unsigned char>(std::max(0.0f, _color.y) * 255),
+                  static_cast<unsigned char>(std::max(0.0f, _color.z) * 255),
+                  static_cast<unsigned char>(std::max(0.0f, _color.w) * 255),
+              };
+              for (auto &v : mesh.vertices) {
+                auto world = transform_coord(
+                    modelMatrix,
+                    v.position); // transform local coordinates into worldspace
+                positions.push_back({world.x, world.y, world.z});
+                colors.push_back(color);
+              }
+              for (auto &t : mesh.triangles) {
+                indices.push_back(offset + t.x);
+                indices.push_back(offset + t.y);
+                indices.push_back(offset + t.z);
+              }
+            },
     };
 
     hotkey active_hotkey = {
@@ -260,6 +277,7 @@ int main(int argc, char *argv[]) {
     }
 
     {
+
       // gizmo_ctx.begin_frame(active_state);
       transform_gizmo(&gizmo_ctx, state, mode, local_toggle,
                       active_hotkey.hotkey_ctrl, "first-example-gizmo", a_t,
@@ -267,10 +285,13 @@ int main(int argc, char *argv[]) {
       transform_gizmo(&gizmo_ctx, state, mode, local_toggle,
                       active_hotkey.hotkey_ctrl, "second-example-gizmo", b_t,
                       b_r, b_s);
-      end_frame(state.drawlist, vertices, indices);
-      if (vertices.size() && indices.size()) {
+
+      // end_frame(state.drawlist, vertices, indices);
+      if (positions.size() && indices.size()) {
+        assert(positions.size() == colors.size());
         // update gizmo mesh
-        gizmo_mesh.load<draw_vertex, uint32_t>(vertices, indices, true);
+        gizmo_mesh.load(positions.size(), positions.data(), colors.data(),
+                        indices.size(), indices.data(), true);
       }
     }
     last_hotkey = active_hotkey;

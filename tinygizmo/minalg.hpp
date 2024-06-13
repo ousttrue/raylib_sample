@@ -1159,10 +1159,6 @@ struct geometry_mesh {
   std::vector<vertex> vertices;
   std::vector<minalg::uint3> triangles;
 };
-struct gizmo_renderable {
-  geometry_mesh mesh;
-  minalg::float4 color;
-};
 struct gizmo_mesh_component {
   geometry_mesh mesh;
   minalg::float4 base_color, highlight_color;
