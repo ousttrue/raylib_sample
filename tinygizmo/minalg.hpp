@@ -1125,6 +1125,19 @@ struct rigid_transform {
 };
 struct ray {
   minalg::float3 origin, direction;
+
+  ray scaling(const float scale) const {
+    return {
+        .origin = origin * scale,
+        .direction = direction * scale,
+    };
+  }
+  ray descale(const float scale) const {
+    return {
+        .origin = origin / scale,
+        .direction = direction / scale,
+    };
+  }
 };
 inline ray transform(const rigid_transform &p, const ray &r) {
   return {p.transform_point(r.origin), p.transform_vector(r.direction)};
@@ -1141,14 +1154,6 @@ inline minalg::float3 transform_vector(const minalg::float4x4 &transform,
                                        const minalg::float3 &vector) {
   return mul(transform, minalg::float4(vector, 0)).xyz();
 }
-inline void transform(const float scale, ray &r) {
-  r.origin *= scale;
-  r.direction *= scale;
-}
-inline void detransform(const float scale, ray &r) {
-  r.origin /= scale;
-  r.direction /= scale;
-}
 
 struct vertex {
   minalg::float3 position;
@@ -1158,10 +1163,6 @@ struct vertex {
 struct geometry_mesh {
   std::vector<vertex> vertices;
   std::vector<minalg::uint3> triangles;
-};
-struct gizmo_mesh_component {
-  geometry_mesh mesh;
-  minalg::float4 base_color, highlight_color;
 };
 
 /////////////////////////////////////////
@@ -1354,4 +1355,11 @@ make_lathed_geometry(const minalg::float3 &axis, const minalg::float3 &arm1,
   }
   compute_normals(mesh);
   return mesh;
+}
+
+inline minalg::float3 to_minalg(const std::array<float, 3> &v) {
+  return {v[0], v[1], v[2]};
+}
+inline minalg::float4 to_minalg(const std::array<float, 4> &v) {
+  return {v[0], v[1], v[2], v[3]};
 }

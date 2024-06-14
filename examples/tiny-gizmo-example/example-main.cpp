@@ -15,7 +15,7 @@ enum class transform_mode {
   rotate,
   scale,
 };
-bool transform_gizmo(tinygizmo::gizmo_context *gizmo,
+void transform_gizmo(tinygizmo::gizmo_context *gizmo,
                      const tinygizmo::gizmo_state &state,
                      const tinygizmo::AddTriangleFunc &add_world_triangle,
                      transform_mode mode, bool local_toggle, bool uniform,
@@ -31,7 +31,7 @@ bool transform_gizmo(tinygizmo::gizmo_context *gizmo,
     if (result.active) {
       t = *(Vector3 *)&result.t;
     }
-    return result.hover || result.active;
+    break;
   }
   case transform_mode::rotate: {
     auto result = gizmo->rotationn_gizmo(state, add_world_triangle,
@@ -39,7 +39,7 @@ bool transform_gizmo(tinygizmo::gizmo_context *gizmo,
     if (result.active) {
       r = *(Quaternion *)&result.r;
     }
-    return result.hover || result.active;
+    break;
   }
   case transform_mode::scale: {
     auto result = gizmo->scale_gizmo(state, add_world_triangle, local_toggle,
@@ -47,7 +47,7 @@ bool transform_gizmo(tinygizmo::gizmo_context *gizmo,
     if (result.active) {
       s = *(Vector3 *)&result.s;
     }
-    return result.hover || result.active;
+    break;
   }
   }
 }
