@@ -25,17 +25,17 @@ struct interaction_state {
 
   gizmo_result position_gizmo(const gizmo_state &state,
                               const AddTriangleFunc &add_triangle,
-                              bool local_toggle, const minalg::float4 &rotation,
+                              const minalg::float4 &rotation,
                               const minalg::float3 &_position);
 
   gizmo_result rotation_gizmo(const gizmo_state &state,
                               const AddTriangleFunc &add_triangle,
-                              bool local_toggle, const minalg::float3 &center,
+                              const minalg::float3 &center,
                               const minalg::float4 &_orientation);
 
   gizmo_result scale_gizmo(const gizmo_state &state,
                            const AddTriangleFunc &add_triangle,
-                           bool local_toggle, const minalg::float4 &orientation,
+                           const minalg::float4 &orientation,
                            const minalg::float3 &center,
                            const minalg::float3 &_scale, bool uniform);
 };

@@ -57,6 +57,7 @@ using AddTriangleFunc = std::function<void(
     const std::array<float, 3> &p1, const std::array<float, 3> &p2)>;
 
 struct gizmo_state {
+  bool local_toggle;
   gizmo_application_state active_state;
   // State to describe if the user has pressed the left mouse button during the
   // last frame
@@ -65,9 +66,9 @@ struct gizmo_state {
   // last frame
   bool has_released;
 
-  gizmo_state(const gizmo_application_state &active_state,
+  gizmo_state(bool local_toggle, const gizmo_application_state &active_state,
               const gizmo_application_state &last_state)
-      : active_state(active_state),
+      : local_toggle(local_toggle), active_state(active_state),
         has_clicked(!last_state.mouse_left && active_state.mouse_left),
         has_released(last_state.mouse_left && !active_state.mouse_left) {}
 };
@@ -80,16 +81,14 @@ struct gizmo_context {
   // Clear geometry buffer and update internal `gizmo_application_state` data
   gizmo_result translation_gizmo(const gizmo_state &state,
                                  const AddTriangleFunc &add_triangle,
-                                 bool local_toggle, uint32_t id,
-                                 const float t[3], const float r[4]);
+                                 uint32_t id, const float t[3],
+                                 const float r[4]);
   gizmo_result rotationn_gizmo(const gizmo_state &state,
-                               const AddTriangleFunc &add_triangle,
-                               bool local_toggle, uint32_t id, const float t[3],
-                               const float r[4]);
+                               const AddTriangleFunc &add_triangle, uint32_t id,
+                               const float t[3], const float r[4]);
   gizmo_result scale_gizmo(const gizmo_state &state,
-                           const AddTriangleFunc &add_triangle,
-                           bool local_toggle, bool uniform, uint32_t id,
-                           const float t[3], const float r[4],
+                           const AddTriangleFunc &add_triangle, bool uniform,
+                           uint32_t id, const float t[3], const float r[4],
                            const float s[3]);
 };
 

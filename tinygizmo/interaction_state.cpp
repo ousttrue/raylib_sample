@@ -183,8 +183,7 @@ static void add_triangles(const AddTriangleFunc &add_triangle,
 
 gizmo_result interaction_state::position_gizmo(
     const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
-    bool local_toggle, const minalg::float4 &rotation,
-    const minalg::float3 &_position) {
+    const minalg::float4 &rotation, const minalg::float3 &_position) {
 
   const float draw_scale =
       (state.active_state.screenspace_scale > 0.f)
@@ -198,7 +197,7 @@ gizmo_result interaction_state::position_gizmo(
   }
 
   rigid_transform p = rigid_transform(
-      local_toggle ? rotation : minalg::float4(0, 0, 0, 1), _position);
+      state.local_toggle ? rotation : minalg::float4(0, 0, 0, 1), _position);
 
   auto ray = detransform(p, {
                                 to_minalg(state.active_state.ray_origin),
@@ -256,8 +255,9 @@ gizmo_result interaction_state::position_gizmo(
     if (this->active) {
       ray = ray.scaling(draw_scale);
       this->drag.click_offset =
-          local_toggle ? p.transform_vector(ray.origin + ray.direction * t)
-                       : ray.origin + ray.direction * t;
+          state.local_toggle
+              ? p.transform_vector(ray.origin + ray.direction * t)
+              : ray.origin + ray.direction * t;
     }
   }
 
@@ -265,7 +265,7 @@ gizmo_result interaction_state::position_gizmo(
       (best_t == std::numeric_limits<float>::infinity()) ? false : true;
 
   std::vector<minalg::float3> axes;
-  if (local_toggle)
+  if (state.local_toggle)
     axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
   else
     axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
@@ -337,13 +337,12 @@ gizmo_result interaction_state::position_gizmo(
 
 gizmo_result interaction_state::rotation_gizmo(
     const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
-    bool local_toggle, const minalg::float3 &center,
-    const minalg::float4 &_orientation) {
+    const minalg::float3 &center, const minalg::float4 &_orientation) {
   assert(length2(_orientation) > float(1e-6));
 
-  rigid_transform p =
-      rigid_transform(local_toggle ? _orientation : minalg::float4(0, 0, 0, 1),
-                      center); // Orientation is local by default
+  rigid_transform p = rigid_transform(
+      state.local_toggle ? _orientation : minalg::float4(0, 0, 0, 1),
+      center); // Orientation is local by default
   const float draw_scale =
       (state.active_state.screenspace_scale > 0.f)
           ? scale_screenspace(state, p.position,
@@ -399,8 +398,8 @@ gizmo_result interaction_state::rotation_gizmo(
   minalg::float3 activeAxis;
   if (this->active) {
     const minalg::float4 starting_orientation =
-        local_toggle ? this->drag.original_orientation
-                     : minalg::float4(0, 0, 0, 1);
+        state.local_toggle ? this->drag.original_orientation
+                           : minalg::float4(0, 0, 0, 1);
     switch (interaction_mode(this->active)) {
     case interact::rotate_x:
       axis_rotation_dragger(&drag, state, {1, 0, 0}, center,
@@ -432,7 +431,7 @@ gizmo_result interaction_state::rotation_gizmo(
   modelMatrix = mul(modelMatrix, scaleMatrix);
 
   std::vector<interact> draw_interactions;
-  if (!local_toggle && this->active)
+  if (!state.local_toggle && this->active)
     draw_interactions = {interaction_mode(this->active)};
   else
     draw_interactions = {interact::rotate_x, interact::rotate_y,
@@ -449,7 +448,7 @@ gizmo_result interaction_state::rotation_gizmo(
   // For non-local transformations, we only present one rotation ring
   // and draw an arrow from the center of the gizmo to indicate the degree
   // of rotation
-  if (local_toggle == false && this->active) {
+  if (state.local_toggle == false && this->active) {
 
     // Create orthonormal basis for drawing the arrow
     minalg::float3 a = qrot(p.orientation, this->drag.click_offset -
@@ -465,7 +464,7 @@ gizmo_result interaction_state::rotation_gizmo(
     add_triangles(add_world_triangle, modelMatrix, geo, minalg::float4(1));
 
     orientation = qmul(p.orientation, this->drag.original_orientation);
-  } else if (local_toggle == true && this->active) {
+  } else if (state.local_toggle == true && this->active) {
     orientation = p.orientation;
   }
 
@@ -481,8 +480,8 @@ gizmo_result interaction_state::rotation_gizmo(
 
 gizmo_result interaction_state::scale_gizmo(
     const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
-    bool local_toggle, const minalg::float4 &orientation,
-    const minalg::float3 &center, const minalg::float3 &_scale, bool uniform) {
+    const minalg::float4 &orientation, const minalg::float3 &center,
+    const minalg::float3 &_scale, bool uniform) {
   rigid_transform p = rigid_transform(orientation, center);
   const float draw_scale =
       (state.active_state.screenspace_scale > 0.f)

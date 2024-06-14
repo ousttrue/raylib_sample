@@ -18,32 +18,31 @@ enum class transform_mode {
 void transform_gizmo(tinygizmo::gizmo_context *gizmo,
                      const tinygizmo::gizmo_state &state,
                      const tinygizmo::AddTriangleFunc &add_world_triangle,
-                     transform_mode mode, bool local_toggle, bool uniform,
-                     const std::string &name, Vector3 &t, Quaternion &r,
-                     Vector3 &s) {
+                     transform_mode mode, bool uniform, const std::string &name,
+                     Vector3 &t, Quaternion &r, Vector3 &s) {
 
   auto id = tinygizmo::hash_fnv1a(name);
 
   switch (mode) {
   case transform_mode::translate: {
-    auto result = gizmo->translation_gizmo(state, add_world_triangle,
-                                           local_toggle, id, &t.x, &r.x);
+    auto result =
+        gizmo->translation_gizmo(state, add_world_triangle, id, &t.x, &r.x);
     if (result.active) {
       t = *(Vector3 *)&result.t;
     }
     break;
   }
   case transform_mode::rotate: {
-    auto result = gizmo->rotationn_gizmo(state, add_world_triangle,
-                                         local_toggle, id, &t.x, &r.x);
+    auto result =
+        gizmo->rotationn_gizmo(state, add_world_triangle, id, &t.x, &r.x);
     if (result.active) {
       r = *(Quaternion *)&result.r;
     }
     break;
   }
   case transform_mode::scale: {
-    auto result = gizmo->scale_gizmo(state, add_world_triangle, local_toggle,
-                                     uniform, id, &t.x, &r.x, &s.x);
+    auto result = gizmo->scale_gizmo(state, add_world_triangle, uniform, id,
+                                     &t.x, &r.x, &s.x);
     if (result.active) {
       s = *(Vector3 *)&result.s;
     }
@@ -199,20 +198,6 @@ int main(int argc, char *argv[]) {
     auto rot =
         QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
 
-    tinygizmo::gizmo_state state(
-        {
-            .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
-            // optional flag to draw the gizmos at a constant screen-space
-            // scale gizmo_state.screenspace_scale = 80.f; camera projection
-            .viewport_size = {static_cast<float>(w), static_cast<float>(h)},
-            .ray_origin = {ray.position.x, ray.position.y, ray.position.z},
-            .ray_direction = {ray.direction.x, ray.direction.y,
-                              ray.direction.z},
-            .cam_yfov = 1.0f,
-            .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
-        },
-        last_state);
-
     hotkey active_hotkey = {
         .hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL),
         .hotkey_translate = IsKeyDown(KEY_T),
@@ -236,6 +221,21 @@ int main(int argc, char *argv[]) {
                          ? !local_toggle
                          : local_toggle;
     }
+
+    tinygizmo::gizmo_state state(
+        local_toggle,
+        {
+            .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
+            // optional flag to draw the gizmos at a constant screen-space
+            // scale gizmo_state.screenspace_scale = 80.f; camera projection
+            .viewport_size = {static_cast<float>(w), static_cast<float>(h)},
+            .ray_origin = {ray.position.x, ray.position.y, ray.position.z},
+            .ray_direction = {ray.direction.x, ray.direction.y,
+                              ray.direction.z},
+            .cam_yfov = 1.0f,
+            .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
+        },
+        last_state);
 
     {
       positions.clear();
@@ -265,10 +265,10 @@ int main(int argc, char *argv[]) {
           };
 
       // gizmo_ctx.begin_frame(active_state);
-      transform_gizmo(&gizmo_ctx, state, add_world_triangle, mode, local_toggle,
+      transform_gizmo(&gizmo_ctx, state, add_world_triangle, mode,
                       active_hotkey.hotkey_ctrl, "first-example-gizmo", a_t,
                       a_r, a_s);
-      transform_gizmo(&gizmo_ctx, state, add_world_triangle, mode, local_toggle,
+      transform_gizmo(&gizmo_ctx, state, add_world_triangle, mode,
                       active_hotkey.hotkey_ctrl, "second-example-gizmo", b_t,
                       b_r, b_s);
 
