@@ -273,30 +273,40 @@ gizmo_result interaction_state::position_gizmo(
   minalg::float3 position = _position;
   if (this->active) {
     position += this->drag.click_offset;
+    rigid_transform src(minalg::float4(0, 0, 0, 1), position,
+                        minalg::float3(1, 1, 1));
     switch (interaction_mode(this->active)) {
     case interact::translate_x:
-      axis_translation_dragger(&drag, state, axes[0], position);
+      position =
+          axis_translation_dragger(&drag, state, axes[0], src, {}).position;
       break;
     case interact::translate_y:
-      axis_translation_dragger(&drag, state, axes[1], position);
+      position =
+          axis_translation_dragger(&drag, state, axes[1], src, {}).position;
       break;
     case interact::translate_z:
-      axis_translation_dragger(&drag, state, axes[2], position);
+      position =
+          axis_translation_dragger(&drag, state, axes[2], src, {}).position;
       break;
     case interact::translate_yz:
-      plane_translation_dragger(&drag, state, axes[0], position);
+      position =
+          plane_translation_dragger(&drag, state, axes[0], src, {}).position;
       break;
     case interact::translate_zx:
-      plane_translation_dragger(&drag, state, axes[1], position);
+      position =
+          plane_translation_dragger(&drag, state, axes[1], src, {}).position;
       break;
     case interact::translate_xy:
-      plane_translation_dragger(&drag, state, axes[2], position);
+      position =
+          plane_translation_dragger(&drag, state, axes[2], src, {}).position;
       break;
     case interact::translate_xyz:
-      plane_translation_dragger(
-          &drag, state,
-          -minalg::qzdir(to_minalg(state.active_state.cam_orientation)),
-          position);
+      position =
+          plane_translation_dragger(
+              &drag, state,
+              -minalg::qzdir(to_minalg(state.active_state.cam_orientation)),
+              src, {})
+              .position;
       break;
     default:
       assert(false);
@@ -397,23 +407,21 @@ gizmo_result interaction_state::rotation_gizmo(
 
   minalg::float3 activeAxis;
   if (this->active) {
-    const minalg::float4 starting_orientation =
-        state.local_toggle ? this->drag.original_orientation
-                           : minalg::float4(0, 0, 0, 1);
+    rigid_transform src(_orientation, center, {1, 1, 1});
     switch (interaction_mode(this->active)) {
     case interact::rotate_x:
-      axis_rotation_dragger(&drag, state, {1, 0, 0}, center,
-                            starting_orientation, p.orientation);
+      p.orientation =
+          axis_rotation_dragger(&drag, state, {1, 0, 0}, src, {}).orientation;
       activeAxis = {1, 0, 0};
       break;
     case interact::rotate_y:
-      axis_rotation_dragger(&drag, state, {0, 1, 0}, center,
-                            starting_orientation, p.orientation);
+      p.orientation =
+          axis_rotation_dragger(&drag, state, {0, 1, 0}, src, {}).orientation;
       activeAxis = {0, 1, 0};
       break;
     case interact::rotate_z:
-      axis_rotation_dragger(&drag, state, {0, 0, 1}, center,
-                            starting_orientation, p.orientation);
+      p.orientation =
+          axis_rotation_dragger(&drag, state, {0, 0, 1}, src, {}).orientation;
       activeAxis = {0, 0, 1};
       break;
     default:
@@ -534,15 +542,16 @@ gizmo_result interaction_state::scale_gizmo(
 
   auto scale = _scale;
   if (this->active) {
+    rigid_transform src({0, 0, 0, 1}, center, scale);
     switch (interaction_mode(this->active)) {
     case interact::scale_x:
-      axis_scale_dragger(&drag, state, {1, 0, 0}, center, scale, uniform);
+      scale = axis_scale_dragger(&drag, state, {1, 0, 0}, src, uniform).scale;
       break;
     case interact::scale_y:
-      axis_scale_dragger(&drag, state, {0, 1, 0}, center, scale, uniform);
+      scale = axis_scale_dragger(&drag, state, {0, 1, 0}, src, uniform).scale;
       break;
     case interact::scale_z:
-      axis_scale_dragger(&drag, state, {0, 0, 1}, center, scale, uniform);
+      scale = axis_scale_dragger(&drag, state, {0, 0, 1}, src, uniform).scale;
       break;
     default:
       assert(false);

@@ -15,23 +15,25 @@ struct drag_state {
   minalg::float4 original_orientation;
 };
 
-void plane_translation_dragger(drag_state *drag, const gizmo_state &state,
-                               const minalg::float3 &plane_normal,
-                               minalg::float3 &point);
+rigid_transform plane_translation_dragger(drag_state *drag,
+                                          const gizmo_state &state,
+                                          const minalg::float3 &plane_normal,
+                                          const rigid_transform &t,
+                                          bool uniform);
 
-void axis_translation_dragger(drag_state *drag, const gizmo_state &state,
-                              const minalg::float3 &axis,
-                              minalg::float3 &point);
+rigid_transform axis_translation_dragger(drag_state *drag,
+                                         const gizmo_state &state,
+                                         const minalg::float3 &axis,
+                                         const rigid_transform &t,
+                                         bool uniform);
 
-void axis_rotation_dragger(drag_state *drag, const gizmo_state &state,
-                           const minalg::float3 &axis,
-                           const minalg::float3 &center,
-                           const minalg::float4 &start_orientation,
-                           minalg::float4 &orientation);
+rigid_transform axis_rotation_dragger(drag_state *drag,
+                                      const gizmo_state &state,
+                                      const minalg::float3 &axis,
+                                      const rigid_transform &t, bool uniform);
 
-void axis_scale_dragger(drag_state *drag, const gizmo_state &state,
-                        const minalg::float3 &axis,
-                        const minalg::float3 &center, minalg::float3 &scale,
-                        const bool uniform);
+rigid_transform axis_scale_dragger(drag_state *drag, const gizmo_state &state,
+                                   const minalg::float3 &axis,
+                                   const rigid_transform &t, bool uniform);
 
 } // namespace tinygizmo
