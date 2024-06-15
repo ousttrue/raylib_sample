@@ -23,6 +23,10 @@ void transform_gizmo(tinygizmo::gizmo_context *gizmo_ctx,
 
   auto id = tinygizmo::hash_fnv1a(name);
   auto gizmo = gizmo_ctx->get_or_create(id);
+  // interaction_mode will only change on clicked
+  if (state.has_clicked) {
+    gizmo->active = nullptr;
+  }
 
   switch (mode) {
   case transform_mode::translate: {

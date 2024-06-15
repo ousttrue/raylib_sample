@@ -151,16 +151,6 @@ interaction_mode(const std::shared_ptr<gizmo_mesh_component> &p) {
   return {};
 }
 
-// This will calculate a scale constant based on the number of screenspace
-// pixels passed as pixel_scale.
-static float scale_screenspace(const gizmo_state &state,
-                               const minalg::float3 position,
-                               const float pixel_scale) {
-  float dist = length(position - to_minalg(state.active_state.ray_origin));
-  return std::tan(state.active_state.cam_yfov) * dist *
-         (pixel_scale / state.active_state.viewport_size[1]);
-}
-
 static void add_triangles(const AddTriangleFunc &add_triangle,
                           const minalg::float4x4 &modelMatrix,
                           const geometry_mesh &mesh,
@@ -187,16 +177,7 @@ gizmo_result interaction_state::position_gizmo(
     const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
     const minalg::float4 &rotation, const minalg::float3 &_position) {
 
-  const float draw_scale =
-      (state.active_state.screenspace_scale > 0.f)
-          ? scale_screenspace(state, _position,
-                              state.active_state.screenspace_scale)
-          : 1.f;
-
-  // interaction_mode will only change on clicked
-  if (state.has_clicked) {
-    this->active = nullptr;
-  }
+  const float draw_scale = state.active_state.scale_screenspace(_position);
 
   rigid_transform p = rigid_transform(
       state.local_toggle ? rotation : minalg::float4(0, 0, 0, 1), _position);
@@ -355,16 +336,7 @@ gizmo_result interaction_state::rotation_gizmo(
   rigid_transform p = rigid_transform(
       state.local_toggle ? _orientation : minalg::float4(0, 0, 0, 1),
       center); // Orientation is local by default
-  const float draw_scale =
-      (state.active_state.screenspace_scale > 0.f)
-          ? scale_screenspace(state, p.position,
-                              state.active_state.screenspace_scale)
-          : 1.f;
-
-  // interaction_mode will only change on clicked
-  if (state.has_clicked) {
-    this->active = nullptr;
-  }
+  auto draw_scale = state.active_state.scale_screenspace(p.position);
 
   {
 
@@ -493,15 +465,7 @@ gizmo_result interaction_state::scale_gizmo(
     const minalg::float4 &orientation, const minalg::float3 &center,
     const minalg::float3 &_scale, bool uniform) {
   rigid_transform p = rigid_transform(orientation, center);
-  const float draw_scale =
-      (state.active_state.screenspace_scale > 0.f)
-          ? scale_screenspace(state, p.position,
-                              state.active_state.screenspace_scale)
-          : 1.f;
-
-  if (state.has_clicked) {
-    this->active = nullptr;
-  }
+  auto draw_scale = state.active_state.scale_screenspace(p.position);
 
   {
     auto ray = detransform(p, {

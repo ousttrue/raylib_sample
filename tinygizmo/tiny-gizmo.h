@@ -28,7 +28,7 @@ struct gizmo_application_state {
   bool mouse_left = false;
   // If > 0.f, the gizmos are drawn scale-invariant with a screenspace value
   // defined here
-  float screenspace_scale = 0.f;
+  float _screenspace_scale = 0.f;
   // World-scale units used for snapping translation
   float snap_translation = 0.f;
   // World-scale units used for snapping scale
@@ -43,6 +43,17 @@ struct gizmo_application_state {
   std::array<float, 3> ray_direction;
   float cam_yfov;
   std::array<float, 4> cam_orientation;
+
+  // This will calculate a scale constant based on the number of screenspace
+  // pixels passed as pixel_scale.
+  float calc_scale_screenspace(const minalg::float3 position) const {
+    float dist = length(position - to_minalg(this->ray_origin));
+    return std::tan(this->cam_yfov) * dist *
+           (_screenspace_scale / this->viewport_size[1]);
+  }
+  float scale_screenspace(const minalg::float3 &position) const {
+    return (_screenspace_scale > 0.f) ? calc_scale_screenspace(position) : 1.f;
+  }
 };
 
 struct gizmo_result {
