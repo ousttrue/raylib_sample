@@ -1,6 +1,7 @@
 // This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
 #pragma once
+#include "minalg.hpp"
 #include <array>
 #include <functional>
 #include <memory>
@@ -73,23 +74,53 @@ struct gizmo_state {
         has_released(last_state.mouse_left && !active_state.mouse_left) {}
 };
 
-struct interaction_state;
+struct gizmo_mesh_component {
+  geometry_mesh mesh;
+  minalg::float4 base_color;
+  minalg::float4 highlight_color;
+
+  gizmo_mesh_component(const geometry_mesh &mesh, const minalg::float4 &base,
+                       const minalg::float4 &high)
+      : mesh(mesh), base_color(base), highlight_color(high) {}
+};
+
+struct drag_state {
+  // Original position of an object being manipulated with a gizmo
+  minalg::float3 original_position;
+  // Offset from position of grabbed object to coordinates of clicked point
+  minalg::float3 click_offset;
+  // Original scale of an object being manipulated with a gizmo
+  minalg::float3 original_scale;
+  // Original orientation of an object being manipulated with a gizmo
+  minalg::float4 original_orientation;
+};
+
+struct interaction_state {
+  // Currently active component
+  std::shared_ptr<gizmo_mesh_component> active;
+
+  drag_state drag = {};
+
+  gizmo_result position_gizmo(const gizmo_state &state,
+                              const AddTriangleFunc &add_triangle,
+                              const minalg::float4 &rotation,
+                              const minalg::float3 &_position);
+
+  gizmo_result rotation_gizmo(const gizmo_state &state,
+                              const AddTriangleFunc &add_triangle,
+                              const minalg::float3 &center,
+                              const minalg::float4 &_orientation);
+
+  gizmo_result scale_gizmo(const gizmo_state &state,
+                           const AddTriangleFunc &add_triangle,
+                           const minalg::float4 &orientation,
+                           const minalg::float3 &center,
+                           const minalg::float3 &_scale, bool uniform);
+};
+
 struct gizmo_context {
   std::unordered_map<uint32_t, std::shared_ptr<interaction_state>> gizmos;
   std::shared_ptr<interaction_state> get_or_create(uint32_t id);
-
-  // Clear geometry buffer and update internal `gizmo_application_state` data
-  gizmo_result translation_gizmo(const gizmo_state &state,
-                                 const AddTriangleFunc &add_triangle,
-                                 uint32_t id, const float t[3],
-                                 const float r[4]);
-  gizmo_result rotationn_gizmo(const gizmo_state &state,
-                               const AddTriangleFunc &add_triangle, uint32_t id,
-                               const float t[3], const float r[4]);
-  gizmo_result scale_gizmo(const gizmo_state &state,
-                           const AddTriangleFunc &add_triangle, bool uniform,
-                           uint32_t id, const float t[3], const float r[4],
-                           const float s[3]);
 };
 
 } // namespace tinygizmo

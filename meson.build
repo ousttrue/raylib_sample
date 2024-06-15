@@ -42,7 +42,6 @@ executable(
     [
         'examples/tiny-gizmo-example/example-main.cpp',
         'tinygizmo/tiny-gizmo.cpp',
-        'tinygizmo/interaction_state.cpp',
         'tinygizmo/drag.cpp',
     ],
     include_directories: include_directories(

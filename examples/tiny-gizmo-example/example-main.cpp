@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <raylib/external/glad.h>
 #include <span>
-#include <tiny-gizmo.hpp>
+#include <tiny-gizmo.h>
 
 #include "orbit_camera.h"
 #include "teapot.h"
@@ -15,18 +15,20 @@ enum class transform_mode {
   rotate,
   scale,
 };
-void transform_gizmo(tinygizmo::gizmo_context *gizmo,
+void transform_gizmo(tinygizmo::gizmo_context *gizmo_ctx,
                      const tinygizmo::gizmo_state &state,
                      const tinygizmo::AddTriangleFunc &add_world_triangle,
                      transform_mode mode, bool uniform, const std::string &name,
                      Vector3 &t, Quaternion &r, Vector3 &s) {
 
   auto id = tinygizmo::hash_fnv1a(name);
+  auto gizmo = gizmo_ctx->get_or_create(id);
 
   switch (mode) {
   case transform_mode::translate: {
     auto result =
-        gizmo->translation_gizmo(state, add_world_triangle, id, &t.x, &r.x);
+        gizmo->position_gizmo(state, add_world_triangle,
+                              *(minalg::float4 *)&r.x, *(minalg::float3 *)&t.x);
     if (result.active) {
       t = *(Vector3 *)&result.t;
     }
@@ -34,15 +36,17 @@ void transform_gizmo(tinygizmo::gizmo_context *gizmo,
   }
   case transform_mode::rotate: {
     auto result =
-        gizmo->rotationn_gizmo(state, add_world_triangle, id, &t.x, &r.x);
+        gizmo->rotation_gizmo(state, add_world_triangle,
+                              *(minalg::float3 *)&t.x, *(minalg::float4 *)&r.x);
     if (result.active) {
       r = *(Quaternion *)&result.r;
     }
     break;
   }
   case transform_mode::scale: {
-    auto result = gizmo->scale_gizmo(state, add_world_triangle, uniform, id,
-                                     &t.x, &r.x, &s.x);
+    auto result = gizmo->scale_gizmo(
+        state, add_world_triangle, *(minalg::float4 *)&r.x,
+        *(minalg::float3 *)&t.x, *(minalg::float3 *)&s.x, uniform);
     if (result.active) {
       s = *(Vector3 *)&result.s;
     }
