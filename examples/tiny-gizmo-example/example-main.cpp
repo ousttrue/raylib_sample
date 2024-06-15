@@ -26,8 +26,7 @@ void transform_gizmo(tinygizmo::gizmo_context *gizmo_ctx,
   // interaction_mode will only change on clicked
   if (state.has_clicked) {
     gizmo->active = nullptr;
-  }
-  if (state.has_released) {
+  } else if (state.has_released) {
     gizmo->active = nullptr;
   }
 
@@ -145,6 +144,44 @@ struct hotkey {
   bool hotkey_local = false;
 };
 
+class Drag {
+  Vector2 _cursor_begin;
+  ;
+  bool _button = false;
+
+  void _begin(const Vector2 &cursor) { _cursor_begin = cursor; }
+
+  void _end(const Vector2 &end) {
+    //
+  }
+
+  void _drag(const Vector2 &cursor) {
+    DrawText(TextFormat("[%.0f, %.0f]", _cursor_begin.x, _cursor_begin.y),
+             _cursor_begin.x + 10, _cursor_begin.y, 10, BLACK);
+    DrawLine(_cursor_begin.x, _cursor_begin.y, cursor.x, cursor.y, BLACK);
+    DrawText(TextFormat("[%.0f, %.0f]", cursor.x, cursor.y), cursor.x + 10,
+             cursor.y, 10, BLACK);
+  }
+
+public:
+  void process(const Vector2 &cursor, bool button) {
+    if (_button != button) {
+      if (button) {
+        _begin(cursor);
+      } else {
+        _end(cursor);
+      }
+    } else {
+      if (button) {
+        _drag(cursor);
+      } else {
+        // nothing
+      }
+    }
+    _button = button;
+  }
+};
+
 int main(int argc, char *argv[]) {
 
   InitWindow(1280, 800, "tiny-gizmo-example-app");
@@ -184,6 +221,10 @@ int main(int argc, char *argv[]) {
   std::vector<Color> colors;
   std::vector<unsigned short> indices;
 
+  Drag left_drag;
+  Drag right_drag;
+  Drag middle_drag;
+
   while (!WindowShouldClose()) {
     auto w = GetScreenWidth();
     auto h = GetScreenHeight();
@@ -201,7 +242,8 @@ int main(int argc, char *argv[]) {
     orbit.update_view(&camera);
 
     // gizmo
-    auto ray = GetMouseRay(GetMousePosition(), camera);
+    auto cursor = GetMousePosition();
+    auto ray = GetMouseRay(cursor, camera);
     auto rot =
         QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
 
@@ -310,6 +352,10 @@ int main(int argc, char *argv[]) {
       gizmo_mesh.draw(MatrixIdentity());
     }
     EndMode3D();
+
+    left_drag.process(cursor, IsMouseButtonDown(MOUSE_BUTTON_LEFT));
+    right_drag.process(cursor, IsMouseButtonDown(MOUSE_BUTTON_RIGHT));
+    middle_drag.process(cursor, IsMouseButtonDown(MOUSE_BUTTON_MIDDLE));
     EndDrawing();
   }
 

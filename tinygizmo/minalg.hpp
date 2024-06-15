@@ -1086,17 +1086,6 @@ template <typename T> T clamp(const T &val, const T &min, const T &max) {
 }
 
 struct rigid_transform {
-  rigid_transform() {}
-  rigid_transform(const minalg::float4 &orientation,
-                  const minalg::float3 &position, const minalg::float3 &scale)
-      : orientation(orientation), position(position), scale(scale) {}
-  rigid_transform(const minalg::float4 &orientation,
-                  const minalg::float3 &position, float scale)
-      : orientation(orientation), position(position), scale(scale) {}
-  rigid_transform(const minalg::float4 &orientation,
-                  const minalg::float3 &position)
-      : orientation(orientation), position(position) {}
-
   minalg::float4 orientation{0, 0, 0, 1};
   minalg::float3 position{0, 0, 0};
   minalg::float3 scale{1, 1, 1};
