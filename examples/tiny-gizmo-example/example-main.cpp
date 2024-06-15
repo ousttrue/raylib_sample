@@ -27,30 +27,29 @@ void transform_gizmo(tinygizmo::gizmo_context *gizmo_ctx,
   if (state.has_clicked) {
     gizmo->active = nullptr;
   }
+  if (state.has_released) {
+    gizmo->active = nullptr;
+  }
 
+  rigid_transform p(*(minalg::float4 *)&r.x, *(minalg::float3 *)&t.x,
+                    *(minalg::float3 *)&s.x);
   switch (mode) {
   case transform_mode::translate: {
-    auto result =
-        gizmo->position_gizmo(state, add_world_triangle,
-                              *(minalg::float4 *)&r.x, *(minalg::float3 *)&t.x);
+    auto result = gizmo->position_gizmo(state, add_world_triangle, p);
     if (result.active) {
       t = *(Vector3 *)&result.t;
     }
     break;
   }
   case transform_mode::rotate: {
-    auto result =
-        gizmo->rotation_gizmo(state, add_world_triangle,
-                              *(minalg::float3 *)&t.x, *(minalg::float4 *)&r.x);
+    auto result = gizmo->rotation_gizmo(state, add_world_triangle, p);
     if (result.active) {
       r = *(Quaternion *)&result.r;
     }
     break;
   }
   case transform_mode::scale: {
-    auto result = gizmo->scale_gizmo(
-        state, add_world_triangle, *(minalg::float4 *)&r.x,
-        *(minalg::float3 *)&t.x, *(minalg::float3 *)&s.x, uniform);
+    auto result = gizmo->scale_gizmo(state, add_world_triangle, p, uniform);
     if (result.active) {
       s = *(Vector3 *)&result.s;
     }

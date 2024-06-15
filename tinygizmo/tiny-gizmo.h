@@ -83,6 +83,21 @@ struct gizmo_state {
       : local_toggle(local_toggle), active_state(active_state),
         has_clicked(!last_state.mouse_left && active_state.mouse_left),
         has_released(last_state.mouse_left && !active_state.mouse_left) {}
+
+  std::tuple<float, rigid_transform, ray>
+  gizmo_transform(const rigid_transform &src) const {
+    auto draw_scale = active_state.scale_screenspace(src.position);
+    auto p = rigid_transform(local_toggle ? src.orientation
+                                          : minalg::float4(0, 0, 0, 1),
+                             src.position);
+    ray ray{
+        .origin = *(minalg::float3 *)&active_state.ray_origin[0],
+        .direction = *(minalg::float3 *)&active_state.ray_direction[0],
+    };
+    ray = detransform(p, ray);
+    ray = ray.descale(draw_scale);
+    return {draw_scale, p, ray};
+  }
 };
 
 struct gizmo_mesh_component {
@@ -114,19 +129,15 @@ struct interaction_state {
 
   gizmo_result position_gizmo(const gizmo_state &state,
                               const AddTriangleFunc &add_triangle,
-                              const minalg::float4 &rotation,
-                              const minalg::float3 &_position);
+                              const rigid_transform &src);
 
   gizmo_result rotation_gizmo(const gizmo_state &state,
                               const AddTriangleFunc &add_triangle,
-                              const minalg::float3 &center,
-                              const minalg::float4 &_orientation);
+                              const rigid_transform &src);
 
   gizmo_result scale_gizmo(const gizmo_state &state,
                            const AddTriangleFunc &add_triangle,
-                           const minalg::float4 &orientation,
-                           const minalg::float3 &center,
-                           const minalg::float3 &_scale, bool uniform);
+                           const rigid_transform &src, bool uniform);
 };
 
 struct gizmo_context {

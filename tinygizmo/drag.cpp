@@ -128,27 +128,24 @@ rigid_transform axis_scale_dragger(drag_state *drag, const gizmo_state &state,
       cross(axis, src.position - to_minalg(state.active_state.ray_origin));
   const minalg::float3 plane_normal = cross(axis, plane_tangent);
 
-  minalg::float3 distance;
-  if (state.active_state.mouse_left) {
-    // Define the plane to contain the original position of the object
-    const minalg::float3 plane_point = src.position;
-    const ray ray = {
-        to_minalg(state.active_state.ray_origin),
-        to_minalg(state.active_state.ray_direction),
-    };
+  // Define the plane to contain the original position of the object
+  const minalg::float3 plane_point = src.position;
+  const ray ray = {
+      to_minalg(state.active_state.ray_origin),
+      to_minalg(state.active_state.ray_direction),
+  };
 
-    // If an intersection exists between the ray and the plane, place the
-    // object at that point
-    const float denom = dot(ray.direction, plane_normal);
-    if (std::abs(denom) == 0)
-      return src;
+  // If an intersection exists between the ray and the plane, place the
+  // object at that point
+  const float denom = dot(ray.direction, plane_normal);
+  if (std::abs(denom) == 0)
+    return src;
 
-    const float t = dot(plane_point - ray.origin, plane_normal) / denom;
-    if (t < 0)
-      return src;
+  const float t = dot(plane_point - ray.origin, plane_normal) / denom;
+  if (t < 0)
+    return src;
 
-    distance = ray.origin + ray.direction * t;
-  }
+  auto distance = ray.origin + ray.direction * t;
 
   minalg::float3 offset_on_axis = (distance - drag->click_offset) * axis;
   flush_to_zero(offset_on_axis);

@@ -1124,7 +1124,8 @@ struct rigid_transform {
   }
 };
 struct ray {
-  minalg::float3 origin, direction;
+  minalg::float3 origin;
+  minalg::float3 direction;
 
   ray scaling(const float scale) const {
     return {

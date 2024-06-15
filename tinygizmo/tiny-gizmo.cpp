@@ -173,21 +173,8 @@ static void add_triangles(const AddTriangleFunc &add_triangle,
   }
 }
 
-gizmo_result interaction_state::position_gizmo(
-    const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
-    const minalg::float4 &rotation, const minalg::float3 &_position) {
-
-  const float draw_scale = state.active_state.scale_screenspace(_position);
-
-  rigid_transform p = rigid_transform(
-      state.local_toggle ? rotation : minalg::float4(0, 0, 0, 1), _position);
-
-  auto ray = detransform(p, {
-                                to_minalg(state.active_state.ray_origin),
-                                to_minalg(state.active_state.ray_direction),
-                            });
-  ray = ray.descale(draw_scale);
-
+static std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
+position_intersect(const ray &ray) {
   float best_t = std::numeric_limits<float>::infinity(), t;
   std::shared_ptr<gizmo_mesh_component> updated_state = {};
   if (intersect_ray_mesh(ray, mesh_components[interact::translate_x]->mesh,
@@ -232,61 +219,101 @@ gizmo_result interaction_state::position_gizmo(
     updated_state = mesh_components[interact::translate_xyz];
     best_t = t;
   }
+  return {updated_state, best_t};
+}
 
-  if (state.has_clicked) {
-    this->active = updated_state;
-    if (this->active) {
-      ray = ray.scaling(draw_scale);
-      this->drag.click_offset =
-          state.local_toggle
-              ? p.transform_vector(ray.origin + ray.direction * t)
-              : ray.origin + ray.direction * t;
-    }
+static std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
+rotation_intersect(const ray &ray) {
+
+  float best_t = std::numeric_limits<float>::infinity(), t;
+  std::shared_ptr<gizmo_mesh_component> updated_state = {};
+  if (intersect_ray_mesh(ray, mesh_components[interact::rotate_x]->mesh, &t) &&
+      t < best_t) {
+    updated_state = mesh_components[interact::rotate_x];
+    best_t = t;
+  }
+  if (intersect_ray_mesh(ray, mesh_components[interact::rotate_y]->mesh, &t) &&
+      t < best_t) {
+    updated_state = mesh_components[interact::rotate_y];
+    best_t = t;
+  }
+  if (intersect_ray_mesh(ray, mesh_components[interact::rotate_z]->mesh, &t) &&
+      t < best_t) {
+    updated_state = mesh_components[interact::rotate_z];
+    best_t = t;
   }
 
-  auto hover =
-      (best_t == std::numeric_limits<float>::infinity()) ? false : true;
+  return {updated_state, best_t};
+}
 
+static std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
+scale_intersect(const ray &ray) {
+
+  float best_t = std::numeric_limits<float>::infinity(), t;
+  std::shared_ptr<gizmo_mesh_component> updated_state = {};
+  if (intersect_ray_mesh(ray, mesh_components[interact::scale_x]->mesh, &t) &&
+      t < best_t) {
+    updated_state = mesh_components[interact::scale_x];
+    best_t = t;
+  }
+  if (intersect_ray_mesh(ray, mesh_components[interact::scale_y]->mesh, &t) &&
+      t < best_t) {
+    updated_state = mesh_components[interact::scale_y];
+    best_t = t;
+  }
+  if (intersect_ray_mesh(ray, mesh_components[interact::scale_z]->mesh, &t) &&
+      t < best_t) {
+    updated_state = mesh_components[interact::scale_z];
+    best_t = t;
+  }
+
+  return {updated_state, best_t};
+}
+
+static minalg::float3
+position_drag(drag_state *drag, const gizmo_state &state,
+              const std::shared_ptr<gizmo_mesh_component> &active,
+              const rigid_transform &p) {
   std::vector<minalg::float3> axes;
   if (state.local_toggle)
     axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
   else
     axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
-  minalg::float3 position = _position;
-  if (this->active) {
-    position += this->drag.click_offset;
+  minalg::float3 position = p.position;
+  if (active) {
+    position += drag->click_offset;
     rigid_transform src(minalg::float4(0, 0, 0, 1), position,
                         minalg::float3(1, 1, 1));
-    switch (interaction_mode(this->active)) {
+    switch (interaction_mode(active)) {
     case interact::translate_x:
       position =
-          axis_translation_dragger(&drag, state, axes[0], src, {}).position;
+          axis_translation_dragger(drag, state, axes[0], src, {}).position;
       break;
     case interact::translate_y:
       position =
-          axis_translation_dragger(&drag, state, axes[1], src, {}).position;
+          axis_translation_dragger(drag, state, axes[1], src, {}).position;
       break;
     case interact::translate_z:
       position =
-          axis_translation_dragger(&drag, state, axes[2], src, {}).position;
+          axis_translation_dragger(drag, state, axes[2], src, {}).position;
       break;
     case interact::translate_yz:
       position =
-          plane_translation_dragger(&drag, state, axes[0], src, {}).position;
+          plane_translation_dragger(drag, state, axes[0], src, {}).position;
       break;
     case interact::translate_zx:
       position =
-          plane_translation_dragger(&drag, state, axes[1], src, {}).position;
+          plane_translation_dragger(drag, state, axes[1], src, {}).position;
       break;
     case interact::translate_xy:
       position =
-          plane_translation_dragger(&drag, state, axes[2], src, {}).position;
+          plane_translation_dragger(drag, state, axes[2], src, {}).position;
       break;
     case interact::translate_xyz:
       position =
           plane_translation_dragger(
-              &drag, state,
+              drag, state,
               -minalg::qzdir(to_minalg(state.active_state.cam_orientation)),
               src, {})
               .position;
@@ -295,13 +322,86 @@ gizmo_result interaction_state::position_gizmo(
       assert(false);
       break;
     }
-    position -= this->drag.click_offset;
+    position -= drag->click_offset;
+  }
+  return position;
+}
+
+static minalg::float4
+rotation_drag(drag_state *drag, const gizmo_state &state,
+              const std::shared_ptr<gizmo_mesh_component> &active,
+              const rigid_transform &src) {
+
+  if (active) {
+    // rigid_transform src(_orientation, center, {1, 1, 1});
+    switch (interaction_mode(active)) {
+    case interact::rotate_x:
+      return axis_rotation_dragger(drag, state, {1, 0, 0}, src, {}).orientation;
+    case interact::rotate_y:
+      return axis_rotation_dragger(drag, state, {0, 1, 0}, src, {}).orientation;
+    case interact::rotate_z:
+      return axis_rotation_dragger(drag, state, {0, 0, 1}, src, {}).orientation;
+    default:
+      assert(false);
+      break;
+    }
   }
 
-  if (state.has_released) {
-    this->active = nullptr;
+  return src.orientation;
+}
+
+static minalg::float3
+scale_drag(drag_state *drag, const gizmo_state &state,
+           const std::shared_ptr<gizmo_mesh_component> &active,
+           const rigid_transform &src, bool uniform) {
+
+  auto scale = src.scale;
+  if (active) {
+    rigid_transform src({0, 0, 0, 1}, src.position, scale);
+    switch (interaction_mode(active)) {
+    case interact::scale_x:
+      scale = axis_scale_dragger(drag, state, {1, 0, 0}, src, uniform).scale;
+      break;
+    case interact::scale_y:
+      scale = axis_scale_dragger(drag, state, {0, 1, 0}, src, uniform).scale;
+      break;
+    case interact::scale_z:
+      scale = axis_scale_dragger(drag, state, {0, 0, 1}, src, uniform).scale;
+      break;
+    default:
+      assert(false);
+      break;
+    }
+  }
+  return scale;
+}
+
+gizmo_result
+interaction_state::position_gizmo(const gizmo_state &state,
+                                  const AddTriangleFunc &add_world_triangle,
+                                  const rigid_transform &src) {
+
+  auto [draw_scale, p, ray] = state.gizmo_transform(src);
+
+  // ray intersection
+  auto [updated_state, t] = position_intersect(ray);
+
+  if (state.has_clicked) {
+    this->active = updated_state;
+    if (this->active) {
+      // begin drag
+      ray = ray.scaling(draw_scale);
+      this->drag.click_offset =
+          state.local_toggle
+              ? p.transform_vector(ray.origin + ray.direction * t)
+              : ray.origin + ray.direction * t;
+    }
   }
 
+  // drag
+  auto position = position_drag(&drag, state, this->active, p);
+
+  // draw
   std::vector<interact> draw_interactions{
       interact::translate_x,  interact::translate_y,  interact::translate_z,
       interact::translate_yz, interact::translate_zx, interact::translate_xy,
@@ -319,7 +419,7 @@ gizmo_result interaction_state::position_gizmo(
     add_triangles(add_world_triangle, modelMatrix, mesh, color);
   }
 
-  return {.hover = hover,
+  return {.hover = updated_state ? true : false,
           .active = this->active ? true : false,
           .t = {
               position.x,
@@ -328,86 +428,31 @@ gizmo_result interaction_state::position_gizmo(
           }};
 }
 
-gizmo_result interaction_state::rotation_gizmo(
-    const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
-    const minalg::float3 &center, const minalg::float4 &_orientation) {
-  assert(length2(_orientation) > float(1e-6));
+gizmo_result
+interaction_state::rotation_gizmo(const gizmo_state &state,
+                                  const AddTriangleFunc &add_world_triangle,
+                                  const rigid_transform &src) {
+  assert(length2(src.orientation) > float(1e-6));
 
-  rigid_transform p = rigid_transform(
-      state.local_toggle ? _orientation : minalg::float4(0, 0, 0, 1),
-      center); // Orientation is local by default
-  auto draw_scale = state.active_state.scale_screenspace(p.position);
+  auto [draw_scale, p, ray] = state.gizmo_transform(src);
 
-  {
+  auto [updated_state, t] = rotation_intersect(ray);
 
-    auto ray = detransform(p, {
-                                  to_minalg(state.active_state.ray_origin),
-                                  to_minalg(state.active_state.ray_direction),
-                              });
-    ray = ray.descale(draw_scale);
-    float best_t = std::numeric_limits<float>::infinity(), t;
-
-    std::shared_ptr<gizmo_mesh_component> updated_state = {};
-    if (intersect_ray_mesh(ray, mesh_components[interact::rotate_x]->mesh,
-                           &t) &&
-        t < best_t) {
-      updated_state = mesh_components[interact::rotate_x];
-      best_t = t;
-    }
-    if (intersect_ray_mesh(ray, mesh_components[interact::rotate_y]->mesh,
-                           &t) &&
-        t < best_t) {
-      updated_state = mesh_components[interact::rotate_y];
-      best_t = t;
-    }
-    if (intersect_ray_mesh(ray, mesh_components[interact::rotate_z]->mesh,
-                           &t) &&
-        t < best_t) {
-      updated_state = mesh_components[interact::rotate_z];
-      best_t = t;
-    }
-
-    if (state.has_clicked) {
-      this->active = updated_state;
-      if (this->active) {
-        ray = ray.scaling(draw_scale);
-        this->drag.original_position = center;
-        this->drag.original_orientation = _orientation;
-        this->drag.click_offset =
-            p.transform_point(ray.origin + ray.direction * t);
-      }
+  if (state.has_clicked) {
+    this->active = updated_state;
+    if (this->active) {
+      // begin drag
+      ray = ray.scaling(draw_scale);
+      this->drag.original_position = src.position;
+      this->drag.original_orientation = src.orientation;
+      this->drag.click_offset =
+          p.transform_point(ray.origin + ray.direction * t);
     }
   }
 
-  minalg::float3 activeAxis;
-  if (this->active) {
-    rigid_transform src(_orientation, center, {1, 1, 1});
-    switch (interaction_mode(this->active)) {
-    case interact::rotate_x:
-      p.orientation =
-          axis_rotation_dragger(&drag, state, {1, 0, 0}, src, {}).orientation;
-      activeAxis = {1, 0, 0};
-      break;
-    case interact::rotate_y:
-      p.orientation =
-          axis_rotation_dragger(&drag, state, {0, 1, 0}, src, {}).orientation;
-      activeAxis = {0, 1, 0};
-      break;
-    case interact::rotate_z:
-      p.orientation =
-          axis_rotation_dragger(&drag, state, {0, 0, 1}, src, {}).orientation;
-      activeAxis = {0, 0, 1};
-      break;
-    default:
-      assert(false);
-      break;
-    }
-  }
+  p.orientation = rotation_drag(&this->drag, state, this->active, src);
 
-  if (state.has_released) {
-    this->active = nullptr;
-  }
-
+  // draw
   minalg::float4x4 modelMatrix = p.matrix();
   minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
   modelMatrix = mul(modelMatrix, scaleMatrix);
@@ -426,7 +471,7 @@ gizmo_result interaction_state::rotation_gizmo(
                       : mesh_components[c]->highlight_color);
   }
 
-  auto orientation = _orientation;
+  minalg::float4 orientation;
   // For non-local transformations, we only present one rotation ring
   // and draw an arrow from the center of the gizmo to indicate the degree
   // of rotation
@@ -435,6 +480,23 @@ gizmo_result interaction_state::rotation_gizmo(
     // Create orthonormal basis for drawing the arrow
     minalg::float3 a = qrot(p.orientation, this->drag.click_offset -
                                                this->drag.original_position);
+
+    minalg::float3 activeAxis;
+    // rigid_transform src(_orientation, center, {1, 1, 1});
+    switch (interaction_mode(this->active)) {
+    case interact::rotate_x:
+      activeAxis = {1, 0, 0};
+      break;
+    case interact::rotate_y:
+      activeAxis = {0, 1, 0};
+      break;
+    case interact::rotate_z:
+      activeAxis = {0, 0, 1};
+      break;
+    default:
+      assert(false);
+      break;
+    }
     minalg::float3 zDir = normalize(activeAxis),
                    xDir = normalize(cross(a, zDir)), yDir = cross(zDir, xDir);
 
@@ -460,70 +522,27 @@ gizmo_result interaction_state::rotation_gizmo(
           }};
 }
 
-gizmo_result interaction_state::scale_gizmo(
-    const gizmo_state &state, const AddTriangleFunc &add_world_triangle,
-    const minalg::float4 &orientation, const minalg::float3 &center,
-    const minalg::float3 &_scale, bool uniform) {
-  rigid_transform p = rigid_transform(orientation, center);
-  auto draw_scale = state.active_state.scale_screenspace(p.position);
+gizmo_result
+interaction_state::scale_gizmo(const gizmo_state &state,
+                               const AddTriangleFunc &add_world_triangle,
+                               const rigid_transform &src, bool uniform) {
 
-  {
-    auto ray = detransform(p, {
-                                  to_minalg(state.active_state.ray_origin),
-                                  to_minalg(state.active_state.ray_direction),
-                              });
-    ray = ray.descale(draw_scale);
-    float best_t = std::numeric_limits<float>::infinity(), t;
-    std::shared_ptr<gizmo_mesh_component> updated_state = {};
-    if (intersect_ray_mesh(ray, mesh_components[interact::scale_x]->mesh, &t) &&
-        t < best_t) {
-      updated_state = mesh_components[interact::scale_x];
-      best_t = t;
-    }
-    if (intersect_ray_mesh(ray, mesh_components[interact::scale_y]->mesh, &t) &&
-        t < best_t) {
-      updated_state = mesh_components[interact::scale_y];
-      best_t = t;
-    }
-    if (intersect_ray_mesh(ray, mesh_components[interact::scale_z]->mesh, &t) &&
-        t < best_t) {
-      updated_state = mesh_components[interact::scale_z];
-      best_t = t;
-    }
+  auto [draw_scale, p, ray] = state.gizmo_transform(src);
 
-    if (state.has_clicked) {
-      this->active = updated_state;
-      if (this->active) {
-        ray = ray.scaling(draw_scale);
-        this->drag.original_scale = _scale;
-        this->drag.click_offset =
-            p.transform_point(ray.origin + ray.direction * t);
-      }
+  auto [updated_state, t] = scale_intersect(ray);
+
+  if (state.has_clicked) {
+    this->active = updated_state;
+    if (this->active) {
+      // begin drag
+      ray = ray.scaling(draw_scale);
+      this->drag.original_scale = src.scale;
+      this->drag.click_offset =
+          p.transform_point(ray.origin + ray.direction * t);
     }
   }
 
-  if (state.has_released) {
-    this->active = nullptr;
-  }
-
-  auto scale = _scale;
-  if (this->active) {
-    rigid_transform src({0, 0, 0, 1}, center, scale);
-    switch (interaction_mode(this->active)) {
-    case interact::scale_x:
-      scale = axis_scale_dragger(&drag, state, {1, 0, 0}, src, uniform).scale;
-      break;
-    case interact::scale_y:
-      scale = axis_scale_dragger(&drag, state, {0, 1, 0}, src, uniform).scale;
-      break;
-    case interact::scale_z:
-      scale = axis_scale_dragger(&drag, state, {0, 0, 1}, src, uniform).scale;
-      break;
-    default:
-      assert(false);
-      break;
-    }
-  }
+  auto scale = scale_drag(&this->drag, state, this->active, src, uniform);
 
   minalg::float4x4 modelMatrix = p.matrix();
   minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
