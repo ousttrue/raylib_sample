@@ -20,31 +20,24 @@ struct OrbitCamera {
   float shiftX = 0;
   float shiftY = 0;
 
-  bool MouseUpdateCamera(float distance, float fovy, const Rectangle &rect) {
-    auto delta = GetMouseDelta();
-    auto active = false;
-
-    // camera shift
-    if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
-      auto speed = distance * tan(fovy * 0.5) * 2.0 / rect.height;
-      shiftX += delta.x * speed;
-      shiftY += delta.y * speed;
-      active = true;
+  void YawPitch(const Vector2 &delta, float distance, float fovy,
+                const Rectangle &rect) {
+    // auto delta = GetMouseDelta();
+    // auto active = false;
+    yawDegree -= static_cast<int>(delta.x);
+    pitchDegree += static_cast<int>(delta.y);
+    if (pitchDegree > 89) {
+      pitchDegree = 89;
+    } else if (pitchDegree < -89) {
+      pitchDegree = -89;
     }
+  }
 
-    // yaw pitch
-    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
-      yawDegree -= static_cast<int>(delta.x);
-      pitchDegree += static_cast<int>(delta.y);
-      if (pitchDegree > 89) {
-        pitchDegree = 89;
-      } else if (pitchDegree < -89) {
-        pitchDegree = -89;
-      }
-      active = true;
-    }
-
-    return active;
+  void Shift(const Vector2 &delta, float distance, float fovy,
+             const Rectangle &rect) {
+    auto speed = distance * tan(fovy * 0.5) * 2.0 / rect.height;
+    shiftX += delta.x * speed;
+    shiftY += delta.y * speed;
   }
 
   void update_view(Camera3D *camera) {

@@ -7,6 +7,7 @@
 #include <tiny-gizmo.h>
 
 #include "orbit_camera.h"
+#include "rdrag.h"
 #include "teapot.h"
 #include <rlgl.h>
 
@@ -144,41 +145,61 @@ struct hotkey {
   bool hotkey_local = false;
 };
 
-class Drag {
-  Vector2 _cursor_begin;
-  ;
-  bool _button = false;
-
-  void _begin(const Vector2 &cursor) { _cursor_begin = cursor; }
-
-  void _end(const Vector2 &end) {
-    //
-  }
-
-  void _drag(const Vector2 &cursor) {
-    DrawText(TextFormat("[%.0f, %.0f]", _cursor_begin.x, _cursor_begin.y),
-             _cursor_begin.x + 10, _cursor_begin.y, 10, BLACK);
-    DrawLine(_cursor_begin.x, _cursor_begin.y, cursor.x, cursor.y, BLACK);
-    DrawText(TextFormat("[%.0f, %.0f]", cursor.x, cursor.y), cursor.x + 10,
-             cursor.y, 10, BLACK);
-  }
+class CameraYawPitchDragger : public Dragger {
+  Camera *_camera;
+  OrbitCamera *_orbit;
+  Vector2 _last;
 
 public:
-  void process(const Vector2 &cursor, bool button) {
-    if (_button != button) {
-      if (button) {
-        _begin(cursor);
-      } else {
-        _end(cursor);
-      }
-    } else {
-      if (button) {
-        _drag(cursor);
-      } else {
-        // nothing
-      }
-    }
-    _button = button;
+  CameraYawPitchDragger(Camera *camera, OrbitCamera *orbit)
+      : _camera(camera), _orbit(orbit) {}
+
+  void begin(const Vector2 &cursor) override { _last = cursor; }
+
+  void end(const Vector2 &end) override {}
+
+  void drag(const DragState &state, const Vector2 &cursor, int w,
+            int h) override {
+    auto delta = Vector2Subtract(cursor, _last);
+    _last = cursor;
+    auto distance = Vector3Distance(_camera->target, _camera->position);
+    _orbit->YawPitch(delta, distance, _camera->fovy,
+                     {
+                         0,
+                         0,
+                         static_cast<float>(w),
+                         static_cast<float>(h),
+                     });
+    _orbit->update_view(_camera);
+  }
+};
+
+class CameraShiftDragger : public Dragger {
+  Camera *_camera;
+  OrbitCamera *_orbit;
+  Vector2 _last;
+
+public:
+  CameraShiftDragger(Camera *camera, OrbitCamera *orbit)
+      : _camera(camera), _orbit(orbit) {}
+
+  void begin(const Vector2 &cursor) override { _last = cursor; }
+
+  void end(const Vector2 &end) override {}
+
+  void drag(const DragState &state, const Vector2 &cursor, int w,
+            int h) override {
+    auto delta = Vector2Subtract(cursor, _last);
+    _last = cursor;
+    auto distance = Vector3Distance(_camera->target, _camera->position);
+    _orbit->Shift(delta, distance, _camera->fovy,
+                  {
+                      0,
+                      0,
+                      static_cast<float>(w),
+                      static_cast<float>(h),
+                  });
+    _orbit->update_view(_camera);
   }
 };
 
@@ -208,6 +229,7 @@ int main(int argc, char *argv[]) {
       .fovy = 45.0f,
       .projection = CAMERA_PERSPECTIVE,
   };
+  orbit.update_view(&camera);
 
   tinygizmo::gizmo_context gizmo_ctx;
   auto mode = transform_mode::translate;
@@ -222,8 +244,12 @@ int main(int argc, char *argv[]) {
   std::vector<unsigned short> indices;
 
   Drag left_drag;
-  Drag right_drag;
-  Drag middle_drag;
+  Drag right_drag{
+      .draggable = std::make_shared<CameraYawPitchDragger>(&camera, &orbit),
+  };
+  Drag middle_drag{
+      .draggable = std::make_shared<CameraShiftDragger>(&camera, &orbit),
+  };
 
   while (!WindowShouldClose()) {
     auto w = GetScreenWidth();
@@ -231,15 +257,6 @@ int main(int argc, char *argv[]) {
 
     // camera
     dolly(&camera);
-    auto distance = Vector3Distance(camera.target, camera.position);
-    orbit.MouseUpdateCamera(distance, camera.fovy,
-                            {
-                                0,
-                                0,
-                                static_cast<float>(w),
-                                static_cast<float>(h),
-                            });
-    orbit.update_view(&camera);
 
     // gizmo
     auto cursor = GetMousePosition();
@@ -353,9 +370,9 @@ int main(int argc, char *argv[]) {
     }
     EndMode3D();
 
-    left_drag.process(cursor, IsMouseButtonDown(MOUSE_BUTTON_LEFT));
-    right_drag.process(cursor, IsMouseButtonDown(MOUSE_BUTTON_RIGHT));
-    middle_drag.process(cursor, IsMouseButtonDown(MOUSE_BUTTON_MIDDLE));
+    left_drag.process(cursor, w, h, IsMouseButtonDown(MOUSE_BUTTON_LEFT));
+    right_drag.process(cursor, w, h, IsMouseButtonDown(MOUSE_BUTTON_RIGHT));
+    middle_drag.process(cursor, w, h, IsMouseButtonDown(MOUSE_BUTTON_MIDDLE));
     EndDrawing();
   }
 
