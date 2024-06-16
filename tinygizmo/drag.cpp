@@ -6,15 +6,6 @@ rigid_transform plane_translation_dragger(drag_state *drag,
                                           const gizmo_state &state,
                                           const minalg::float3 &plane_normal,
                                           const rigid_transform &src, bool) {
-  // Mouse clicked
-  if (state.has_clicked) {
-    drag->original_position = src.position;
-  }
-
-  if (!state.active_state.mouse_left) {
-    return src;
-  }
-
   // Define the plane to contain the original position of the object
   auto plane_point = drag->original_position;
   const ray r = {
@@ -45,10 +36,6 @@ rigid_transform axis_translation_dragger(drag_state *drag,
                                          const gizmo_state &state,
                                          const minalg::float3 &axis,
                                          const rigid_transform &t, bool) {
-  if (!state.active_state.mouse_left) {
-    return t;
-  }
-
   // First apply a plane translation dragger with a plane that contains the
   // desired axis and is oriented to face the camera
   const minalg::float3 plane_tangent =

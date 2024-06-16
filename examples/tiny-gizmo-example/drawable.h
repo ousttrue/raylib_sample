@@ -13,6 +13,7 @@ struct Vertex {
 };
 
 struct Drawable {
+  std::string name;
   Model model = {};
   Vector3 position = {0, 0, 0};
   Quaternion rotation = {0, 0, 0, 1};
@@ -40,38 +41,4 @@ struct hotkey {
   bool hotkey_rotate = false;
   bool hotkey_scale = false;
   bool hotkey_local = false;
-};
-
-class GizmoDragger : public Dragger {
-  Camera *_camera;
-  std::list<std::shared_ptr<Drawable>> _scene;
-
-  tinygizmo::gizmo_context gizmo_ctx;
-
-  std::vector<Vector3> positions;
-  std::vector<Color> colors;
-  std::vector<unsigned short> indices;
-
-public:
-  transform_mode mode = transform_mode::translate;
-  hotkey active_hotkey{0};
-  hotkey last_hotkey{0};
-  tinygizmo::gizmo_application_state active_state;
-  tinygizmo::gizmo_application_state last_state;
-  bool local_toggle{true};
-
-public:
-  GizmoDragger(Camera *camera, std::list<std::shared_ptr<Drawable>> &scene)
-      : _camera(camera), _scene(scene) {}
-
-  void hotkey(int w, int h, const Vector2 &cursor, const hotkey &hotkey);
-
-  void begin(const Vector2 &cursor) override {}
-
-  void end(const Vector2 &end) override {}
-
-  void drag(const DragState &state, const Vector2 &cursor, int w,
-            int h) override {}
-
-  void draw();
 };

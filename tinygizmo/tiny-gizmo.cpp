@@ -173,7 +173,7 @@ static void add_triangles(const AddTriangleFunc &add_triangle,
   }
 }
 
-static std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
+std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
 position_intersect(const ray &ray) {
   float best_t = std::numeric_limits<float>::infinity(), t;
   std::shared_ptr<gizmo_mesh_component> updated_state = {};
@@ -270,7 +270,7 @@ scale_intersect(const ray &ray) {
   return {updated_state, best_t};
 }
 
-static minalg::float3
+minalg::float3
 position_drag(drag_state *drag, const gizmo_state &state,
               const std::shared_ptr<gizmo_mesh_component> &active,
               const rigid_transform &p) {
@@ -357,16 +357,20 @@ scale_drag(drag_state *drag, const gizmo_state &state,
 
   auto scale = src.scale;
   if (active) {
-    rigid_transform src({0, 0, 0, 1}, src.position, scale);
+    rigid_transform _src{
+        .orientation = {0, 0, 0, 1},
+        .position = src.position,
+        .scale = scale,
+    };
     switch (interaction_mode(active)) {
     case interact::scale_x:
-      scale = axis_scale_dragger(drag, state, {1, 0, 0}, src, uniform).scale;
+      scale = axis_scale_dragger(drag, state, {1, 0, 0}, _src, uniform).scale;
       break;
     case interact::scale_y:
-      scale = axis_scale_dragger(drag, state, {0, 1, 0}, src, uniform).scale;
+      scale = axis_scale_dragger(drag, state, {0, 1, 0}, _src, uniform).scale;
       break;
     case interact::scale_z:
-      scale = axis_scale_dragger(drag, state, {0, 0, 1}, src, uniform).scale;
+      scale = axis_scale_dragger(drag, state, {0, 0, 1}, _src, uniform).scale;
       break;
     default:
       assert(false);
@@ -376,206 +380,211 @@ scale_drag(drag_state *drag, const gizmo_state &state,
   return scale;
 }
 
-gizmo_result
-interaction_state::position_gizmo(const gizmo_state &state,
-                                  const AddTriangleFunc &add_world_triangle,
-                                  const rigid_transform &src) {
-
-  auto [draw_scale, p, ray] = state.gizmo_transform(src);
-
-  // ray intersection
-  auto [updated_state, t] = position_intersect(ray);
-
-  if (state.has_clicked) {
-    this->active = updated_state;
-    if (this->active) {
-      // begin drag
-      ray = ray.scaling(draw_scale);
-      this->drag.click_offset =
-          state.local_toggle
-              ? p.transform_vector(ray.origin + ray.direction * t)
-              : ray.origin + ray.direction * t;
-    }
-  }
-
-  // drag
-  auto position = position_drag(&drag, state, this->active, p);
-
-  // draw
+void position_draw(const AddTriangleFunc &add_world_triangle,
+                   const std::shared_ptr<gizmo_mesh_component> &active,
+                   const minalg::float4x4 &modelMatrix) {
   std::vector<interact> draw_interactions{
       interact::translate_x,  interact::translate_y,  interact::translate_z,
       interact::translate_yz, interact::translate_zx, interact::translate_xy,
       interact::translate_xyz};
 
-  minalg::float4x4 modelMatrix = p.matrix();
-  minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
-  modelMatrix = mul(modelMatrix, scaleMatrix);
-
   for (auto c : draw_interactions) {
     auto mesh = mesh_components[c]->mesh;
-    auto color = (c == interaction_mode(this->active))
+    auto color = (c == interaction_mode(active))
                      ? mesh_components[c]->base_color
                      : mesh_components[c]->highlight_color;
     add_triangles(add_world_triangle, modelMatrix, mesh, color);
   }
-
-  return {.hover = updated_state ? true : false,
-          .active = this->active ? true : false,
-          .t = {
-              position.x,
-              position.y,
-              position.z,
-          }};
 }
 
-gizmo_result
-interaction_state::rotation_gizmo(const gizmo_state &state,
-                                  const AddTriangleFunc &add_world_triangle,
-                                  const rigid_transform &src) {
-  assert(length2(src.orientation) > float(1e-6));
+// gizmo_result
+// interaction_state::position_gizmo(const gizmo_state &state,
+//                                   const AddTriangleFunc &add_world_triangle,
+//                                   const rigid_transform &src) {
+//
+//   auto [draw_scale, p, ray] = state.gizmo_transform(src);
+//
+//   // ray intersection
+//   auto [updated_state, t] = position_intersect(ray);
+//
+//   if (state.has_clicked) {
+//     this->active = updated_state;
+//     if (this->active) {
+//       // begin drag
+//       ray = ray.scaling(draw_scale);
+//       this->drag.click_offset =
+//           state.local_toggle
+//               ? p.transform_vector(ray.origin + ray.direction * t)
+//               : ray.origin + ray.direction * t;
+//     }
+//   }
+//
+//   // drag
+//   auto position = position_drag(&drag, state, this->active, p);
+//
+//   // draw
+//   minalg::float4x4 modelMatrix = p.matrix();
+//   minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
+//   modelMatrix = mul(modelMatrix, scaleMatrix);
+//   position_draw(add_world_triangle, this->active, modelMatrix);
+//
+//   return {.hover = updated_state ? true : false,
+//           .active = this->active ? true : false,
+//           .t = {
+//               position.x,
+//               position.y,
+//               position.z,
+//           }};
+// }
 
-  auto [draw_scale, p, ray] = state.gizmo_transform(src);
+// gizmo_result
+// interaction_state::rotation_gizmo(const gizmo_state &state,
+//                                   const AddTriangleFunc &add_world_triangle,
+//                                   const rigid_transform &src) {
+//   assert(length2(src.orientation) > float(1e-6));
+//
+//   auto [draw_scale, p, ray] = state.gizmo_transform(src);
+//
+//   auto [updated_state, t] = rotation_intersect(ray);
+//
+//   if (state.has_clicked) {
+//     this->active = updated_state;
+//     if (this->active) {
+//       // begin drag
+//       ray = ray.scaling(draw_scale);
+//       this->drag.original_position = src.position;
+//       this->drag.original_orientation = src.orientation;
+//       this->drag.click_offset =
+//           p.transform_point(ray.origin + ray.direction * t);
+//     }
+//   }
+//
+//   p.orientation = rotation_drag(&this->drag, state, this->active, src);
+//
+//   // draw
+//   minalg::float4x4 modelMatrix = p.matrix();
+//   minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
+//   modelMatrix = mul(modelMatrix, scaleMatrix);
+//
+//   std::vector<interact> draw_interactions;
+//   if (!state.local_toggle && this->active)
+//     draw_interactions = {interaction_mode(this->active)};
+//   else
+//     draw_interactions = {interact::rotate_x, interact::rotate_y,
+//                          interact::rotate_z};
+//
+//   for (auto c : draw_interactions) {
+//     add_triangles(add_world_triangle, modelMatrix, mesh_components[c]->mesh,
+//                   (c == interaction_mode(this->active))
+//                       ? mesh_components[c]->base_color
+//                       : mesh_components[c]->highlight_color);
+//   }
+//
+//   minalg::float4 orientation;
+//   // For non-local transformations, we only present one rotation ring
+//   // and draw an arrow from the center of the gizmo to indicate the degree
+//   // of rotation
+//   if (state.local_toggle == false && this->active) {
+//
+//     // Create orthonormal basis for drawing the arrow
+//     minalg::float3 a = qrot(p.orientation, this->drag.click_offset -
+//                                                this->drag.original_position);
+//
+//     minalg::float3 activeAxis;
+//     // rigid_transform src(_orientation, center, {1, 1, 1});
+//     switch (interaction_mode(this->active)) {
+//     case interact::rotate_x:
+//       activeAxis = {1, 0, 0};
+//       break;
+//     case interact::rotate_y:
+//       activeAxis = {0, 1, 0};
+//       break;
+//     case interact::rotate_z:
+//       activeAxis = {0, 0, 1};
+//       break;
+//     default:
+//       assert(false);
+//       break;
+//     }
+//     minalg::float3 zDir = normalize(activeAxis),
+//                    xDir = normalize(cross(a, zDir)), yDir = cross(zDir, xDir);
+//
+//     // Ad-hoc geometry
+//     std::initializer_list<minalg::float2> arrow_points = {
+//         {0.0f, 0.f}, {0.0f, 0.05f}, {0.8f, 0.05f}, {0.9f, 0.10f}, {1.0f, 0}};
+//     auto geo = make_lathed_geometry(yDir, xDir, zDir, 32, arrow_points);
+//
+//     add_triangles(add_world_triangle, modelMatrix, geo, minalg::float4(1));
+//
+//     orientation = qmul(p.orientation, this->drag.original_orientation);
+//   } else if (state.local_toggle == true && this->active) {
+//     orientation = p.orientation;
+//   }
+//
+//   return {.hover = false,
+//           .active = this->active ? true : false,
+//           .r = {
+//               orientation.x,
+//               orientation.y,
+//               orientation.z,
+//               orientation.w,
+//           }};
+// }
 
-  auto [updated_state, t] = rotation_intersect(ray);
+// gizmo_result
+// interaction_state::scale_gizmo(const gizmo_state &state,
+//                                const AddTriangleFunc &add_world_triangle,
+//                                const rigid_transform &src, bool uniform) {
+//
+//   auto [draw_scale, p, ray] = state.gizmo_transform(src);
+//
+//   auto [updated_state, t] = scale_intersect(ray);
+//
+//   if (state.has_clicked) {
+//     this->active = updated_state;
+//     if (this->active) {
+//       // begin drag
+//       ray = ray.scaling(draw_scale);
+//       this->drag.original_scale = src.scale;
+//       this->drag.click_offset =
+//           p.transform_point(ray.origin + ray.direction * t);
+//     }
+//   }
+//
+//   auto scale = scale_drag(&this->drag, state, this->active, src, uniform);
+//
+//   minalg::float4x4 modelMatrix = p.matrix();
+//   minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
+//   modelMatrix = mul(modelMatrix, scaleMatrix);
+//
+//   std::vector<interact> draw_components{interact::scale_x, interact::scale_y,
+//                                         interact::scale_z};
+//
+//   for (auto c : draw_components) {
+//     add_triangles(add_world_triangle, modelMatrix, mesh_components[c]->mesh,
+//                   (c == interaction_mode(this->active))
+//                       ? mesh_components[c]->base_color
+//                       : mesh_components[c]->highlight_color);
+//   }
+//
+//   return {.hover = false,
+//           .active = this->active ? true : false,
+//           .s = {
+//               scale.x,
+//               scale.y,
+//               scale.z,
+//           }};
+// }
 
-  if (state.has_clicked) {
-    this->active = updated_state;
-    if (this->active) {
-      // begin drag
-      ray = ray.scaling(draw_scale);
-      this->drag.original_position = src.position;
-      this->drag.original_orientation = src.orientation;
-      this->drag.click_offset =
-          p.transform_point(ray.origin + ray.direction * t);
-    }
-  }
-
-  p.orientation = rotation_drag(&this->drag, state, this->active, src);
-
-  // draw
-  minalg::float4x4 modelMatrix = p.matrix();
-  minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
-  modelMatrix = mul(modelMatrix, scaleMatrix);
-
-  std::vector<interact> draw_interactions;
-  if (!state.local_toggle && this->active)
-    draw_interactions = {interaction_mode(this->active)};
-  else
-    draw_interactions = {interact::rotate_x, interact::rotate_y,
-                         interact::rotate_z};
-
-  for (auto c : draw_interactions) {
-    add_triangles(add_world_triangle, modelMatrix, mesh_components[c]->mesh,
-                  (c == interaction_mode(this->active))
-                      ? mesh_components[c]->base_color
-                      : mesh_components[c]->highlight_color);
-  }
-
-  minalg::float4 orientation;
-  // For non-local transformations, we only present one rotation ring
-  // and draw an arrow from the center of the gizmo to indicate the degree
-  // of rotation
-  if (state.local_toggle == false && this->active) {
-
-    // Create orthonormal basis for drawing the arrow
-    minalg::float3 a = qrot(p.orientation, this->drag.click_offset -
-                                               this->drag.original_position);
-
-    minalg::float3 activeAxis;
-    // rigid_transform src(_orientation, center, {1, 1, 1});
-    switch (interaction_mode(this->active)) {
-    case interact::rotate_x:
-      activeAxis = {1, 0, 0};
-      break;
-    case interact::rotate_y:
-      activeAxis = {0, 1, 0};
-      break;
-    case interact::rotate_z:
-      activeAxis = {0, 0, 1};
-      break;
-    default:
-      assert(false);
-      break;
-    }
-    minalg::float3 zDir = normalize(activeAxis),
-                   xDir = normalize(cross(a, zDir)), yDir = cross(zDir, xDir);
-
-    // Ad-hoc geometry
-    std::initializer_list<minalg::float2> arrow_points = {
-        {0.0f, 0.f}, {0.0f, 0.05f}, {0.8f, 0.05f}, {0.9f, 0.10f}, {1.0f, 0}};
-    auto geo = make_lathed_geometry(yDir, xDir, zDir, 32, arrow_points);
-
-    add_triangles(add_world_triangle, modelMatrix, geo, minalg::float4(1));
-
-    orientation = qmul(p.orientation, this->drag.original_orientation);
-  } else if (state.local_toggle == true && this->active) {
-    orientation = p.orientation;
-  }
-
-  return {.hover = false,
-          .active = this->active ? true : false,
-          .r = {
-              orientation.x,
-              orientation.y,
-              orientation.z,
-              orientation.w,
-          }};
-}
-
-gizmo_result
-interaction_state::scale_gizmo(const gizmo_state &state,
-                               const AddTriangleFunc &add_world_triangle,
-                               const rigid_transform &src, bool uniform) {
-
-  auto [draw_scale, p, ray] = state.gizmo_transform(src);
-
-  auto [updated_state, t] = scale_intersect(ray);
-
-  if (state.has_clicked) {
-    this->active = updated_state;
-    if (this->active) {
-      // begin drag
-      ray = ray.scaling(draw_scale);
-      this->drag.original_scale = src.scale;
-      this->drag.click_offset =
-          p.transform_point(ray.origin + ray.direction * t);
-    }
-  }
-
-  auto scale = scale_drag(&this->drag, state, this->active, src, uniform);
-
-  minalg::float4x4 modelMatrix = p.matrix();
-  minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
-  modelMatrix = mul(modelMatrix, scaleMatrix);
-
-  std::vector<interact> draw_components{interact::scale_x, interact::scale_y,
-                                        interact::scale_z};
-
-  for (auto c : draw_components) {
-    add_triangles(add_world_triangle, modelMatrix, mesh_components[c]->mesh,
-                  (c == interaction_mode(this->active))
-                      ? mesh_components[c]->base_color
-                      : mesh_components[c]->highlight_color);
-  }
-
-  return {.hover = false,
-          .active = this->active ? true : false,
-          .s = {
-              scale.x,
-              scale.y,
-              scale.z,
-          }};
-}
-
-std::shared_ptr<interaction_state> gizmo_context::get_or_create(uint32_t id) {
-  auto found = gizmos.find(id);
-  if (found != gizmos.end()) {
-    return found->second;
-  }
-
-  auto new_gizmo = std::make_shared<interaction_state>();
-  gizmos.insert({id, new_gizmo});
-  return new_gizmo;
-}
+// std::shared_ptr<interaction_state> gizmo_context::get_or_create(uint32_t id) {
+//   auto found = gizmos.find(id);
+//   if (found != gizmos.end()) {
+//     return found->second;
+//   }
+//
+//   auto new_gizmo = std::make_shared<interaction_state>();
+//   gizmos.insert({id, new_gizmo});
+//   return new_gizmo;
+// }
 
 } // namespace tinygizmo

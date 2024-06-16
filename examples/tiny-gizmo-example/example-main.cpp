@@ -4,6 +4,7 @@
 #include <raylib/external/glad.h>
 
 #include "drawable.h"
+#include "gizmo_dragger.h"
 #include "orbit_camera.h"
 #include "rdrag.h"
 #include "teapot.h"
@@ -14,11 +15,13 @@ int main(int argc, char *argv[]) {
   InitWindow(1280, 800, "tiny-gizmo-example-app");
 
   auto a = std::make_shared<Drawable>();
+  a->name = "first-example-gizmo";
   a->position = {-2, 0, 0};
   a->load({(Vertex *)teapot_vertices, _countof(teapot_vertices) / 6},
           teapot_triangles, false);
 
   auto b = std::make_shared<Drawable>();
+  b->name = "second-example-gizmo";
   b->position = {2, 0, 0};
   b->load({(Vertex *)teapot_vertices, _countof(teapot_vertices) / 6},
           teapot_triangles, false);
@@ -47,7 +50,7 @@ int main(int argc, char *argv[]) {
   };
 
   Drawable gizmo_mesh;
-  auto gizmo = std::make_shared<GizmoDragger>(&camera, scene);
+  auto gizmo = std::make_shared<TranslationGizmoDragger>(&camera, scene);
   Drag left_drag{
       .draggable = gizmo,
   };
@@ -91,6 +94,7 @@ int main(int argc, char *argv[]) {
 
         // draw gizmo
         glClear(GL_DEPTH_BUFFER_BIT);
+        gizmo->load(&gizmo_mesh);
         gizmo_mesh.draw();
         EndMode3D();
       }

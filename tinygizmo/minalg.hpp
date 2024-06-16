@@ -1086,9 +1086,9 @@ template <typename T> T clamp(const T &val, const T &min, const T &max) {
 }
 
 struct rigid_transform {
-  minalg::float4 orientation{0, 0, 0, 1};
-  minalg::float3 position{0, 0, 0};
-  minalg::float3 scale{1, 1, 1};
+  minalg::float4 orientation = {0, 0, 0, 1};
+  minalg::float3 position = {0, 0, 0};
+  minalg::float3 scale = {1, 1, 1};
 
   bool uniform_scale() const {
     return scale.x == scale.y && scale.x == scale.z;

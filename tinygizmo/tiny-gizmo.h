@@ -121,28 +121,40 @@ struct drag_state {
   minalg::float4 original_orientation;
 };
 
-struct interaction_state {
-  // Currently active component
-  std::shared_ptr<gizmo_mesh_component> active;
+// struct interaction_state {
+//   // Currently active component
+//   std::shared_ptr<gizmo_mesh_component> active;
+//
+//   drag_state drag = {};
+//
+//   gizmo_result position_gizmo(const gizmo_state &state,
+//                               const AddTriangleFunc &add_triangle,
+//                               const rigid_transform &src);
+//
+//   gizmo_result rotation_gizmo(const gizmo_state &state,
+//                               const AddTriangleFunc &add_triangle,
+//                               const rigid_transform &src);
+//
+//   gizmo_result scale_gizmo(const gizmo_state &state,
+//                            const AddTriangleFunc &add_triangle,
+//                            const rigid_transform &src, bool uniform);
+// };
 
-  drag_state drag = {};
+// struct gizmo_context {
+//   std::unordered_map<uint32_t, std::shared_ptr<interaction_state>> gizmos;
+//   std::shared_ptr<interaction_state> get_or_create(uint32_t id);
+// };
 
-  gizmo_result position_gizmo(const gizmo_state &state,
-                              const AddTriangleFunc &add_triangle,
-                              const rigid_transform &src);
+std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
+position_intersect(const ray &ray);
 
-  gizmo_result rotation_gizmo(const gizmo_state &state,
-                              const AddTriangleFunc &add_triangle,
-                              const rigid_transform &src);
+minalg::float3
+position_drag(drag_state *drag, const gizmo_state &state,
+              const std::shared_ptr<gizmo_mesh_component> &active,
+              const rigid_transform &p);
 
-  gizmo_result scale_gizmo(const gizmo_state &state,
-                           const AddTriangleFunc &add_triangle,
-                           const rigid_transform &src, bool uniform);
-};
-
-struct gizmo_context {
-  std::unordered_map<uint32_t, std::shared_ptr<interaction_state>> gizmos;
-  std::shared_ptr<interaction_state> get_or_create(uint32_t id);
-};
+void position_draw(const AddTriangleFunc &add_world_triangle,
+                   const std::shared_ptr<gizmo_mesh_component> &active,
+                   const minalg::float4x4 &modelMatrix);
 
 } // namespace tinygizmo
