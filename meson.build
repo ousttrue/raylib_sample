@@ -41,6 +41,7 @@ executable(
     'tiny-gizmo-example',
     [
         'examples/tiny-gizmo-example/example-main.cpp',
+        'examples/tiny-gizmo-example/drawable.cpp',
         'tinygizmo/tiny-gizmo.cpp',
         'tinygizmo/drag.cpp',
     ],

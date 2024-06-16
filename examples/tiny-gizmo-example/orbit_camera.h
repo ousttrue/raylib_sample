@@ -1,4 +1,5 @@
 #pragma once
+#include "rdrag.h"
 #include <raylib.h>
 #include <raymath.h>
 #include <rcamera.h>
@@ -60,5 +61,63 @@ struct OrbitCamera {
     };
     camera->target =
         Vector3Add(camera->position, Vector3Scale(forward, distance));
+  }
+};
+
+class CameraYawPitchDragger : public Dragger {
+  Camera *_camera;
+  OrbitCamera *_orbit;
+  Vector2 _last;
+
+public:
+  CameraYawPitchDragger(Camera *camera, OrbitCamera *orbit)
+      : _camera(camera), _orbit(orbit) {}
+
+  void begin(const Vector2 &cursor) override { _last = cursor; }
+
+  void end(const Vector2 &end) override {}
+
+  void drag(const DragState &state, const Vector2 &cursor, int w,
+            int h) override {
+    auto delta = Vector2Subtract(cursor, _last);
+    _last = cursor;
+    auto distance = Vector3Distance(_camera->target, _camera->position);
+    _orbit->YawPitch(delta, distance, _camera->fovy,
+                     {
+                         0,
+                         0,
+                         static_cast<float>(w),
+                         static_cast<float>(h),
+                     });
+    _orbit->update_view(_camera);
+  }
+};
+
+class CameraShiftDragger : public Dragger {
+  Camera *_camera;
+  OrbitCamera *_orbit;
+  Vector2 _last;
+
+public:
+  CameraShiftDragger(Camera *camera, OrbitCamera *orbit)
+      : _camera(camera), _orbit(orbit) {}
+
+  void begin(const Vector2 &cursor) override { _last = cursor; }
+
+  void end(const Vector2 &end) override {}
+
+  void drag(const DragState &state, const Vector2 &cursor, int w,
+            int h) override {
+    auto delta = Vector2Subtract(cursor, _last);
+    _last = cursor;
+    auto distance = Vector3Distance(_camera->target, _camera->position);
+    _orbit->Shift(delta, distance, _camera->fovy,
+                  {
+                      0,
+                      0,
+                      static_cast<float>(w),
+                      static_cast<float>(h),
+                  });
+    _orbit->update_view(_camera);
   }
 };

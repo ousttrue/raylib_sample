@@ -41,7 +41,7 @@ struct Drag {
   DragState state;
   bool _button = false;
 
-  void process(const Vector2 &cursor, int w, int h, bool button) {
+  void process(int w, int h, const Vector2 &cursor, bool button) {
     if (_button != button) {
       if (button) {
         state = {
