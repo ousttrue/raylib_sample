@@ -1,7 +1,7 @@
 #include "gizmo_dragger.h"
 
-void TranslationGizmoDragger::hotkey(int w, int h, const Vector2 &cursor,
-                                     const struct hotkey &hotkey) {
+void GizmoManager::hotkey(int w, int h, const Vector2 &cursor,
+                          const struct hotkey &hotkey) {
   if (hotkey.hotkey_ctrl == true) {
     if (last_hotkey.hotkey_translate == false &&
         hotkey.hotkey_translate == true)
@@ -33,6 +33,9 @@ void TranslationGizmoDragger::hotkey(int w, int h, const Vector2 &cursor,
       .cam_yfov = 1.0f,
       .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
   };
+
+  _translation->gizmo_state =
+      tinygizmo::gizmo_state(local_toggle, active_state, last_state);
 }
 
 struct RayState {
@@ -44,7 +47,6 @@ struct RayState {
 };
 
 void TranslationGizmoDragger::begin(const Vector2 &cursor) {
-  tinygizmo::gizmo_state gizmo_state(local_toggle, active_state, last_state);
   float best_t = std::numeric_limits<float>::infinity();
   std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
   for (auto &target : this->_scene) {
@@ -67,20 +69,20 @@ void TranslationGizmoDragger::begin(const Vector2 &cursor) {
                           .t = t,
                       }});
       if (t < best_t) {
-        this->gizmo = updated_state;
+        this->active = updated_state;
         this->gizmo_target = target;
       }
     }
   }
 
-  if (this->gizmo) {
+  if (this->active) {
     auto ray_state = ray_map[this->gizmo_target];
     // begin drag
     auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
     // click point in gizmo local
     this->drag_state = {
         .original_position = ray_state.transform.position,
-        .click_offset = local_toggle
+        .click_offset = gizmo_state.local_toggle
                             ? ray_state.gizmo_transform.transform_vector(
                                   ray.origin + ray.direction * ray_state.t)
                             : ray.origin + ray.direction * ray_state.t,
@@ -89,16 +91,15 @@ void TranslationGizmoDragger::begin(const Vector2 &cursor) {
 }
 
 void TranslationGizmoDragger::end(const Vector2 &end) {
-  this->gizmo = {};
+  this->active = {};
   this->gizmo_target = {};
   this->drag_state = {};
 }
 
 void TranslationGizmoDragger::drag(const DragState &state,
                                    const Vector2 &cursor, int w, int h) {
-  tinygizmo::gizmo_state gizmo_state(local_toggle, active_state, last_state);
   for (auto &target : this->_scene) {
-    if (this->gizmo && this->gizmo_target == target) {
+    if (this->active && this->gizmo_target == target) {
       rigid_transform src{
           .orientation = *(minalg::float4 *)&target->rotation,
           .position = *(minalg::float3 *)&target->position,
@@ -106,13 +107,13 @@ void TranslationGizmoDragger::drag(const DragState &state,
       };
       auto [_0, gizmo_transform, _2] = gizmo_state.gizmo_transform(src);
       auto position = tinygizmo::position_drag(&drag_state, gizmo_state,
-                                               this->gizmo, gizmo_transform);
+                                               this->active, gizmo_transform);
       target->position = *(Vector3 *)&position;
     }
   }
 }
 
-void TranslationGizmoDragger::load(Drawable *drawable) {
+void GizmoManager::load(Drawable *drawable) {
   positions.clear();
   colors.clear();
   indices.clear();
@@ -150,9 +151,7 @@ void TranslationGizmoDragger::load(Drawable *drawable) {
     minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
     modelMatrix = mul(modelMatrix, scaleMatrix);
 
-    tinygizmo::position_draw(
-        add_world_triangle,
-        target == this->gizmo_target ? this->gizmo : nullptr, modelMatrix);
+    tinygizmo::position_draw(add_world_triangle, nullptr, modelMatrix);
   }
 
   if (positions.size() && indices.size()) {

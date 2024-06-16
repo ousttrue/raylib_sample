@@ -69,14 +69,16 @@ using AddTriangleFunc = std::function<void(
     const std::array<float, 3> &p1, const std::array<float, 3> &p2)>;
 
 struct gizmo_state {
-  bool local_toggle;
-  gizmo_application_state active_state;
+  bool local_toggle = false;
+  gizmo_application_state active_state = {};
   // State to describe if the user has pressed the left mouse button during the
   // last frame
-  bool has_clicked;
+  bool has_clicked = false;
   // State to describe if the user has released the left mouse button during the
   // last frame
-  bool has_released;
+  bool has_released = false;
+
+  gizmo_state(){};
 
   gizmo_state(bool local_toggle, const gizmo_application_state &active_state,
               const gizmo_application_state &last_state)
