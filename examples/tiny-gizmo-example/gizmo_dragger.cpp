@@ -1,10 +1,11 @@
 #include "gizmo_dragger.h"
+#include "ray.h"
 
 struct RayState {
-  rigid_transform transform;
+  minalg::rigid_transform transform;
   float draw_scale;
-  rigid_transform gizmo_transform;
-  ray local_ray;
+  minalg::rigid_transform gizmo_transform;
+  tinygizmo::ray local_ray;
   float t;
 };
 
@@ -12,7 +13,7 @@ void TranslationGizmo::begin(const Vector2 &cursor) {
   float best_t = std::numeric_limits<float>::infinity();
   std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
   for (auto &target : this->_scene) {
-    rigid_transform src{
+    minalg::rigid_transform src{
         .orientation = *(minalg::float4 *)&target->rotation,
         .position = *(minalg::float3 *)&target->position,
         .scale = *(minalg::float3 *)&target->scale,
@@ -40,7 +41,7 @@ void TranslationGizmo::begin(const Vector2 &cursor) {
   if (this->active) {
     auto ray_state = ray_map[this->gizmo_target];
     // begin drag
-    auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+    auto ray = tinygizmo::scaling(ray_state.draw_scale, ray_state.local_ray);
     // click point in gizmo local
     this->drag_state = {
         .original_position = ray_state.transform.position,
@@ -56,7 +57,7 @@ void TranslationGizmo::drag(const DragState &state, int w, int h,
                             const Vector2 &cursor) {
   for (auto &target : this->_scene) {
     if (this->active && this->gizmo_target == target) {
-      rigid_transform src{
+      minalg::rigid_transform src{
           .orientation = *(minalg::float4 *)&target->rotation,
           .position = *(minalg::float3 *)&target->position,
           .scale = *(minalg::float3 *)&target->scale,
@@ -75,7 +76,7 @@ void RotationGizmo::begin(const Vector2 &cursor) {
   float best_t = std::numeric_limits<float>::infinity();
   std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
   for (auto &target : this->_scene) {
-    rigid_transform src{
+    minalg::rigid_transform src{
         .orientation = *(minalg::float4 *)&target->rotation,
         .position = *(minalg::float3 *)&target->position,
         .scale = *(minalg::float3 *)&target->scale,
@@ -103,7 +104,7 @@ void RotationGizmo::begin(const Vector2 &cursor) {
   if (this->active) {
     auto ray_state = ray_map[this->gizmo_target];
     // begin drag
-    auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+    auto ray = tinygizmo::scaling(ray_state.draw_scale, ray_state.local_ray);
     // click point in gizmo local
     this->drag_state = {
         .original_position = ray_state.transform.position,
@@ -122,7 +123,7 @@ void RotationGizmo::drag(const DragState &state, int w, int h,
                          const Vector2 &cursor) {
   for (auto &target : this->_scene) {
     if (this->active && this->gizmo_target == target) {
-      rigid_transform src{
+      minalg::rigid_transform src{
           .orientation = *(minalg::float4 *)&target->rotation,
           .position = *(minalg::float3 *)&target->position,
           .scale = *(minalg::float3 *)&target->scale,
@@ -142,7 +143,7 @@ void ScalingGizmo::begin(const Vector2 &cursor) {
   float best_t = std::numeric_limits<float>::infinity();
   std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
   for (auto &target : this->_scene) {
-    rigid_transform src{
+    minalg::rigid_transform src{
         .orientation = *(minalg::float4 *)&target->rotation,
         .position = *(minalg::float3 *)&target->position,
         .scale = *(minalg::float3 *)&target->scale,
@@ -170,7 +171,7 @@ void ScalingGizmo::begin(const Vector2 &cursor) {
   if (this->active) {
     auto ray_state = ray_map[this->gizmo_target];
     // begin drag
-    auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+    auto ray = tinygizmo::scaling(ray_state.draw_scale, ray_state.local_ray);
     // click point in gizmo local
     this->drag_state = {
         // .click_offset = local_toggle
@@ -188,7 +189,7 @@ void ScalingGizmo::drag(const DragState &state, int w, int h,
                         const Vector2 &cursor) {
   for (auto &target : this->_scene) {
     if (this->active && this->gizmo_target == target) {
-      rigid_transform src{
+      minalg::rigid_transform src{
           .orientation = *(minalg::float4 *)&target->rotation,
           .position = *(minalg::float3 *)&target->position,
           .scale = *(minalg::float3 *)&target->scale,
@@ -271,9 +272,9 @@ void TRSGizmo::load(Drawable *drawable) {
       };
 
   for (auto &target : this->_scene) {
-    rigid_transform src(*(minalg::float4 *)&target->rotation,
-                        *(minalg::float3 *)&target->position,
-                        *(minalg::float3 *)&target->scale);
+    minalg::rigid_transform src(*(minalg::float4 *)&target->rotation,
+                                *(minalg::float3 *)&target->position,
+                                *(minalg::float3 *)&target->scale);
     auto [draw_scale, p, ray] =
         tinygizmo::gizmo_transform(active_state, local_toggle, src);
 

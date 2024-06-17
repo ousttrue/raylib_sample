@@ -8,17 +8,18 @@ std::vector<minalg::float2> ring_points = {
     {-0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1}};
 
 auto _rotate_x = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 32, ring_points,
-                         0.003f),
+    geometry_mesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 32,
+                                        ring_points, 0.003f),
     minalg::float4{1, 0.5f, 0.5f, 1.f}, minalg::float4{1, 0, 0, 1.f});
 
 auto _rotate_y = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 32, ring_points,
-                         -0.003f),
+    geometry_mesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 32,
+                                        ring_points, -0.003f),
     minalg::float4{0.5f, 1, 0.5f, 1.f}, minalg::float4{0, 1, 0, 1.f});
 
 auto _rotate_z = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 32, ring_points),
+    geometry_mesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 32,
+                                        ring_points),
     minalg::float4{0.5f, 0.5f, 1, 1.f}, minalg::float4{0, 0, 1, 1.f});
 
 std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
@@ -26,26 +27,39 @@ rotation_intersect(const ray &ray) {
 
   float best_t = std::numeric_limits<float>::infinity(), t;
   std::shared_ptr<gizmo_mesh_component> updated_state = {};
-  if (intersect_ray_mesh(ray, _rotate_x->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_rotate_x->mesh, &t) && t < best_t) {
     updated_state = _rotate_x;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _rotate_y->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_rotate_y->mesh, &t) && t < best_t) {
     updated_state = _rotate_y;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _rotate_z->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_rotate_z->mesh, &t) && t < best_t) {
     updated_state = _rotate_z;
     best_t = t;
   }
   return {updated_state, best_t};
 }
 
-static rigid_transform
+inline minalg::float4 make_rotation_quat_axis_angle(const minalg::float3 &axis,
+                                                    float angle) {
+  return {axis * std::sin(angle / 2), std::cos(angle / 2)};
+}
+
+inline minalg::float4 make_rotation_quat_between_vectors_snapped(
+    const minalg::float3 &from, const minalg::float3 &to, const float angle) {
+  auto a = normalize(from);
+  auto b = normalize(to);
+  auto snappedAcos = std::floor(std::acos(dot(a, b)) / angle) * angle;
+  return make_rotation_quat_axis_angle(normalize(cross(a, b)), snappedAcos);
+}
+
+static minalg::rigid_transform
 axis_rotation_dragger(drag_state *drag,
                       const gizmo_application_state &active_state,
                       bool local_toggle, const minalg::float3 &axis,
-                      const rigid_transform &src, bool) {
+                      const minalg::rigid_transform &src, bool) {
 
   const minalg::float4 start_orientation =
       local_toggle ? drag->original_orientation : minalg::float4(0, 0, 0, 1);
@@ -54,7 +68,8 @@ axis_rotation_dragger(drag_state *drag,
     return src;
   }
 
-  rigid_transform original_pose = {start_orientation, drag->original_position};
+  minalg::rigid_transform original_pose = {start_orientation,
+                                           drag->original_position};
   auto the_axis = original_pose.transform_vector(axis);
   minalg::float4 the_plane = {the_axis, -dot(the_axis, drag->click_offset)};
   const ray r = {
@@ -63,7 +78,7 @@ axis_rotation_dragger(drag_state *drag,
   };
 
   float t;
-  if (!intersect_ray_plane(r, the_plane, &t)) {
+  if (!r.intersect_plane(the_plane, &t)) {
     return src;
   }
 
@@ -76,23 +91,24 @@ axis_rotation_dragger(drag_state *drag,
 
   float d = dot(arm1, arm2);
   if (d > 0.999f) {
-    return rigid_transform(start_orientation, src.position, src.scale);
+    return minalg::rigid_transform(start_orientation, src.position, src.scale);
   }
 
   float angle = std::acos(d);
   if (angle < 0.001f) {
-    return rigid_transform(start_orientation, src.position, src.scale);
+    return minalg::rigid_transform(start_orientation, src.position, src.scale);
   }
 
   if (active_state.snap_rotation) {
     auto snapped = make_rotation_quat_between_vectors_snapped(
         arm1, arm2, active_state.snap_rotation);
-    return rigid_transform(qmul(snapped, start_orientation), src.position,
-                           src.scale);
+    return minalg::rigid_transform(qmul(snapped, start_orientation),
+                                   src.position, src.scale);
   } else {
     auto a = normalize(cross(arm1, arm2));
-    return rigid_transform(qmul(rotation_quat(a, angle), start_orientation),
-                           src.position, src.scale);
+    return minalg::rigid_transform(
+        qmul(rotation_quat(a, angle), start_orientation), src.position,
+        src.scale);
   }
 }
 
@@ -100,7 +116,7 @@ minalg::float4
 rotation_drag(drag_state *drag, const gizmo_application_state &state,
               bool local_toggle,
               const std::shared_ptr<gizmo_mesh_component> &active,
-              const rigid_transform &src) {
+              const minalg::rigid_transform &src) {
   if (active == _rotate_x) {
     return axis_rotation_dragger(drag, state, local_toggle, {1, 0, 0}, src, {})
         .orientation;

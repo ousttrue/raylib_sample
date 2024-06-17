@@ -2,11 +2,25 @@
 // For more information, please refer to <http://unlicense.org>
 #pragma once
 #include "minalg.hpp"
+#include "ray.h"
+#include "rigid_transform.h"
 #include <array>
 #include <functional>
 #include <string>
 
 namespace tinygizmo {
+
+inline minalg::float3 to_minalg(const std::array<float, 3> &v) {
+  return {v[0], v[1], v[2]};
+}
+inline minalg::float4 to_minalg(const std::array<float, 4> &v) {
+  return {v[0], v[1], v[2], v[3]};
+}
+inline minalg::float3 snap(const minalg::float3 &value, const float snap) {
+  if (snap > 0.0f)
+    return minalg::float3(floor(value / snap) * snap);
+  return value;
+}
 
 // 32 bit Fowler-Noll-Vo Hash
 inline uint32_t hash_fnv1a(std::string_view str) {
@@ -54,6 +68,12 @@ struct gizmo_application_state {
   }
 };
 
+inline minalg::float3 transform_coord(const minalg::float4x4 &transform,
+                                      const minalg::float3 &coord) {
+  auto r = mul(transform, minalg::float4(coord, 1));
+  return (r.xyz() / r.w);
+}
+
 using AddTriangleFunc = std::function<void(
     const std::array<float, 4> &rgba, const std::array<float, 3> &p0,
     const std::array<float, 3> &p1, const std::array<float, 3> &p2)>;
@@ -79,19 +99,41 @@ inline void add_triangles(const AddTriangleFunc &add_triangle,
   }
 }
 
-inline std::tuple<float, rigid_transform, ray>
+inline ray transform(const minalg::rigid_transform &p, const ray &r) {
+  return {p.transform_point(r.origin), p.transform_vector(r.direction)};
+}
+
+inline ray detransform(const minalg::rigid_transform &p, const ray &r) {
+  return {p.detransform_point(r.origin), p.detransform_vector(r.direction)};
+}
+
+inline ray scaling(const float scale, const ray &r) {
+  return {
+      .origin = r.origin * scale,
+      .direction = r.direction * scale,
+  };
+}
+
+inline ray descale(const float scale, const ray &r) {
+  return {
+      .origin = r.origin / scale,
+      .direction = r.direction / scale,
+  };
+}
+
+inline std::tuple<float, minalg::rigid_transform, ray>
 gizmo_transform(const gizmo_application_state &active_state, bool local_toggle,
-                const rigid_transform &src) {
+                const minalg::rigid_transform &src) {
   auto draw_scale = active_state.scale_screenspace(src.position);
-  auto p = rigid_transform(local_toggle ? src.orientation
-                                        : minalg::float4(0, 0, 0, 1),
-                           src.position);
+  auto p = minalg::rigid_transform(local_toggle ? src.orientation
+                                                : minalg::float4(0, 0, 0, 1),
+                                   src.position);
   ray ray{
       .origin = *(minalg::float3 *)&active_state.ray_origin[0],
       .direction = *(minalg::float3 *)&active_state.ray_direction[0],
   };
   ray = detransform(p, ray);
-  ray = ray.descale(draw_scale);
+  ray = descale(draw_scale, ray);
   return {draw_scale, p, ray};
 };
 

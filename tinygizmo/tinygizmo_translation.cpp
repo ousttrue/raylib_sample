@@ -7,67 +7,74 @@ std::vector<minalg::float2> arrow_points = {
     {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
 
 auto _translate_x = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16, arrow_points),
+    geometry_mesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16,
+                                        arrow_points),
     minalg::float4{1, 0.5f, 0.5f, 1.f}, minalg::float4{1, 0, 0, 1.f});
 auto _translate_y = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16, arrow_points),
+    geometry_mesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16,
+                                        arrow_points),
     minalg::float4{0.5f, 1, 0.5f, 1.f}, minalg::float4{0, 1, 0, 1.f});
 auto _translate_z = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16, arrow_points),
+    geometry_mesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16,
+                                        arrow_points),
     minalg::float4{0.5f, 0.5f, 1, 1.f}, minalg::float4{0, 0, 1, 1.f});
 auto _translate_yz = std::make_shared<gizmo_mesh_component>(
-    make_box_geometry({-0.01f, 0.25, 0.25}, {0.01f, 0.75f, 0.75f}),
+    geometry_mesh::make_box_geometry({-0.01f, 0.25, 0.25},
+                                     {0.01f, 0.75f, 0.75f}),
     minalg::float4{0.5f, 1, 1, 0.5f}, minalg::float4{0, 1, 1, 0.6f});
 auto _translate_zx = std::make_shared<gizmo_mesh_component>(
-    make_box_geometry({0.25, -0.01f, 0.25}, {0.75f, 0.01f, 0.75f}),
+    geometry_mesh::make_box_geometry({0.25, -0.01f, 0.25},
+                                     {0.75f, 0.01f, 0.75f}),
     minalg::float4{1, 0.5f, 1, 0.5f}, minalg::float4{1, 0, 1, 0.6f});
 auto _translate_xy = std::make_shared<gizmo_mesh_component>(
-    make_box_geometry({0.25, 0.25, -0.01f}, {0.75f, 0.75f, 0.01f}),
+    geometry_mesh::make_box_geometry({0.25, 0.25, -0.01f},
+                                     {0.75f, 0.75f, 0.01f}),
     minalg::float4{1, 1, 0.5f, 0.5f}, minalg::float4{1, 1, 0, 0.6f});
 auto _translate_xyz = std::make_shared<gizmo_mesh_component>(
-    make_box_geometry({-0.05f, -0.05f, -0.05f}, {0.05f, 0.05f, 0.05f}),
+    geometry_mesh::make_box_geometry({-0.05f, -0.05f, -0.05f},
+                                     {0.05f, 0.05f, 0.05f}),
     minalg::float4{0.9f, 0.9f, 0.9f, 0.25f}, minalg::float4{1, 1, 1, 0.35f});
 
 std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
 position_intersect(const ray &ray) {
   float best_t = std::numeric_limits<float>::infinity(), t;
   std::shared_ptr<gizmo_mesh_component> updated_state = {};
-  if (intersect_ray_mesh(ray, _translate_x->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_translate_x->mesh, &t) && t < best_t) {
     updated_state = _translate_x;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _translate_y->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_translate_y->mesh, &t) && t < best_t) {
     updated_state = _translate_y;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _translate_z->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_translate_z->mesh, &t) && t < best_t) {
     updated_state = _translate_z;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _translate_yz->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_translate_yz->mesh, &t) && t < best_t) {
     updated_state = _translate_yz;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _translate_zx->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_translate_zx->mesh, &t) && t < best_t) {
     updated_state = _translate_zx;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _translate_xy->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_translate_xy->mesh, &t) && t < best_t) {
     updated_state = _translate_xy;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _translate_xyz->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_translate_xyz->mesh, &t) && t < best_t) {
     updated_state = _translate_xyz;
     best_t = t;
   }
   return {updated_state, best_t};
 }
 
-rigid_transform
+minalg::rigid_transform
 plane_translation_dragger(drag_state *drag,
                           const gizmo_application_state &active_state,
                           bool local_toggle, const minalg::float3 &plane_normal,
-                          const rigid_transform &src, bool) {
+                          const minalg::rigid_transform &src, bool) {
   // Define the plane to contain the original position of the object
   auto plane_point = drag->original_position;
   const ray r = {
@@ -91,14 +98,14 @@ plane_translation_dragger(drag_state *drag,
   if (active_state.snap_translation) {
     point = snap(point, active_state.snap_translation);
   }
-  return rigid_transform(src.orientation, point, src.scale);
+  return minalg::rigid_transform(src.orientation, point, src.scale);
 }
 
-rigid_transform
+minalg::rigid_transform
 axis_translation_dragger(drag_state *drag,
                          const gizmo_application_state &active_state,
                          bool local_toggle, const minalg::float3 &axis,
-                         const rigid_transform &t, bool) {
+                         const minalg::rigid_transform &t, bool) {
   // First apply a plane translation dragger with a plane that contains the
   // desired axis and is oriented to face the camera
   const minalg::float3 plane_tangent =
@@ -110,14 +117,14 @@ axis_translation_dragger(drag_state *drag,
   // Constrain object motion to be along the desired axis
   auto point = drag->original_position +
                axis * dot(dst.position - drag->original_position, axis);
-  return rigid_transform(t.orientation, point, t.scale);
+  return minalg::rigid_transform(t.orientation, point, t.scale);
 }
 
 minalg::float3
 position_drag(drag_state *drag, const gizmo_application_state &state,
               bool local_toggle,
               const std::shared_ptr<gizmo_mesh_component> &active,
-              const rigid_transform &p) {
+              const minalg::rigid_transform &p) {
   std::vector<minalg::float3> axes;
   if (local_toggle)
     axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
@@ -127,8 +134,8 @@ position_drag(drag_state *drag, const gizmo_application_state &state,
   minalg::float3 position = p.position;
   if (active) {
     position += drag->click_offset;
-    rigid_transform src(minalg::float4(0, 0, 0, 1), position,
-                        minalg::float3(1, 1, 1));
+    minalg::rigid_transform src(minalg::float4(0, 0, 0, 1), position,
+                                minalg::float3(1, 1, 1));
     if (active == _translate_x) {
       position =
           axis_translation_dragger(drag, state, local_toggle, axes[0], src, {})

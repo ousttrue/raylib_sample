@@ -9,7 +9,7 @@ minalg::float4
 rotation_drag(drag_state *drag, const gizmo_application_state &state,
               bool local_toggle,
               const std::shared_ptr<gizmo_mesh_component> &active,
-              const rigid_transform &p);
+              const minalg::rigid_transform &p);
 
 void rotation_draw(const AddTriangleFunc &add_world_triangle,
                    const std::shared_ptr<gizmo_mesh_component> &active,

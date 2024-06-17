@@ -2,20 +2,27 @@
 
 namespace tinygizmo {
 
+template <typename T> T clamp(const T &val, const T &min, const T &max) {
+  return std::min(std::max(val, min), max);
+}
+
 std::vector<minalg::float2> mace_points = {{0.25f, 0},    {0.25f, 0.05f},
                                            {1, 0.05f},    {1, 0.1f},
                                            {1.25f, 0.1f}, {1.25f, 0}};
 
 auto _scale_x = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16, mace_points),
+    geometry_mesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16,
+                                        mace_points),
     minalg::float4{1, 0.5f, 0.5f, 1.f}, minalg::float4{1, 0, 0, 1.f});
 
 auto _scale_y = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16, mace_points),
+    geometry_mesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16,
+                                        mace_points),
     minalg::float4{0.5f, 1, 0.5f, 1.f}, minalg::float4{0, 1, 0, 1.f});
 
 auto _scale_z = std::make_shared<gizmo_mesh_component>(
-    make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16, mace_points),
+    geometry_mesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16,
+                                        mace_points),
     minalg::float4{0.5f, 0.5f, 1, 1.f}, minalg::float4{0, 0, 1, 1.f});
 
 std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
@@ -23,15 +30,15 @@ scaling_intersect(const ray &ray) {
 
   float best_t = std::numeric_limits<float>::infinity(), t;
   std::shared_ptr<gizmo_mesh_component> updated_state = {};
-  if (intersect_ray_mesh(ray, _scale_x->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_scale_x->mesh, &t) && t < best_t) {
     updated_state = _scale_x;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _scale_y->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_scale_y->mesh, &t) && t < best_t) {
     updated_state = _scale_y;
     best_t = t;
   }
-  if (intersect_ray_mesh(ray, _scale_z->mesh, &t) && t < best_t) {
+  if (ray.intersect_mesh(_scale_z->mesh, &t) && t < best_t) {
     updated_state = _scale_z;
     best_t = t;
   }
@@ -39,11 +46,20 @@ scaling_intersect(const ray &ray) {
   return {updated_state, best_t};
 }
 
-static rigid_transform
+inline void flush_to_zero(minalg::float3 &f) {
+  if (std::abs(f.x) < 0.02f)
+    f.x = 0.f;
+  if (std::abs(f.y) < 0.02f)
+    f.y = 0.f;
+  if (std::abs(f.z) < 0.02f)
+    f.z = 0.f;
+}
+
+static minalg::rigid_transform
 axis_scale_dragger(drag_state *drag,
                    const gizmo_application_state &active_state,
                    bool local_toggle, const minalg::float3 &axis,
-                   const rigid_transform &src, bool uniform) {
+                   const minalg::rigid_transform &src, bool uniform) {
   if (!active_state.mouse_left) {
     return src;
   }
@@ -83,18 +99,18 @@ axis_scale_dragger(drag_state *drag,
   if (active_state.snap_scale) {
     scale = snap(scale, active_state.snap_scale);
   }
-  return rigid_transform(src.orientation, src.position, scale);
+  return minalg::rigid_transform(src.orientation, src.position, scale);
 }
 
 minalg::float3 scaling_drag(drag_state *drag,
                             const gizmo_application_state &state,
                             bool local_toggle,
                             const std::shared_ptr<gizmo_mesh_component> &active,
-                            const rigid_transform &src, bool uniform) {
+                            const minalg::rigid_transform &src, bool uniform) {
 
   auto scale = src.scale;
   if (active) {
-    rigid_transform _src{
+    minalg::rigid_transform _src{
         .orientation = {0, 0, 0, 1},
         .position = src.position,
         .scale = scale,
