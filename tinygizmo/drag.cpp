@@ -2,15 +2,16 @@
 
 namespace tinygizmo {
 
-rigid_transform plane_translation_dragger(drag_state *drag,
-                                          const gizmo_state &state,
-                                          const minalg::float3 &plane_normal,
-                                          const rigid_transform &src, bool) {
+rigid_transform
+plane_translation_dragger(drag_state *drag,
+                          const gizmo_application_state &active_state,
+                          bool local_toggle, const minalg::float3 &plane_normal,
+                          const rigid_transform &src, bool) {
   // Define the plane to contain the original position of the object
   auto plane_point = drag->original_position;
   const ray r = {
-      to_minalg(state.active_state.ray_origin),
-      to_minalg(state.active_state.ray_direction),
+      to_minalg(active_state.ray_origin),
+      to_minalg(active_state.ray_direction),
   };
 
   // If an intersection exists between the ray and the plane, place the
@@ -26,22 +27,24 @@ rigid_transform plane_translation_dragger(drag_state *drag,
   }
 
   auto point = r.origin + r.direction * t;
-  if (state.active_state.snap_translation) {
-    point = snap(point, state.active_state.snap_translation);
+  if (active_state.snap_translation) {
+    point = snap(point, active_state.snap_translation);
   }
   return rigid_transform(src.orientation, point, src.scale);
 }
 
-rigid_transform axis_translation_dragger(drag_state *drag,
-                                         const gizmo_state &state,
-                                         const minalg::float3 &axis,
-                                         const rigid_transform &t, bool) {
+rigid_transform
+axis_translation_dragger(drag_state *drag,
+                         const gizmo_application_state &active_state,
+                         bool local_toggle, const minalg::float3 &axis,
+                         const rigid_transform &t, bool) {
   // First apply a plane translation dragger with a plane that contains the
   // desired axis and is oriented to face the camera
   const minalg::float3 plane_tangent =
-      cross(axis, t.position - to_minalg(state.active_state.ray_origin));
+      cross(axis, t.position - to_minalg(active_state.ray_origin));
   const minalg::float3 plane_normal = cross(axis, plane_tangent);
-  auto dst = plane_translation_dragger(drag, state, plane_normal, t, {});
+  auto dst = plane_translation_dragger(drag, active_state, local_toggle,
+                                       plane_normal, t, {});
 
   // Constrain object motion to be along the desired axis
   auto point = drag->original_position +
@@ -49,16 +52,16 @@ rigid_transform axis_translation_dragger(drag_state *drag,
   return rigid_transform(t.orientation, point, t.scale);
 }
 
-rigid_transform axis_rotation_dragger(drag_state *drag,
-                                      const gizmo_state &state,
-                                      const minalg::float3 &axis,
-                                      const rigid_transform &src, bool) {
+rigid_transform
+axis_rotation_dragger(drag_state *drag,
+                      const gizmo_application_state &active_state,
+                      bool local_toggle, const minalg::float3 &axis,
+                      const rigid_transform &src, bool) {
 
-  const minalg::float4 start_orientation = state.local_toggle
-                                               ? drag->original_orientation
-                                               : minalg::float4(0, 0, 0, 1);
+  const minalg::float4 start_orientation =
+      local_toggle ? drag->original_orientation : minalg::float4(0, 0, 0, 1);
 
-  if (!state.active_state.mouse_left) {
+  if (!active_state.mouse_left) {
     return src;
   }
 
@@ -66,8 +69,8 @@ rigid_transform axis_rotation_dragger(drag_state *drag,
   auto the_axis = original_pose.transform_vector(axis);
   minalg::float4 the_plane = {the_axis, -dot(the_axis, drag->click_offset)};
   const ray r = {
-      to_minalg(state.active_state.ray_origin),
-      to_minalg(state.active_state.ray_direction),
+      to_minalg(active_state.ray_origin),
+      to_minalg(active_state.ray_direction),
   };
 
   float t;
@@ -92,9 +95,9 @@ rigid_transform axis_rotation_dragger(drag_state *drag,
     return rigid_transform(start_orientation, src.position, src.scale);
   }
 
-  if (state.active_state.snap_rotation) {
+  if (active_state.snap_rotation) {
     auto snapped = make_rotation_quat_between_vectors_snapped(
-        arm1, arm2, state.active_state.snap_rotation);
+        arm1, arm2, active_state.snap_rotation);
     return rigid_transform(qmul(snapped, start_orientation), src.position,
                            src.scale);
   } else {
@@ -104,22 +107,24 @@ rigid_transform axis_rotation_dragger(drag_state *drag,
   }
 }
 
-rigid_transform axis_scale_dragger(drag_state *drag, const gizmo_state &state,
+rigid_transform axis_scale_dragger(drag_state *drag,
+                                   const gizmo_application_state &active_state,
+                                   bool local_toggle,
                                    const minalg::float3 &axis,
                                    const rigid_transform &src, bool uniform) {
-  if (!state.active_state.mouse_left) {
+  if (!active_state.mouse_left) {
     return src;
   }
 
   const minalg::float3 plane_tangent =
-      cross(axis, src.position - to_minalg(state.active_state.ray_origin));
+      cross(axis, src.position - to_minalg(active_state.ray_origin));
   const minalg::float3 plane_normal = cross(axis, plane_tangent);
 
   // Define the plane to contain the original position of the object
   const minalg::float3 plane_point = src.position;
   const ray ray = {
-      to_minalg(state.active_state.ray_origin),
-      to_minalg(state.active_state.ray_direction),
+      to_minalg(active_state.ray_origin),
+      to_minalg(active_state.ray_direction),
   };
 
   // If an intersection exists between the ray and the plane, place the
@@ -143,8 +148,8 @@ rigid_transform axis_scale_dragger(drag_state *drag, const gizmo_state &state,
                 : minalg::float3(clamp(new_scale.x, 0.01f, 1000.f),
                                  clamp(new_scale.y, 0.01f, 1000.f),
                                  clamp(new_scale.z, 0.01f, 1000.f));
-  if (state.active_state.snap_scale) {
-    scale = snap(scale, state.active_state.snap_scale);
+  if (active_state.snap_scale) {
+    scale = snap(scale, active_state.snap_scale);
   }
   return rigid_transform(src.orientation, src.position, scale);
 }

@@ -34,8 +34,8 @@ void GizmoManager::hotkey(int w, int h, const Vector2 &cursor,
       .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
   };
 
-  _translation->gizmo_state =
-      tinygizmo::gizmo_state(local_toggle, active_state, last_state);
+  _translation->gizmo_state = active_state;
+  _translation->local_toggle = local_toggle;
 }
 
 struct RayState {
@@ -56,7 +56,7 @@ void TranslationGizmoDragger::begin(const Vector2 &cursor) {
         .scale = *(minalg::float3 *)&target->scale,
     };
     auto [draw_scale, gizmo_transform, local_ray] =
-        gizmo_state.gizmo_transform(src);
+        tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
     // ray intersection
     auto [updated_state, t] = tinygizmo::position_intersect(local_ray);
     if (updated_state) {
@@ -82,7 +82,7 @@ void TranslationGizmoDragger::begin(const Vector2 &cursor) {
     // click point in gizmo local
     this->drag_state = {
         .original_position = ray_state.transform.position,
-        .click_offset = gizmo_state.local_toggle
+        .click_offset = local_toggle
                             ? ray_state.gizmo_transform.transform_vector(
                                   ray.origin + ray.direction * ray_state.t)
                             : ray.origin + ray.direction * ray_state.t,
@@ -105,9 +105,11 @@ void TranslationGizmoDragger::drag(const DragState &state,
           .position = *(minalg::float3 *)&target->position,
           .scale = *(minalg::float3 *)&target->scale,
       };
-      auto [_0, gizmo_transform, _2] = gizmo_state.gizmo_transform(src);
-      auto position = tinygizmo::position_drag(&drag_state, gizmo_state,
-                                               this->active, gizmo_transform);
+      auto [_0, gizmo_transform, _2] =
+          tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
+      auto position =
+          tinygizmo::position_drag(&drag_state, gizmo_state, local_toggle,
+                                   this->active, gizmo_transform);
       target->position = *(Vector3 *)&position;
     }
   }
@@ -144,8 +146,8 @@ void GizmoManager::load(Drawable *drawable) {
     rigid_transform src(*(minalg::float4 *)&target->rotation,
                         *(minalg::float3 *)&target->position,
                         *(minalg::float3 *)&target->scale);
-    tinygizmo::gizmo_state gizmo_state(local_toggle, active_state, last_state);
-    auto [draw_scale, p, ray] = gizmo_state.gizmo_transform(src);
+    auto [draw_scale, p, ray] =
+        tinygizmo::gizmo_transform(active_state, local_toggle, src);
 
     minalg::float4x4 modelMatrix = p.matrix();
     minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));

@@ -68,38 +68,20 @@ using AddTriangleFunc = std::function<void(
     const std::array<float, 4> &rgba, const std::array<float, 3> &p0,
     const std::array<float, 3> &p1, const std::array<float, 3> &p2)>;
 
-struct gizmo_state {
-  bool local_toggle = false;
-  gizmo_application_state active_state = {};
-  // State to describe if the user has pressed the left mouse button during the
-  // last frame
-  bool has_clicked = false;
-  // State to describe if the user has released the left mouse button during the
-  // last frame
-  bool has_released = false;
-
-  gizmo_state(){};
-
-  gizmo_state(bool local_toggle, const gizmo_application_state &active_state,
-              const gizmo_application_state &last_state)
-      : local_toggle(local_toggle), active_state(active_state),
-        has_clicked(!last_state.mouse_left && active_state.mouse_left),
-        has_released(last_state.mouse_left && !active_state.mouse_left) {}
-
-  std::tuple<float, rigid_transform, ray>
-  gizmo_transform(const rigid_transform &src) const {
-    auto draw_scale = active_state.scale_screenspace(src.position);
-    auto p = rigid_transform(local_toggle ? src.orientation
-                                          : minalg::float4(0, 0, 0, 1),
-                             src.position);
-    ray ray{
-        .origin = *(minalg::float3 *)&active_state.ray_origin[0],
-        .direction = *(minalg::float3 *)&active_state.ray_direction[0],
-    };
-    ray = detransform(p, ray);
-    ray = ray.descale(draw_scale);
-    return {draw_scale, p, ray};
-  }
+inline std::tuple<float, rigid_transform, ray>
+gizmo_transform(const gizmo_application_state &active_state, bool local_toggle,
+                const rigid_transform &src) {
+  auto draw_scale = active_state.scale_screenspace(src.position);
+  auto p = rigid_transform(local_toggle ? src.orientation
+                                        : minalg::float4(0, 0, 0, 1),
+                           src.position);
+  ray ray{
+      .origin = *(minalg::float3 *)&active_state.ray_origin[0],
+      .direction = *(minalg::float3 *)&active_state.ray_direction[0],
+  };
+  ray = detransform(p, ray);
+  ray = ray.descale(draw_scale);
+  return {draw_scale, p, ray};
 };
 
 struct gizmo_mesh_component {
@@ -151,7 +133,8 @@ std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
 position_intersect(const ray &ray);
 
 minalg::float3
-position_drag(drag_state *drag, const gizmo_state &state,
+position_drag(drag_state *drag, const gizmo_application_state &state,
+              bool local_toggle,
               const std::shared_ptr<gizmo_mesh_component> &active,
               const rigid_transform &p);
 

@@ -271,11 +271,12 @@ scale_intersect(const ray &ray) {
 }
 
 minalg::float3
-position_drag(drag_state *drag, const gizmo_state &state,
+position_drag(drag_state *drag, const gizmo_application_state &state,
+              bool local_toggle,
               const std::shared_ptr<gizmo_mesh_component> &active,
               const rigid_transform &p) {
   std::vector<minalg::float3> axes;
-  if (state.local_toggle)
+  if (local_toggle)
     axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
   else
     axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
@@ -288,35 +289,39 @@ position_drag(drag_state *drag, const gizmo_state &state,
     switch (interaction_mode(active)) {
     case interact::translate_x:
       position =
-          axis_translation_dragger(drag, state, axes[0], src, {}).position;
+          axis_translation_dragger(drag, state, local_toggle, axes[0], src, {})
+              .position;
       break;
     case interact::translate_y:
       position =
-          axis_translation_dragger(drag, state, axes[1], src, {}).position;
+          axis_translation_dragger(drag, state, local_toggle, axes[1], src, {})
+              .position;
       break;
     case interact::translate_z:
       position =
-          axis_translation_dragger(drag, state, axes[2], src, {}).position;
+          axis_translation_dragger(drag, state, local_toggle, axes[2], src, {})
+              .position;
       break;
     case interact::translate_yz:
       position =
-          plane_translation_dragger(drag, state, axes[0], src, {}).position;
+          plane_translation_dragger(drag, state, local_toggle, axes[0], src, {})
+              .position;
       break;
     case interact::translate_zx:
       position =
-          plane_translation_dragger(drag, state, axes[1], src, {}).position;
+          plane_translation_dragger(drag, state, local_toggle, axes[1], src, {})
+              .position;
       break;
     case interact::translate_xy:
       position =
-          plane_translation_dragger(drag, state, axes[2], src, {}).position;
+          plane_translation_dragger(drag, state, local_toggle, axes[2], src, {})
+              .position;
       break;
     case interact::translate_xyz:
-      position =
-          plane_translation_dragger(
-              drag, state,
-              -minalg::qzdir(to_minalg(state.active_state.cam_orientation)),
-              src, {})
-              .position;
+      position = plane_translation_dragger(
+                     drag, state, local_toggle,
+                     -minalg::qzdir(to_minalg(state.cam_orientation)), src, {})
+                     .position;
       break;
     default:
       assert(false);
@@ -328,7 +333,8 @@ position_drag(drag_state *drag, const gizmo_state &state,
 }
 
 static minalg::float4
-rotation_drag(drag_state *drag, const gizmo_state &state,
+rotation_drag(drag_state *drag, const gizmo_application_state &state,
+              bool local_toggle,
               const std::shared_ptr<gizmo_mesh_component> &active,
               const rigid_transform &src) {
 
@@ -336,11 +342,17 @@ rotation_drag(drag_state *drag, const gizmo_state &state,
     // rigid_transform src(_orientation, center, {1, 1, 1});
     switch (interaction_mode(active)) {
     case interact::rotate_x:
-      return axis_rotation_dragger(drag, state, {1, 0, 0}, src, {}).orientation;
+      return axis_rotation_dragger(drag, state, local_toggle, {1, 0, 0}, src,
+                                   {})
+          .orientation;
     case interact::rotate_y:
-      return axis_rotation_dragger(drag, state, {0, 1, 0}, src, {}).orientation;
+      return axis_rotation_dragger(drag, state, local_toggle, {0, 1, 0}, src,
+                                   {})
+          .orientation;
     case interact::rotate_z:
-      return axis_rotation_dragger(drag, state, {0, 0, 1}, src, {}).orientation;
+      return axis_rotation_dragger(drag, state, local_toggle, {0, 0, 1}, src,
+                                   {})
+          .orientation;
     default:
       assert(false);
       break;
@@ -351,7 +363,8 @@ rotation_drag(drag_state *drag, const gizmo_state &state,
 }
 
 static minalg::float3
-scale_drag(drag_state *drag, const gizmo_state &state,
+scale_drag(drag_state *drag, const gizmo_application_state &state,
+           bool local_toggle,
            const std::shared_ptr<gizmo_mesh_component> &active,
            const rigid_transform &src, bool uniform) {
 
@@ -364,13 +377,19 @@ scale_drag(drag_state *drag, const gizmo_state &state,
     };
     switch (interaction_mode(active)) {
     case interact::scale_x:
-      scale = axis_scale_dragger(drag, state, {1, 0, 0}, _src, uniform).scale;
+      scale = axis_scale_dragger(drag, state, local_toggle, {1, 0, 0}, _src,
+                                 uniform)
+                  .scale;
       break;
     case interact::scale_y:
-      scale = axis_scale_dragger(drag, state, {0, 1, 0}, _src, uniform).scale;
+      scale = axis_scale_dragger(drag, state, local_toggle, {0, 1, 0}, _src,
+                                 uniform)
+                  .scale;
       break;
     case interact::scale_z:
-      scale = axis_scale_dragger(drag, state, {0, 0, 1}, _src, uniform).scale;
+      scale = axis_scale_dragger(drag, state, local_toggle, {0, 0, 1}, _src,
+                                 uniform)
+                  .scale;
       break;
     default:
       assert(false);
@@ -507,7 +526,8 @@ void position_draw(const AddTriangleFunc &add_world_triangle,
 //       break;
 //     }
 //     minalg::float3 zDir = normalize(activeAxis),
-//                    xDir = normalize(cross(a, zDir)), yDir = cross(zDir, xDir);
+//                    xDir = normalize(cross(a, zDir)), yDir = cross(zDir,
+//                    xDir);
 //
 //     // Ad-hoc geometry
 //     std::initializer_list<minalg::float2> arrow_points = {
@@ -576,7 +596,8 @@ void position_draw(const AddTriangleFunc &add_world_triangle,
 //           }};
 // }
 
-// std::shared_ptr<interaction_state> gizmo_context::get_or_create(uint32_t id) {
+// std::shared_ptr<interaction_state> gizmo_context::get_or_create(uint32_t id)
+// {
 //   auto found = gizmos.find(id);
 //   if (found != gizmos.end()) {
 //     return found->second;

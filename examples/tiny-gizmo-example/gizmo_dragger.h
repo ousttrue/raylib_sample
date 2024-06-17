@@ -11,7 +11,8 @@ class TranslationGizmoDragger : public Dragger {
   std::list<std::shared_ptr<Drawable>> _scene;
 
 public:
-  tinygizmo::gizmo_state gizmo_state;
+  tinygizmo::gizmo_application_state gizmo_state;
+  bool local_toggle;
   TranslationGizmoDragger(std::list<std::shared_ptr<Drawable>> &scene)
       : _scene(scene) {}
 
