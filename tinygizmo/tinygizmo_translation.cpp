@@ -6,39 +6,39 @@ namespace tinygizmo {
 std::vector<minalg::float2> arrow_points = {
     {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
 
-auto _translate_x = std::make_shared<gizmo_mesh_component>(
+auto _translate_x = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16,
                                         arrow_points),
     minalg::float4{1, 0.5f, 0.5f, 1.f}, minalg::float4{1, 0, 0, 1.f});
-auto _translate_y = std::make_shared<gizmo_mesh_component>(
+auto _translate_y = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16,
                                         arrow_points),
     minalg::float4{0.5f, 1, 0.5f, 1.f}, minalg::float4{0, 1, 0, 1.f});
-auto _translate_z = std::make_shared<gizmo_mesh_component>(
+auto _translate_z = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16,
                                         arrow_points),
     minalg::float4{0.5f, 0.5f, 1, 1.f}, minalg::float4{0, 0, 1, 1.f});
-auto _translate_yz = std::make_shared<gizmo_mesh_component>(
+auto _translate_yz = std::make_shared<gizmo_component>(
     geometry_mesh::make_box_geometry({-0.01f, 0.25, 0.25},
                                      {0.01f, 0.75f, 0.75f}),
     minalg::float4{0.5f, 1, 1, 0.5f}, minalg::float4{0, 1, 1, 0.6f});
-auto _translate_zx = std::make_shared<gizmo_mesh_component>(
+auto _translate_zx = std::make_shared<gizmo_component>(
     geometry_mesh::make_box_geometry({0.25, -0.01f, 0.25},
                                      {0.75f, 0.01f, 0.75f}),
     minalg::float4{1, 0.5f, 1, 0.5f}, minalg::float4{1, 0, 1, 0.6f});
-auto _translate_xy = std::make_shared<gizmo_mesh_component>(
+auto _translate_xy = std::make_shared<gizmo_component>(
     geometry_mesh::make_box_geometry({0.25, 0.25, -0.01f},
                                      {0.75f, 0.75f, 0.01f}),
     minalg::float4{1, 1, 0.5f, 0.5f}, minalg::float4{1, 1, 0, 0.6f});
-auto _translate_xyz = std::make_shared<gizmo_mesh_component>(
+auto _translate_xyz = std::make_shared<gizmo_component>(
     geometry_mesh::make_box_geometry({-0.05f, -0.05f, -0.05f},
                                      {0.05f, 0.05f, 0.05f}),
     minalg::float4{0.9f, 0.9f, 0.9f, 0.25f}, minalg::float4{1, 1, 1, 0.35f});
 
-std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
+std::tuple<std::shared_ptr<gizmo_component>, float>
 position_intersect(const ray &ray) {
   float best_t = std::numeric_limits<float>::infinity(), t;
-  std::shared_ptr<gizmo_mesh_component> updated_state = {};
+  std::shared_ptr<gizmo_component> updated_state = {};
   if (ray.intersect_mesh(_translate_x->mesh, &t) && t < best_t) {
     updated_state = _translate_x;
     best_t = t;
@@ -120,11 +120,11 @@ axis_translation_dragger(drag_state *drag,
   return minalg::rigid_transform(t.orientation, point, t.scale);
 }
 
-minalg::float3
-position_drag(drag_state *drag, const gizmo_application_state &state,
-              bool local_toggle,
-              const std::shared_ptr<gizmo_mesh_component> &active,
-              const minalg::rigid_transform &p) {
+minalg::float3 position_drag(drag_state *drag,
+                             const gizmo_application_state &state,
+                             bool local_toggle,
+                             const std::shared_ptr<gizmo_component> &active,
+                             const minalg::rigid_transform &p) {
   std::vector<minalg::float3> axes;
   if (local_toggle)
     axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
@@ -174,9 +174,9 @@ position_drag(drag_state *drag, const gizmo_application_state &state,
 }
 
 void position_draw(const AddTriangleFunc &add_world_triangle,
-                   const std::shared_ptr<gizmo_mesh_component> &active,
+                   const std::shared_ptr<gizmo_component> &active,
                    const minalg::float4x4 &modelMatrix) {
-  std::vector<std::shared_ptr<gizmo_mesh_component>> draw_interactions{
+  std::vector<std::shared_ptr<gizmo_component>> draw_interactions{
       _translate_x,  _translate_y,  _translate_z,   _translate_yz,
       _translate_zx, _translate_xy, _translate_xyz,
   };

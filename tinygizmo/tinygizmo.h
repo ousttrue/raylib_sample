@@ -137,16 +137,6 @@ gizmo_transform(const gizmo_application_state &active_state, bool local_toggle,
   return {draw_scale, p, ray};
 };
 
-struct gizmo_mesh_component {
-  geometry_mesh mesh;
-  minalg::float4 base_color;
-  minalg::float4 highlight_color;
-
-  gizmo_mesh_component(const geometry_mesh &mesh, const minalg::float4 &base,
-                       const minalg::float4 &high)
-      : mesh(mesh), base_color(base), highlight_color(high) {}
-};
-
 struct drag_state {
   // Original position of an object being manipulated with a gizmo
   minalg::float3 original_position;

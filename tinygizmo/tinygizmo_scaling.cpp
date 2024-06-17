@@ -10,26 +10,26 @@ std::vector<minalg::float2> mace_points = {{0.25f, 0},    {0.25f, 0.05f},
                                            {1, 0.05f},    {1, 0.1f},
                                            {1.25f, 0.1f}, {1.25f, 0}};
 
-auto _scale_x = std::make_shared<gizmo_mesh_component>(
+auto _scale_x = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16,
                                         mace_points),
     minalg::float4{1, 0.5f, 0.5f, 1.f}, minalg::float4{1, 0, 0, 1.f});
 
-auto _scale_y = std::make_shared<gizmo_mesh_component>(
+auto _scale_y = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16,
                                         mace_points),
     minalg::float4{0.5f, 1, 0.5f, 1.f}, minalg::float4{0, 1, 0, 1.f});
 
-auto _scale_z = std::make_shared<gizmo_mesh_component>(
+auto _scale_z = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16,
                                         mace_points),
     minalg::float4{0.5f, 0.5f, 1, 1.f}, minalg::float4{0, 0, 1, 1.f});
 
-std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
+std::tuple<std::shared_ptr<gizmo_component>, float>
 scaling_intersect(const ray &ray) {
 
   float best_t = std::numeric_limits<float>::infinity(), t;
-  std::shared_ptr<gizmo_mesh_component> updated_state = {};
+  std::shared_ptr<gizmo_component> updated_state = {};
   if (ray.intersect_mesh(_scale_x->mesh, &t) && t < best_t) {
     updated_state = _scale_x;
     best_t = t;
@@ -105,7 +105,7 @@ axis_scale_dragger(drag_state *drag,
 minalg::float3 scaling_drag(drag_state *drag,
                             const gizmo_application_state &state,
                             bool local_toggle,
-                            const std::shared_ptr<gizmo_mesh_component> &active,
+                            const std::shared_ptr<gizmo_component> &active,
                             const minalg::rigid_transform &src, bool uniform) {
 
   auto scale = src.scale;
@@ -133,9 +133,9 @@ minalg::float3 scaling_drag(drag_state *drag,
 }
 
 void scaling_draw(const AddTriangleFunc &add_world_triangle,
-                  const std::shared_ptr<gizmo_mesh_component> &active,
+                  const std::shared_ptr<gizmo_component> &active,
                   const minalg::float4x4 &modelMatrix) {
-  std::vector<std::shared_ptr<gizmo_mesh_component>> draw_components{
+  std::vector<std::shared_ptr<gizmo_component>> draw_components{
       _scale_x,
       _scale_y,
       _scale_z,

@@ -10,7 +10,7 @@ class Gizmo : public Dragger {
 protected:
   std::list<std::shared_ptr<Drawable>> _scene;
   std::shared_ptr<Drawable> gizmo_target;
-  std::shared_ptr<tinygizmo::gizmo_mesh_component> active;
+  std::shared_ptr<tinygizmo::gizmo_component> active;
   tinygizmo::drag_state drag_state;
 
 public:

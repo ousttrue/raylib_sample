@@ -7,26 +7,26 @@ std::vector<minalg::float2> ring_points = {
     {+0.025f, 1},    {-0.025f, 1},    {-0.025f, 1},    {-0.025f, 1.1f},
     {-0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1}};
 
-auto _rotate_x = std::make_shared<gizmo_mesh_component>(
+auto _rotate_x = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 32,
                                         ring_points, 0.003f),
     minalg::float4{1, 0.5f, 0.5f, 1.f}, minalg::float4{1, 0, 0, 1.f});
 
-auto _rotate_y = std::make_shared<gizmo_mesh_component>(
+auto _rotate_y = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 32,
                                         ring_points, -0.003f),
     minalg::float4{0.5f, 1, 0.5f, 1.f}, minalg::float4{0, 1, 0, 1.f});
 
-auto _rotate_z = std::make_shared<gizmo_mesh_component>(
+auto _rotate_z = std::make_shared<gizmo_component>(
     geometry_mesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 32,
                                         ring_points),
     minalg::float4{0.5f, 0.5f, 1, 1.f}, minalg::float4{0, 0, 1, 1.f});
 
-std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
+std::tuple<std::shared_ptr<gizmo_component>, float>
 rotation_intersect(const ray &ray) {
 
   float best_t = std::numeric_limits<float>::infinity(), t;
-  std::shared_ptr<gizmo_mesh_component> updated_state = {};
+  std::shared_ptr<gizmo_component> updated_state = {};
   if (ray.intersect_mesh(_rotate_x->mesh, &t) && t < best_t) {
     updated_state = _rotate_x;
     best_t = t;
@@ -112,11 +112,11 @@ axis_rotation_dragger(drag_state *drag,
   }
 }
 
-minalg::float4
-rotation_drag(drag_state *drag, const gizmo_application_state &state,
-              bool local_toggle,
-              const std::shared_ptr<gizmo_mesh_component> &active,
-              const minalg::rigid_transform &src) {
+minalg::float4 rotation_drag(drag_state *drag,
+                             const gizmo_application_state &state,
+                             bool local_toggle,
+                             const std::shared_ptr<gizmo_component> &active,
+                             const minalg::rigid_transform &src) {
   if (active == _rotate_x) {
     return axis_rotation_dragger(drag, state, local_toggle, {1, 0, 0}, src, {})
         .orientation;
@@ -133,10 +133,10 @@ rotation_drag(drag_state *drag, const gizmo_application_state &state,
 }
 
 void rotation_draw(const AddTriangleFunc &add_world_triangle,
-                   const std::shared_ptr<gizmo_mesh_component> &active,
+                   const std::shared_ptr<gizmo_component> &active,
                    const minalg::float4x4 &modelMatrix) {
 
-  std::vector<std::shared_ptr<gizmo_mesh_component>> draw_interactions;
+  std::vector<std::shared_ptr<gizmo_component>> draw_interactions;
   // if (!state.local_toggle && this->active)
   //   draw_interactions = {interaction_mode(this->active)};
   // else
