@@ -77,8 +77,8 @@ public:
 
   void end(const Vector2 &end) override {}
 
-  void drag(const DragState &state, const Vector2 &cursor, int w,
-            int h) override {
+  void drag(const DragState &state, int w, int h,
+            const Vector2 &cursor) override {
     auto delta = Vector2Subtract(cursor, _last);
     _last = cursor;
     auto distance = Vector3Distance(_camera->target, _camera->position);
@@ -106,8 +106,8 @@ public:
 
   void end(const Vector2 &end) override {}
 
-  void drag(const DragState &state, const Vector2 &cursor, int w,
-            int h) override {
+  void drag(const DragState &state, int w, int h,
+            const Vector2 &cursor) override {
     auto delta = Vector2Subtract(cursor, _last);
     _last = cursor;
     auto distance = Vector3Distance(_camera->target, _camera->position);

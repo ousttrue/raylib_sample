@@ -28,17 +28,3 @@ struct Drawable {
 
   void draw();
 };
-
-enum class transform_mode {
-  translate,
-  rotate,
-  scale,
-};
-
-struct hotkey {
-  bool hotkey_ctrl = false;
-  bool hotkey_translate = false;
-  bool hotkey_rotate = false;
-  bool hotkey_scale = false;
-  bool hotkey_local = false;
-};

@@ -1,43 +1,5 @@
 #include "gizmo_dragger.h"
 
-void GizmoManager::hotkey(int w, int h, const Vector2 &cursor,
-                          const struct hotkey &hotkey) {
-  if (hotkey.hotkey_ctrl == true) {
-    if (last_hotkey.hotkey_translate == false &&
-        hotkey.hotkey_translate == true)
-      mode = transform_mode::translate;
-    else if (last_hotkey.hotkey_rotate == false && hotkey.hotkey_rotate == true)
-      mode = transform_mode::rotate;
-    else if (last_hotkey.hotkey_scale == false && hotkey.hotkey_scale == true)
-      mode = transform_mode::scale;
-
-    local_toggle = (!last_hotkey.hotkey_local && hotkey.hotkey_local)
-                       ? !local_toggle
-                       : local_toggle;
-  }
-  last_hotkey = active_hotkey;
-  active_hotkey = hotkey;
-
-  auto ray = GetMouseRay(cursor, *_camera);
-  auto rot =
-      QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
-
-  last_state = active_state;
-  active_state = {
-      .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
-      // optional flag to draw the gizmos at a constant screen-space
-      // scale gizmo_state.screenspace_scale = 80.f; camera projection
-      .viewport_size = {static_cast<float>(w), static_cast<float>(h)},
-      .ray_origin = {ray.position.x, ray.position.y, ray.position.z},
-      .ray_direction = {ray.direction.x, ray.direction.y, ray.direction.z},
-      .cam_yfov = 1.0f,
-      .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
-  };
-
-  _translation->gizmo_state = active_state;
-  _translation->local_toggle = local_toggle;
-}
-
 struct RayState {
   rigid_transform transform;
   float draw_scale;
@@ -46,7 +8,7 @@ struct RayState {
   float t;
 };
 
-void TranslationGizmoDragger::begin(const Vector2 &cursor) {
+void TranslationGizmo::begin(const Vector2 &cursor) {
   float best_t = std::numeric_limits<float>::infinity();
   std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
   for (auto &target : this->_scene) {
@@ -90,14 +52,8 @@ void TranslationGizmoDragger::begin(const Vector2 &cursor) {
   }
 }
 
-void TranslationGizmoDragger::end(const Vector2 &end) {
-  this->active = {};
-  this->gizmo_target = {};
-  this->drag_state = {};
-}
-
-void TranslationGizmoDragger::drag(const DragState &state,
-                                   const Vector2 &cursor, int w, int h) {
+void TranslationGizmo::drag(const DragState &state, int w, int h,
+                            const Vector2 &cursor) {
   for (auto &target : this->_scene) {
     if (this->active && this->gizmo_target == target) {
       rigid_transform src{
@@ -115,7 +71,179 @@ void TranslationGizmoDragger::drag(const DragState &state,
   }
 }
 
-void GizmoManager::load(Drawable *drawable) {
+void RotationGizmo::begin(const Vector2 &cursor) {
+  float best_t = std::numeric_limits<float>::infinity();
+  std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
+  for (auto &target : this->_scene) {
+    rigid_transform src{
+        .orientation = *(minalg::float4 *)&target->rotation,
+        .position = *(minalg::float3 *)&target->position,
+        .scale = *(minalg::float3 *)&target->scale,
+    };
+    auto [draw_scale, gizmo_transform, local_ray] =
+        tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
+    // ray intersection
+    auto [updated_state, t] = tinygizmo::rotation_intersect(local_ray);
+    if (updated_state) {
+      ray_map.insert({target,
+                      {
+                          .transform = src,
+                          .draw_scale = draw_scale,
+                          .gizmo_transform = gizmo_transform,
+                          .local_ray = local_ray,
+                          .t = t,
+                      }});
+      if (t < best_t) {
+        this->active = updated_state;
+        this->gizmo_target = target;
+      }
+    }
+  }
+
+  if (this->active) {
+    auto ray_state = ray_map[this->gizmo_target];
+    // begin drag
+    auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+    // click point in gizmo local
+    this->drag_state = {
+        .original_position = ray_state.transform.position,
+        // .click_offset = local_toggle
+        //                     ? ray_state.gizmo_transform.transform_vector(
+        //                           ray.origin + ray.direction * ray_state.t)
+        //                     : ray.origin + ray.direction * ray_state.t,
+        .click_offset = ray_state.transform.transform_point(
+            ray.origin + ray.direction * ray_state.t),
+        .original_orientation = ray_state.transform.orientation,
+    };
+  }
+}
+
+void RotationGizmo::drag(const DragState &state, int w, int h,
+                         const Vector2 &cursor) {
+  for (auto &target : this->_scene) {
+    if (this->active && this->gizmo_target == target) {
+      rigid_transform src{
+          .orientation = *(minalg::float4 *)&target->rotation,
+          .position = *(minalg::float3 *)&target->position,
+          .scale = *(minalg::float3 *)&target->scale,
+      };
+      auto [_0, gizmo_transform, _2] =
+          tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
+
+      auto rotation =
+          tinygizmo::rotation_drag(&drag_state, gizmo_state, local_toggle,
+                                   this->active, gizmo_transform);
+      target->rotation = *(Vector4 *)&rotation;
+    }
+  }
+}
+
+void ScalingGizmo::begin(const Vector2 &cursor) {
+  float best_t = std::numeric_limits<float>::infinity();
+  std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
+  for (auto &target : this->_scene) {
+    rigid_transform src{
+        .orientation = *(minalg::float4 *)&target->rotation,
+        .position = *(minalg::float3 *)&target->position,
+        .scale = *(minalg::float3 *)&target->scale,
+    };
+    auto [draw_scale, gizmo_transform, local_ray] =
+        tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
+    // ray intersection
+    auto [updated_state, t] = tinygizmo::scaling_intersect(local_ray);
+    if (updated_state) {
+      ray_map.insert({target,
+                      {
+                          .transform = src,
+                          .draw_scale = draw_scale,
+                          .gizmo_transform = gizmo_transform,
+                          .local_ray = local_ray,
+                          .t = t,
+                      }});
+      if (t < best_t) {
+        this->active = updated_state;
+        this->gizmo_target = target;
+      }
+    }
+  }
+
+  if (this->active) {
+    auto ray_state = ray_map[this->gizmo_target];
+    // begin drag
+    auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+    // click point in gizmo local
+    this->drag_state = {
+        // .click_offset = local_toggle
+        //                     ? ray_state.gizmo_transform.transform_vector(
+        //                           ray.origin + ray.direction * ray_state.t)
+        //                     : ray.origin + ray.direction * ray_state.t,
+        .click_offset = ray_state.transform.transform_point(
+            ray.origin + ray.direction * ray_state.t),
+        .original_scale = ray_state.transform.scale,
+    };
+  }
+}
+
+void ScalingGizmo::drag(const DragState &state, int w, int h,
+                        const Vector2 &cursor) {
+  for (auto &target : this->_scene) {
+    if (this->active && this->gizmo_target == target) {
+      rigid_transform src{
+          .orientation = *(minalg::float4 *)&target->rotation,
+          .position = *(minalg::float3 *)&target->position,
+          .scale = *(minalg::float3 *)&target->scale,
+      };
+      // auto [_0, gizmo_transform, _2] =
+      //     tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
+      auto scale = tinygizmo::scaling_drag(
+          &drag_state, gizmo_state, local_toggle, this->active, src, uniform);
+      target->scale = *(Vector3 *)&scale;
+    }
+  }
+}
+
+void TRSGizmo::hotkey(int w, int h, const Vector2 &cursor,
+                      const struct hotkey &hotkey) {
+  if (hotkey.hotkey_ctrl == true) {
+    if (last_hotkey.hotkey_translate == false &&
+        hotkey.hotkey_translate == true) {
+      _active = _t;
+    } else if (last_hotkey.hotkey_rotate == false &&
+               hotkey.hotkey_rotate == true) {
+      _active = _r;
+    } else if (last_hotkey.hotkey_scale == false &&
+               hotkey.hotkey_scale == true) {
+      _active = _s;
+    }
+
+    local_toggle = (!last_hotkey.hotkey_local && hotkey.hotkey_local)
+                       ? !local_toggle
+                       : local_toggle;
+  }
+  last_hotkey = active_hotkey;
+  active_hotkey = hotkey;
+
+  auto ray = GetMouseRay(cursor, *_camera);
+  auto rot =
+      QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
+
+  last_state = active_state;
+  active_state = {
+      .mouse_left = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
+      // optional flag to draw the gizmos at a constant screen-space
+      // scale gizmo_state.screenspace_scale = 80.f; camera projection
+      .viewport_size = {static_cast<float>(w), static_cast<float>(h)},
+      .ray_origin = {ray.position.x, ray.position.y, ray.position.z},
+      .ray_direction = {ray.direction.x, ray.direction.y, ray.direction.z},
+      .cam_yfov = 1.0f,
+      .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
+  };
+
+  _active->gizmo_state = active_state;
+  _active->local_toggle = local_toggle;
+}
+
+void TRSGizmo::load(Drawable *drawable) {
   positions.clear();
   colors.clear();
   indices.clear();
@@ -153,7 +281,8 @@ void GizmoManager::load(Drawable *drawable) {
     minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
     modelMatrix = mul(modelMatrix, scaleMatrix);
 
-    tinygizmo::position_draw(add_world_triangle, nullptr, modelMatrix);
+    // tinygizmo::position_draw(add_world_triangle, nullptr, modelMatrix);
+    _active->draw(add_world_triangle, modelMatrix);
   }
 
   if (positions.size() && indices.size()) {

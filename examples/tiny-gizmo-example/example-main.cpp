@@ -49,10 +49,10 @@ int main(int argc, char *argv[]) {
       .draggable = std::make_shared<CameraShiftDragger>(&camera, &orbit),
   };
 
-  GizmoManager gizmo(&camera, scene);
+  auto gizmo = std::make_shared<TRSGizmo>(&camera, scene);
   Drawable gizmo_mesh;
   Drag left_drag{
-      .draggable = gizmo.make_translation(),
+      .draggable = gizmo,
   };
 
   while (!WindowShouldClose()) {
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
         .hotkey_scale = IsKeyDown(KEY_S),
         .hotkey_local = IsKeyDown(KEY_L),
     };
-    gizmo.hotkey(w, h, cursor, active_hotkey);
+    gizmo->hotkey(w, h, cursor, active_hotkey);
 
     // camera
     dolly(&camera);
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
 
         // draw gizmo
         glClear(GL_DEPTH_BUFFER_BIT);
-        gizmo.load(&gizmo_mesh);
+        gizmo->load(&gizmo_mesh);
         gizmo_mesh.draw();
         EndMode3D();
       }

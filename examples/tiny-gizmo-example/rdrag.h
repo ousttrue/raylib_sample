@@ -32,8 +32,8 @@ public:
     //
   }
 
-  virtual void drag(const DragState &state, const Vector2 &cursor, int w,
-                    int h) {}
+  virtual void drag(const DragState &state, int w, int h,
+                    const Vector2 &cursor) {}
 };
 
 struct Drag {
@@ -65,7 +65,7 @@ struct Drag {
         DrawText(TextFormat("[%.0f, %.0f]", cursor.x, cursor.y), cursor.x + 10,
                  cursor.y, 10, BLACK);
         if (draggable) {
-          draggable->drag(state, cursor, w, h);
+          draggable->drag(state, w, h, cursor);
         }
       } else {
         // nothing
