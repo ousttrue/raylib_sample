@@ -4,7 +4,6 @@
 #include "minalg.hpp"
 #include <array>
 #include <functional>
-#include <memory>
 #include <string>
 
 namespace tinygizmo {
@@ -58,6 +57,27 @@ struct gizmo_application_state {
 using AddTriangleFunc = std::function<void(
     const std::array<float, 4> &rgba, const std::array<float, 3> &p0,
     const std::array<float, 3> &p1, const std::array<float, 3> &p2)>;
+inline void add_triangles(const AddTriangleFunc &add_triangle,
+                          const minalg::float4x4 &modelMatrix,
+                          const geometry_mesh &mesh,
+                          const minalg::float4 &color) {
+  for (auto &t : mesh.triangles) {
+    auto v0 = mesh.vertices[t.x];
+    auto v1 = mesh.vertices[t.y];
+    auto v2 = mesh.vertices[t.z];
+    auto p0 = transform_coord(
+        modelMatrix,
+        v0.position); // transform local coordinates into worldspace
+    auto p1 = transform_coord(
+        modelMatrix,
+        v1.position); // transform local coordinates into worldspace
+    auto p2 = transform_coord(
+        modelMatrix,
+        v2.position); // transform local coordinates into worldspace
+    add_triangle({color.x, color.y, color.z, color.w}, {p0.x, p0.y, p0.z},
+                 {p1.x, p1.y, p1.z}, {p2.x, p2.y, p2.z});
+  }
+}
 
 inline std::tuple<float, rigid_transform, ray>
 gizmo_transform(const gizmo_application_state &active_state, bool local_toggle,
@@ -95,53 +115,5 @@ struct drag_state {
   // Original orientation of an object being manipulated with a gizmo
   minalg::float4 original_orientation;
 };
-
-//
-// translation
-//
-std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
-position_intersect(const ray &ray);
-
-minalg::float3
-position_drag(drag_state *drag, const gizmo_application_state &state,
-              bool local_toggle,
-              const std::shared_ptr<gizmo_mesh_component> &active,
-              const rigid_transform &p);
-
-void position_draw(const AddTriangleFunc &add_world_triangle,
-                   const std::shared_ptr<gizmo_mesh_component> &active,
-                   const minalg::float4x4 &modelMatrix);
-
-//
-// rotation
-//
-std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
-rotation_intersect(const ray &ray);
-
-minalg::float4
-rotation_drag(drag_state *drag, const gizmo_application_state &state,
-              bool local_toggle,
-              const std::shared_ptr<gizmo_mesh_component> &active,
-              const rigid_transform &p);
-
-void rotation_draw(const AddTriangleFunc &add_world_triangle,
-                   const std::shared_ptr<gizmo_mesh_component> &active,
-                   const minalg::float4x4 &modelMatrix);
-
-//
-// scaling
-//
-std::tuple<std::shared_ptr<gizmo_mesh_component>, float>
-scaling_intersect(const ray &ray);
-
-minalg::float3 scaling_drag(drag_state *drag,
-                            const gizmo_application_state &state,
-                            bool local_toggle,
-                            const std::shared_ptr<gizmo_mesh_component> &active,
-                            const rigid_transform &p, bool uniform);
-
-void scaling_draw(const AddTriangleFunc &add_world_triangle,
-                  const std::shared_ptr<gizmo_mesh_component> &active,
-                  const minalg::float4x4 &modelMatrix);
 
 } // namespace tinygizmo

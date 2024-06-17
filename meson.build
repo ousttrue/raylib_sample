@@ -43,8 +43,9 @@ executable(
         'examples/tiny-gizmo-example/example-main.cpp',
         'examples/tiny-gizmo-example/drawable.cpp',
         'examples/tiny-gizmo-example/gizmo_dragger.cpp',
-        'tinygizmo/tiny-gizmo.cpp',
-        'tinygizmo/drag.cpp',
+        'tinygizmo/tinygizmo_translation.cpp',
+        'tinygizmo/tinygizmo_rotation.cpp',
+        'tinygizmo/tinygizmo_scaling.cpp',
     ],
     include_directories: include_directories(
         'tinygizmo',

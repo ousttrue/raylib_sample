@@ -2,6 +2,9 @@
 #include "drawable.h"
 #include "rdrag.h"
 #include <list>
+#include <tinygizmo_rotation.h>
+#include <tinygizmo_scaling.h>
+#include <tinygizmo_translation.h>
 
 class Gizmo : public Dragger {
 protected:

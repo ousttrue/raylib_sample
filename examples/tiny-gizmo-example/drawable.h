@@ -1,11 +1,9 @@
 #pragma once
-#include "rdrag.h"
-#include <list>
 #include <raylib.h>
 #include <raymath.h>
 #include <rlgl.h>
 #include <span>
-#include <tiny-gizmo.h>
+#include <string>
 
 struct Vertex {
   Vector3 position;
