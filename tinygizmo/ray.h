@@ -1,6 +1,7 @@
 #pragma once
 #include "geometry_mesh.h"
 #include "minalg.hpp"
+#include <optional>
 
 namespace tinygizmo {
 
@@ -8,13 +9,13 @@ struct ray {
   minalg::float3 origin;
   minalg::float3 direction;
 
-  bool intersect_plane(const minalg::float4 &plane, float *hit_t) const {
+  minalg::float3 point(float t) const { return origin + direction * t; }
+
+  std::optional<float> intersect_plane(const minalg::float4 &plane) const {
     float denom = dot(plane.xyz(), this->direction);
     if (std::abs(denom) == 0)
       return false;
-    if (hit_t)
-      *hit_t = -dot(plane, minalg::float4(this->origin, 1)) / denom;
-    return true;
+    return -dot(plane, minalg::float4(this->origin, 1)) / denom;
   }
 
   bool intersect_triangle(const minalg::float3 &v0, const minalg::float3 &v1,

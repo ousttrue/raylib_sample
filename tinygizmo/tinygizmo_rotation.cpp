@@ -72,13 +72,9 @@ axis_rotation_dragger(drag_state *drag,
                                            drag->original_position};
   auto the_axis = original_pose.transform_vector(axis);
   minalg::float4 the_plane = {the_axis, -dot(the_axis, drag->click_offset)};
-  const ray r = {
-      to_minalg(active_state.ray_origin),
-      to_minalg(active_state.ray_direction),
-  };
 
-  float t;
-  if (!r.intersect_plane(the_plane, &t)) {
+  auto t = active_state.ray.intersect_plane(the_plane);
+  if (!t) {
     return src;
   }
 
@@ -87,7 +83,7 @@ axis_rotation_dragger(drag_state *drag,
       the_axis * dot(the_axis, drag->click_offset - drag->original_position);
   minalg::float3 arm1 = normalize(drag->click_offset - center_of_rotation);
   minalg::float3 arm2 =
-      normalize(r.origin + r.direction * t - center_of_rotation);
+      normalize(active_state.ray.point(*t) - center_of_rotation);
 
   float d = dot(arm1, arm2);
   if (d > 0.999f) {

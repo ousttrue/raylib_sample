@@ -10,12 +10,6 @@
 
 namespace tinygizmo {
 
-inline minalg::float3 to_minalg(const std::array<float, 3> &v) {
-  return {v[0], v[1], v[2]};
-}
-inline minalg::float4 to_minalg(const std::array<float, 4> &v) {
-  return {v[0], v[1], v[2], v[3]};
-}
 inline minalg::float3 snap(const minalg::float3 &value, const float snap) {
   if (snap > 0.0f)
     return minalg::float3(floor(value / snap) * snap);
@@ -49,17 +43,14 @@ struct gizmo_application_state {
   float snap_rotation = 0.f;
   // 3d viewport used to render the view
   std::array<float, 2> viewport_size;
-  // world-space ray origin (i.e. the camera position)
-  std::array<float, 3> ray_origin;
-  // world-space ray direction
-  std::array<float, 3> ray_direction;
+  ray ray;
   float cam_yfov;
-  std::array<float, 4> cam_orientation;
+  minalg::float4 cam_orientation;
 
   // This will calculate a scale constant based on the number of screenspace
   // pixels passed as pixel_scale.
   float calc_scale_screenspace(const minalg::float3 position) const {
-    float dist = length(position - to_minalg(this->ray_origin));
+    float dist = length(position - this->ray.origin);
     return std::tan(this->cam_yfov) * dist *
            (_screenspace_scale / this->viewport_size[1]);
   }
@@ -128,11 +119,7 @@ gizmo_transform(const gizmo_application_state &active_state, bool local_toggle,
   auto p = minalg::rigid_transform(local_toggle ? src.orientation
                                                 : minalg::float4(0, 0, 0, 1),
                                    src.position);
-  ray ray{
-      .origin = *(minalg::float3 *)&active_state.ray_origin[0],
-      .direction = *(minalg::float3 *)&active_state.ray_direction[0],
-  };
-  ray = detransform(p, ray);
+  auto ray = detransform(p, active_state.ray);
   ray = descale(draw_scale, ray);
   return {draw_scale, p, ray};
 };

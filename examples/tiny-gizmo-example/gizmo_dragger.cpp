@@ -234,8 +234,11 @@ void TRSGizmo::hotkey(int w, int h, const Vector2 &cursor,
       // optional flag to draw the gizmos at a constant screen-space
       // scale gizmo_state.screenspace_scale = 80.f; camera projection
       .viewport_size = {static_cast<float>(w), static_cast<float>(h)},
-      .ray_origin = {ray.position.x, ray.position.y, ray.position.z},
-      .ray_direction = {ray.direction.x, ray.direction.y, ray.direction.z},
+      .ray =
+          {
+              .origin = {ray.position.x, ray.position.y, ray.position.z},
+              .direction = {ray.direction.x, ray.direction.y, ray.direction.z},
+          },
       .cam_yfov = 1.0f,
       .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
   };

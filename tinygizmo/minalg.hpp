@@ -1051,3 +1051,8 @@ inline minalg::float3 transform_vector(const minalg::float4x4 &transform,
                                        const minalg::float3 &vector) {
   return mul(transform, minalg::float4(vector, 0)).xyz();
 }
+
+inline minalg::float4 make_plane(const minalg::float3 &normal,
+                                 const minalg::float3 &p) {
+  return {normal.x, normal.y, normal.z, -minalg::dot(normal, p)};
+}

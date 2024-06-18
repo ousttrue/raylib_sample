@@ -8,26 +8,26 @@ plane_translation_dragger(drag_state *drag,
                           const gizmo_application_state &active_state,
                           bool local_toggle, const minalg::float3 &plane_normal,
                           const minalg::rigid_transform &src, bool) {
+
+  // auto plane = make_plane(plane_normal, drag->original_position);
+
   // Define the plane to contain the original position of the object
   auto plane_point = drag->original_position;
-  const ray r = {
-      to_minalg(active_state.ray_origin),
-      to_minalg(active_state.ray_direction),
-  };
 
   // If an intersection exists between the ray and the plane, place the
   // object at that point
-  const float denom = dot(r.direction, plane_normal);
+  const float denom = dot(active_state.ray.direction, plane_normal);
   if (std::abs(denom) == 0) {
     return src;
   }
 
-  const float t = dot(plane_point - r.origin, plane_normal) / denom;
+  const float t =
+      dot(plane_point - active_state.ray.origin, plane_normal) / denom;
   if (t < 0) {
     return src;
   }
 
-  auto point = r.origin + r.direction * t;
+  auto point = active_state.ray.point(t);
   if (active_state.snap_translation) {
     point = snap(point, active_state.snap_translation);
   }
@@ -42,7 +42,7 @@ axis_translation_dragger(drag_state *drag,
   // First apply a plane translation dragger with a plane that contains the
   // desired axis and is oriented to face the camera
   const minalg::float3 plane_tangent =
-      cross(axis, t.position - to_minalg(active_state.ray_origin));
+      cross(axis, t.position - active_state.ray.origin);
   const minalg::float3 plane_normal = cross(axis, plane_tangent);
   auto dst = plane_translation_dragger(drag, active_state, local_toggle,
                                        plane_normal, t, {});
@@ -223,7 +223,7 @@ struct translation_xyz_component : translation_plane_component {
   minalg::float3 drag_axis(const gizmo_application_state &state,
                            bool local_toggle,
                            const minalg::rigid_transform &p) const override {
-    return -minalg::qzdir(to_minalg(state.cam_orientation));
+    return -minalg::qzdir(state.cam_orientation);
   }
 };
 
