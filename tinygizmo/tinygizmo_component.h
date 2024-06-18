@@ -1,5 +1,6 @@
 #pragma once
 #include "geometry_mesh.h"
+#include "tinygizmo.h"
 
 namespace tinygizmo {
 
@@ -13,6 +14,12 @@ struct gizmo_component {
       : mesh(mesh), base_color(base), highlight_color(high) {}
 
   virtual ~gizmo_component() {}
+
+  virtual minalg::rigid_transform
+  drag(drag_state *drag, const gizmo_application_state &active_state,
+       bool local_toggle, const minalg::rigid_transform &src) const {
+    return {};
+  }
 };
 
 } // namespace tinygizmo
