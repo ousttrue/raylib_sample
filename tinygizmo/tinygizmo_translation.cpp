@@ -69,38 +69,21 @@ auto _translate_yz = std::make_shared<translation_yz_component>();
 auto _translate_zx = std::make_shared<translation_zx_component>();
 auto _translate_xy = std::make_shared<translation_xy_component>();
 auto _translate_xyz = std::make_shared<translation_xyz_component>();
+std::shared_ptr<gizmo_component> _gizmo_components[] = {
+    _translate_x,  _translate_y,  _translate_z,   _translate_yz,
+    _translate_zx, _translate_xy, _translate_xyz,
+};
 
 std::tuple<std::shared_ptr<gizmo_component>, float>
 position_intersect(const ray &ray) {
-  float best_t = std::numeric_limits<float>::infinity(), t;
+  float best_t = std::numeric_limits<float>::infinity();
   std::shared_ptr<gizmo_component> updated_state = {};
-  if (ray.intersect_mesh(_translate_x->mesh, &t) && t < best_t) {
-    updated_state = _translate_x;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_translate_y->mesh, &t) && t < best_t) {
-    updated_state = _translate_y;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_translate_z->mesh, &t) && t < best_t) {
-    updated_state = _translate_z;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_translate_yz->mesh, &t) && t < best_t) {
-    updated_state = _translate_yz;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_translate_zx->mesh, &t) && t < best_t) {
-    updated_state = _translate_zx;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_translate_xy->mesh, &t) && t < best_t) {
-    updated_state = _translate_xy;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_translate_xyz->mesh, &t) && t < best_t) {
-    updated_state = _translate_xyz;
-    best_t = t;
+  float t;
+  for (auto c : _gizmo_components) {
+    if (ray.intersect_mesh(c->mesh, &t) && t < best_t) {
+      updated_state = c;
+      best_t = t;
+    }
   }
   return {updated_state, best_t};
 }
