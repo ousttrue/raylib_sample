@@ -1,37 +1,31 @@
 #include "tinygizmo_translation.h"
 #include <assert.h>
+#include <optional>
 
 namespace tinygizmo {
 
-static minalg::rigid_transform
+static std::optional<minalg::float3>
 plane_translation_dragger(drag_state *drag,
                           const gizmo_application_state &active_state,
-                          bool local_toggle, const minalg::float3 &plane_normal,
-                          const minalg::rigid_transform &src, bool) {
+                          const minalg::float3 &plane_normal) {
 
-  // auto plane = make_plane(plane_normal, drag->original_position);
+  auto plane = make_plane(plane_normal, drag->original_position);
 
-  // Define the plane to contain the original position of the object
-  auto plane_point = drag->original_position;
-
-  // If an intersection exists between the ray and the plane, place the
-  // object at that point
-  const float denom = dot(active_state.ray.direction, plane_normal);
-  if (std::abs(denom) == 0) {
-    return src;
+  auto t = active_state.ray.intersect_plane(plane);
+  if (!t) {
+    return {};
   }
 
-  const float t =
-      dot(plane_point - active_state.ray.origin, plane_normal) / denom;
-  if (t < 0) {
-    return src;
+  if (*t < 0) {
+    return {};
   }
 
-  auto point = active_state.ray.point(t);
+  auto point = active_state.ray.point(*t);
   if (active_state.snap_translation) {
     point = snap(point, active_state.snap_translation);
   }
-  return minalg::rigid_transform(src.orientation, point, src.scale);
+  return point;
+  // return minalg::rigid_transform(src.orientation, point, src.scale);
 }
 
 static minalg::rigid_transform
@@ -41,17 +35,19 @@ axis_translation_dragger(drag_state *drag,
                          const minalg::rigid_transform &t, bool) {
   // First apply a plane translation dragger with a plane that contains the
   // desired axis and is oriented to face the camera
-  const minalg::float3 plane_tangent =
-      cross(axis, t.position - active_state.ray.origin);
-  const minalg::float3 plane_normal = cross(axis, plane_tangent);
-  auto dst = plane_translation_dragger(drag, active_state, local_toggle,
-                                       plane_normal, t, {});
+  auto plane_tangent = cross(axis, t.position - active_state.ray.origin);
+  auto plane_normal = cross(axis, plane_tangent);
+  auto dst = plane_translation_dragger(drag, active_state, plane_normal);
+  if (!dst) {
+    return t;
+  }
 
   // Constrain object motion to be along the desired axis
   auto point = drag->original_position +
-               axis * dot(dst.position - drag->original_position, axis);
+               axis * dot(*dst - drag->original_position, axis);
   return minalg::rigid_transform(t.orientation, point, t.scale);
 }
+
 std::vector<minalg::float2> arrow_points = {
     {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
 
@@ -66,13 +62,21 @@ struct translation_plane_component : gizmo_component {
   drag(drag_state *drag, const gizmo_application_state &state,
        bool local_toggle, const minalg::rigid_transform &p) const override {
 
-    minalg::rigid_transform src(minalg::float4(0, 0, 0, 1), p.position,
-                                minalg::float3(1, 1, 1));
+    // minalg::rigid_transform src(minalg::float4(0, 0, 0, 1), p.position,
+    //                             minalg::float3(1, 1, 1));
     // src.position += drag->click_offset;
-    src = plane_translation_dragger(drag, state, local_toggle,
-                                    drag_axis(state, local_toggle, p), src, {});
+    auto dst = plane_translation_dragger(drag, state,
+                                         drag_axis(state, local_toggle, p));
+    if (!dst) {
+      return p;
+    }
+
     // src.position -= drag->click_offset;
-    return src;
+    return {
+        .orientation = p.orientation,
+        .position = *dst,
+        .scale = p.scale,
+    };
   }
 };
 
