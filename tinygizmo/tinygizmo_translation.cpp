@@ -2,6 +2,11 @@
 #include <assert.h>
 #include <optional>
 
+// ray plane
+// up, right
+// delta
+// axis
+
 namespace tinygizmo {
 
 std::vector<minalg::float2> arrow_points = {
