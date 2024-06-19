@@ -9,9 +9,8 @@ const zamath = @import("zamath.zig");
 
 const Scene = struct {
     cubePosition: c.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
-    rendertargets: []RenderTarget,
 
-    pub fn draw(self: @This(), current: *const RenderTarget) void {
+    pub fn draw(self: @This(), rendertargets: []RenderTarget, current: *const RenderTarget) void {
         // c.BeginMode3D(current.*);
         c.rlDrawRenderBatchActive(); // Update and draw internal render batch
 
@@ -29,16 +28,18 @@ const Scene = struct {
 
         c.rlEnableDepthTest(); // Enable DEPTH_TEST for 3D
 
-        for (self.rendertargets) |rendertarget| {
-            if (&rendertarget != current) {
-                // c.DrawLine3D(camera.position, camera.target, c.DARKBLUE);
+        {
+            for (rendertargets) |rendertarget| {
+                if (&rendertarget != current) {
+                    // c.DrawLine3D(camera.position, camera.target, c.DARKBLUE);
+                }
             }
+
+            c.DrawCube(self.cubePosition, 2.0, 2.0, 2.0, c.RED);
+            c.DrawCubeWires(self.cubePosition, 2.0, 2.0, 2.0, c.MAROON);
+
+            c.DrawGrid(10, 1.0);
         }
-
-        c.DrawCube(self.cubePosition, 2.0, 2.0, 2.0, c.RED);
-        c.DrawCubeWires(self.cubePosition, 2.0, 2.0, 2.0, c.MAROON);
-
-        c.DrawGrid(10, 1.0);
 
         c.EndMode3D();
     }
@@ -51,8 +52,6 @@ const RenderTarget = struct {
     orbit: zamath.CameraOrbit = .{},
     // projection
     projection: zamath.CameraProjection = .{},
-
-    is_active: bool = false,
 
     fn make(rect: c.Rectangle) @This() {
         var rt = RenderTarget{
@@ -68,8 +67,8 @@ const RenderTarget = struct {
         return rt;
     }
 
-    fn contains(self: Self, cursor: c.Vector2) bool {
-        if (cursor.x < self.viewport.width) {
+    fn contains(self: @This(), cursor: c.Vector2) bool {
+        if (cursor.x < self.viewport.x) {
             return false;
         }
         if (cursor.x > (self.viewport.x + self.viewport.width)) {
@@ -84,7 +83,7 @@ const RenderTarget = struct {
         return true;
     }
 
-    fn process(self: *Self) bool {
+    fn process(self: *@This()) bool {
         const wheel = c.GetMouseWheelMoveV();
         const delta = c.GetMouseDelta();
 
@@ -118,47 +117,7 @@ const RenderTarget = struct {
         return active;
     }
 
-    fn render(self: *Self, scene: Scene) void {
-        const render_texture = self.get_or_create_render_texture();
-
-        c.BeginTextureMode(render_texture);
-        c.ClearBackground(c.SKYBLUE);
-
-        if (self.is_active) {
-            c.DrawText(
-                c.TextFormat(
-                    "yaw: %d, pitch: %d, shift: %.3f, %.3f",
-                    self.orbit.yawDegree,
-                    self.orbit.pitchDegree,
-                    self.orbit.shiftX,
-                    self.orbit.shiftY,
-                ),
-                0,
-                0,
-                20,
-                c.LIGHTGRAY,
-            );
-        }
-
-        scene.draw(self);
-
-        c.EndTextureMode();
-
-        c.DrawTextureRec(
-            render_texture.texture,
-            .{
-                .width = self.viewport.width,
-                .height = -self.viewport.height,
-            },
-            .{
-                .x = self.viewport.x,
-                .y = self.viewport.y,
-            },
-            c.WHITE,
-        );
-    }
-
-    fn get_or_create_render_texture(self: *Self) c.RenderTexture2D {
+    fn get_or_create_render_texture(self: *@This()) c.RenderTexture2D {
         if (self.render_texture) |render_texture| {
             return render_texture;
         } else {
@@ -231,7 +190,7 @@ pub fn main() !void {
     var focus = Focus.make(w, h);
 
     const scene = Scene{
-        .rendertargets = &focus.rendertargets,
+        // .rendertargets = &focus.rendertargets,
     };
 
     while (!c.WindowShouldClose()) {
@@ -258,7 +217,44 @@ pub fn main() !void {
         }
 
         for (&focus.rendertargets) |*rendertarget| {
-            rendertarget.render(scene);
+            // rendertarget.render(scene);
+            const render_texture = rendertarget.get_or_create_render_texture();
+
+            c.BeginTextureMode(render_texture);
+            c.ClearBackground(c.SKYBLUE);
+
+            if (focus.active == rendertarget) {
+                c.DrawText(
+                    c.TextFormat(
+                        "yaw: %d, pitch: %d, shift: %.3f, %.3f",
+                        rendertarget.orbit.yawDegree,
+                        rendertarget.orbit.pitchDegree,
+                        rendertarget.orbit.shiftX,
+                        rendertarget.orbit.shiftY,
+                    ),
+                    0,
+                    0,
+                    20,
+                    c.LIGHTGRAY,
+                );
+            }
+
+            scene.draw(&focus.rendertargets, rendertarget);
+
+            c.EndTextureMode();
+
+            c.DrawTextureRec(
+                render_texture.texture,
+                .{
+                    .width = rendertarget.viewport.width,
+                    .height = -rendertarget.viewport.height,
+                },
+                .{
+                    .x = rendertarget.viewport.x,
+                    .y = rendertarget.viewport.y,
+                },
+                c.WHITE,
+            );
         }
 
         c.EndDrawing();
