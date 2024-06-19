@@ -1,6 +1,7 @@
 #pragma once
 #include "geometry_mesh.h"
 #include "tinygizmo.h"
+#include <optional>
 
 namespace tinygizmo {
 
@@ -15,7 +16,7 @@ struct gizmo_component {
 
   virtual ~gizmo_component() {}
 
-  virtual minalg::rigid_transform
+  virtual std::optional<minalg::rigid_transform>
   drag(drag_state *drag, const gizmo_application_state &active_state,
        bool local_toggle, const minalg::rigid_transform &src) const {
     return {};

@@ -12,21 +12,20 @@ struct translation_plane_component : gizmo_component {
 
   virtual minalg::float3 get_axis(const gizmo_application_state &state,
                                   bool local_toggle,
-                                  const minalg::rigid_transform &p) const = 0;
+                                  const minalg::float4 &rotation) const = 0;
 
-  minalg::rigid_transform
+  std::optional<minalg::rigid_transform>
   drag(drag_state *drag, const gizmo_application_state &active_state,
        bool local_toggle, const minalg::rigid_transform &p) const override {
-
-    auto plane_normal = get_axis(active_state, local_toggle, p);
+    auto plane_normal = get_axis(active_state, local_toggle, p.orientation);
     auto plane = make_plane(plane_normal, drag->original_position);
     auto t = active_state.ray.intersect_plane(plane);
     if (!t) {
-      return p;
+      return {};
     }
-    auto dst = active_state.ray.point(*t);
+    auto dst = active_state.ray.point(*t) - drag->click_offset;
 
-    return {
+    return minalg::rigid_transform{
         .orientation = p.orientation,
         .position = dst,
         .scale = p.scale,
@@ -39,39 +38,27 @@ struct translation_axis_component : gizmo_component {
 
   virtual minalg::float3 get_axis(const gizmo_application_state &state,
                                   bool local_toggle,
-                                  const minalg::rigid_transform &p) const = 0;
+                                  const minalg::float4 &rotation) const = 0;
 
-  static minalg::rigid_transform
-  axis_translation_dragger(drag_state *drag,
-                           const gizmo_application_state &active_state,
-                           bool local_toggle, const minalg::float3 &axis,
-                           const minalg::rigid_transform &src, bool) {}
-
-  minalg::rigid_transform
+  std::optional<minalg::rigid_transform>
   drag(drag_state *drag, const gizmo_application_state &active_state,
        bool local_toggle, const minalg::rigid_transform &p) const override {
-    minalg::rigid_transform src(minalg::float4(0, 0, 0, 1), p.position,
-                                minalg::float3(1, 1, 1));
-    auto axis = get_axis(active_state, local_toggle, p);
-    // return axis_translation_dragger(drag, state, local_toggle,
-    //                                 get_axis(state, local_toggle, p), src,
-    //                                 {});
     // First apply a plane translation dragger with a plane that contains the
     // desired axis and is oriented to face the camera
-    auto plane_tangent = cross(axis, src.position - active_state.ray.origin);
+    auto axis = get_axis(active_state, local_toggle, p.orientation);
+    auto plane_tangent = cross(axis, p.position - active_state.ray.origin);
     auto plane_normal = cross(axis, plane_tangent);
     auto plane = make_plane(plane_normal, drag->original_position);
-
     auto t = active_state.ray.intersect_plane(plane);
     if (!t) {
-      return src;
+      return {};
     }
-    auto dst = active_state.ray.point(*t);
+    auto dst = active_state.ray.point(*t) - drag->click_offset;
 
     // Constrain object motion to be along the desired axis
     auto point = drag->original_position +
                  axis * dot(dst - drag->original_position, axis);
-    return minalg::rigid_transform(src.orientation, point, src.scale);
+    return minalg::rigid_transform(p.orientation, point, p.scale);
   }
 };
 
@@ -84,14 +71,8 @@ struct translation_x_component : translation_axis_component {
 
   minalg::float3 get_axis(const gizmo_application_state &state,
                           bool local_toggle,
-                          const minalg::rigid_transform &p) const override {
-    std::vector<minalg::float3> axes;
-    if (local_toggle)
-      axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
-    else
-      axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-
-    return axes[0];
+                          const minalg::float4 &rotation) const override {
+    return (local_toggle) ? qxdir(rotation) : minalg::float3{1, 0, 0};
   }
 };
 
@@ -104,14 +85,8 @@ struct translation_y_component : translation_axis_component {
 
   minalg::float3 get_axis(const gizmo_application_state &state,
                           bool local_toggle,
-                          const minalg::rigid_transform &p) const override {
-    std::vector<minalg::float3> axes;
-    if (local_toggle)
-      axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
-    else
-      axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-
-    return axes[1];
+                          const minalg::float4 &rotation) const override {
+    return (local_toggle) ? qydir(rotation) : minalg::float3{0, 1, 0};
   }
 };
 
@@ -124,14 +99,8 @@ struct translation_z_component : translation_axis_component {
 
   minalg::float3 get_axis(const gizmo_application_state &state,
                           bool local_toggle,
-                          const minalg::rigid_transform &p) const override {
-    std::vector<minalg::float3> axes;
-    if (local_toggle)
-      axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
-    else
-      axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-
-    return axes[2];
+                          const minalg::float4 &rotation) const override {
+    return (local_toggle) ? qzdir(rotation) : minalg::float3{0, 0, 1};
   }
 };
 
@@ -144,14 +113,8 @@ struct translation_yz_component : translation_plane_component {
 
   minalg::float3 get_axis(const gizmo_application_state &state,
                           bool local_toggle,
-                          const minalg::rigid_transform &p) const override {
-    std::vector<minalg::float3> axes;
-    if (local_toggle)
-      axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
-    else
-      axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-
-    return axes[0];
+                          const minalg::float4 &rotation) const override {
+    return (local_toggle) ? qxdir(rotation) : minalg::float3{1, 0, 0};
   }
 };
 
@@ -164,14 +127,8 @@ struct translation_zx_component : translation_plane_component {
 
   minalg::float3 get_axis(const gizmo_application_state &state,
                           bool local_toggle,
-                          const minalg::rigid_transform &p) const override {
-    std::vector<minalg::float3> axes;
-    if (local_toggle)
-      axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
-    else
-      axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-
-    return axes[1];
+                          const minalg::float4 &rotation) const override {
+    return (local_toggle) ? qydir(rotation) : minalg::float3{0, 1, 0};
   }
 };
 
@@ -184,14 +141,8 @@ struct translation_xy_component : translation_plane_component {
 
   minalg::float3 get_axis(const gizmo_application_state &state,
                           bool local_toggle,
-                          const minalg::rigid_transform &p) const override {
-    std::vector<minalg::float3> axes;
-    if (local_toggle)
-      axes = {qxdir(p.orientation), qydir(p.orientation), qzdir(p.orientation)};
-    else
-      axes = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-
-    return axes[2];
+                          const minalg::float4 &rotation) const override {
+    return (local_toggle) ? qzdir(rotation) : minalg::float3{0, 0, 1};
   }
 };
 
@@ -205,7 +156,7 @@ struct translation_xyz_component : translation_plane_component {
 
   minalg::float3 get_axis(const gizmo_application_state &state,
                           bool local_toggle,
-                          const minalg::rigid_transform &p) const override {
+                          const minalg::float4 &) const override {
     return -minalg::qzdir(state.cam_orientation);
   }
 };
@@ -242,27 +193,18 @@ minalg::float3 position_drag(drag_state *drag,
                              const std::shared_ptr<gizmo_component> &active,
                              const minalg::rigid_transform &p) {
 
-  minalg::float3 position = p.position;
-  if (active) {
-    minalg::rigid_transform src(minalg::float4(0, 0, 0, 1), position,
-                                minalg::float3(1, 1, 1));
-    src.position += drag->click_offset;
-    src = active->drag(drag, state, local_toggle, src);
-    src.position -= drag->click_offset;
-    position = src.position;
+  if (auto dst =
+          active->drag(drag, state, local_toggle, {.position = p.position})) {
+    return dst->position;
+  } else {
+    return p.position;
   }
-  return position;
 }
 
 void position_draw(const AddTriangleFunc &add_world_triangle,
                    const std::shared_ptr<gizmo_component> &active,
                    const minalg::float4x4 &modelMatrix) {
-  std::vector<std::shared_ptr<gizmo_component>> draw_interactions{
-      _translate_x,  _translate_y,  _translate_z,   _translate_yz,
-      _translate_zx, _translate_xy, _translate_xyz,
-  };
-
-  for (auto c : draw_interactions) {
+  for (auto c : _gizmo_components) {
     auto mesh = c->mesh;
     auto color = (c == active) ? c->base_color : c->highlight_color;
     add_triangles(add_world_triangle, modelMatrix, mesh, color);
