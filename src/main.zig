@@ -1,16 +1,17 @@
 const std = @import("std");
-const c = @cImport({
-    @cInclude("raylib.h");
-    @cInclude("rlgl.h");
-    // @cInclude("rcamera.h");
-    // @cInclude("raymath.h");
-});
+
 const zamath = @import("zamath.zig");
+const layout = @import("layout.zig");
+const c = layout.c;
 
 const Scene = struct {
-    cubePosition: c.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
+    cubePosition: layout.c.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
 
-    pub fn draw(self: @This(), rendertargets: []RenderTarget, current: *const RenderTarget) void {
+    pub fn draw(
+        self: @This(),
+        rendertargets: []layout.RenderTarget,
+        current: *const layout.RenderTarget,
+    ) void {
         // c.BeginMode3D(current.*);
         c.rlDrawRenderBatchActive(); // Update and draw internal render batch
 
@@ -45,218 +46,33 @@ const Scene = struct {
     }
 };
 
-const RenderTarget = struct {
-    viewport: zamath.Rect = .{ .x = 0, .y = 0, .width = 1, .height = 1 },
-    render_texture: ?c.RenderTexture2D = null,
-    // view
-    orbit: zamath.CameraOrbit = .{},
-    // projection
-    projection: zamath.CameraProjection = .{},
-
-    fn make(rect: c.Rectangle) @This() {
-        var rt = RenderTarget{
-            .viewport = .{
-                .x = rect.x,
-                .y = rect.y,
-                .width = rect.width,
-                .height = rect.height,
-            },
-        };
-        rt.orbit.update_matrix();
-        rt.projection.update_matrix(rt.viewport);
-        return rt;
-    }
-
-    fn contains(self: @This(), cursor: c.Vector2) bool {
-        if (cursor.x < self.viewport.x) {
-            return false;
-        }
-        if (cursor.x > (self.viewport.x + self.viewport.width)) {
-            return false;
-        }
-        if (cursor.y < self.viewport.y) {
-            return false;
-        }
-        if (cursor.y > (self.viewport.y + self.viewport.height)) {
-            return false;
-        }
-        return true;
-    }
-
-    fn process(self: *@This()) bool {
-        const wheel = c.GetMouseWheelMoveV();
-        const delta = c.GetMouseDelta();
-
-        self.orbit.dolly(wheel.y);
-
-        var active = wheel.y != 0;
-        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
-            // yaw pitch
-            active = true;
-            self.orbit.yawDegree += @intFromFloat(delta.x);
-            self.orbit.pitchDegree += @intFromFloat(delta.y);
-            if (self.orbit.pitchDegree > 89) {
-                self.orbit.pitchDegree = 89;
-            } else if (self.orbit.pitchDegree < -89) {
-                self.orbit.pitchDegree = -89;
-            }
-        }
-
-        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
-            // camera shift
-            active = true;
-            const speed = self.orbit.distance * std.math.tan(self.projection.fovy * 0.5) * 2.0 / self.viewport.height;
-            self.orbit.shiftX += delta.x * speed;
-            self.orbit.shiftY -= delta.y * speed;
-        }
-
-        if (active) {
-            self.orbit.update_matrix();
-            self.projection.update_matrix(self.viewport);
-        }
-        return active;
-    }
-
-    fn get_or_create_render_texture(self: *@This()) c.RenderTexture2D {
-        if (self.render_texture) |render_texture| {
-            return render_texture;
-        } else {
-            const render_texture = c.LoadRenderTexture(
-                @intFromFloat(self.viewport.width),
-                @intFromFloat(self.viewport.height),
-            );
-            self.render_texture = render_texture;
-            return render_texture;
-        }
-    }
-};
-
-const Focus = struct {
-    rendertargets: [2]RenderTarget,
-    active: ?*RenderTarget = null,
-
-    const Self = @This();
-    fn make(screen_width: i32, screen_height: i32) Self {
-        const half_width = @divTrunc(screen_width, 2);
-        // const half_height = @divTrunc(screen_height, 2);
-
-        var focus = Focus{
-            .rendertargets = [_]RenderTarget{
-                RenderTarget.make(.{
-                    .x = 0,
-                    .y = 0,
-                    .width = @as(f32, @floatFromInt(half_width)),
-                    .height = @as(f32, @floatFromInt(screen_height)),
-                }),
-                RenderTarget.make(.{
-                    .x = @as(f32, @floatFromInt(half_width)),
-                    .y = 0,
-                    .width = @as(f32, @floatFromInt(half_width)),
-                    .height = @as(f32, @floatFromInt(screen_height)),
-                }),
-            },
-        };
-        for (&focus.rendertargets) |*rendertarget| {
-            _ = rendertarget.process();
-        }
-        return focus;
-    }
-
-    fn get_active(self: *Self, cursor: c.Vector2) ?*RenderTarget {
-        if (self.active) |rendertarget| {
-            return rendertarget;
-        } else {
-            for (&self.rendertargets) |*rendertarget| {
-                if (rendertarget.contains(cursor)) {
-                    return rendertarget;
-                }
-            }
-            return null;
-        }
-    }
-
-    fn set_active(self: *Self, active: ?*RenderTarget) void {
-        self.active = active;
-    }
-};
-
 pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
+    c.SetConfigFlags(c.FLAG_WINDOW_RESIZABLE);
     c.InitWindow(1600, 1200, "experiment");
     defer c.CloseWindow();
 
-    const w = c.GetScreenWidth();
-    const h = c.GetScreenHeight();
+    var root = try layout.Layout.make(allocator);
+    defer root.deinit();
 
-    var focus = Focus.make(w, h);
-
-    const scene = Scene{
-        // .rendertargets = &focus.rendertargets,
-    };
+    const scene = Scene{};
 
     while (!c.WindowShouldClose()) {
-
-        // render
-        c.BeginDrawing();
-        c.ClearBackground(c.RAYWHITE);
-
+        const w = c.GetScreenWidth();
+        const h = c.GetScreenHeight();
         const cursor = c.GetMousePosition();
-        if (focus.get_active(cursor)) |active| {
-            if (active.process()) {
-                focus.set_active(active);
-            } else {
-                focus.set_active(null);
+        root.update(w, h, @intFromFloat(cursor.x), @intFromFloat(cursor.y));
+
+        {
+            c.BeginDrawing();
+            // c.ClearBackground(c.RAYWHITE);
+            for (root.rendertargets.items) |*rendertarget| {
+                const texture = rendertarget.begin(root.active == rendertarget);
+                scene.draw(root.rendertargets.items, rendertarget);
+                rendertarget.end(texture);
             }
-        } else {
-            for (&focus.rendertargets) |*rendertarget| {
-                if (rendertarget.contains(cursor)) {
-                    if (rendertarget.process()) {
-                        focus.set_active(rendertarget);
-                    }
-                }
-            }
+            c.EndDrawing();
         }
-
-        for (&focus.rendertargets) |*rendertarget| {
-            // rendertarget.render(scene);
-            const render_texture = rendertarget.get_or_create_render_texture();
-
-            c.BeginTextureMode(render_texture);
-            c.ClearBackground(c.SKYBLUE);
-
-            if (focus.active == rendertarget) {
-                c.DrawText(
-                    c.TextFormat(
-                        "yaw: %d, pitch: %d, shift: %.3f, %.3f",
-                        rendertarget.orbit.yawDegree,
-                        rendertarget.orbit.pitchDegree,
-                        rendertarget.orbit.shiftX,
-                        rendertarget.orbit.shiftY,
-                    ),
-                    0,
-                    0,
-                    20,
-                    c.LIGHTGRAY,
-                );
-            }
-
-            scene.draw(&focus.rendertargets, rendertarget);
-
-            c.EndTextureMode();
-
-            c.DrawTextureRec(
-                render_texture.texture,
-                .{
-                    .width = rendertarget.viewport.width,
-                    .height = -rendertarget.viewport.height,
-                },
-                .{
-                    .x = rendertarget.viewport.x,
-                    .y = rendertarget.viewport.y,
-                },
-                c.WHITE,
-            );
-        }
-
-        c.EndDrawing();
     }
 }
