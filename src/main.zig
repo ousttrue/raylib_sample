@@ -4,7 +4,7 @@ const zamath = @import("zamath.zig");
 const layout = @import("layout.zig");
 const c = layout.c;
 
-fn to_raylib(v: zamath.Vec3) c.Vector3 {
+fn tor(v: zamath.Vec3) c.Vector3 {
     return .{
         .x = v.x,
         .y = v.y,
@@ -39,17 +39,27 @@ const Scene = struct {
         {
             for (rendertargets) |rendertarget| {
                 if (&rendertarget != current) {
-                    const b = rendertarget.orbit.position();
-                    const e = b.add(rendertarget.orbit.forward().scale(rendertarget.projection.z_far));
-                    c.DrawLine3D(.{
-                        .x = b.x,
-                        .y = b.y,
-                        .z = b.z,
-                    }, .{
-                        .x = e.x,
-                        .y = e.y,
-                        .z = e.z,
-                    }, c.DARKBLUE);
+                    const frustum = zamath.Frustum.make(
+                        rendertarget.orbit.transform_matrix,
+                        rendertarget.projection.fovy,
+                        rendertarget.viewport.width / rendertarget.viewport.height,
+                        rendertarget.projection.z_near,
+                        rendertarget.projection.z_far,
+                    ); //;rendertargets.frustum();
+                    c.DrawLine3D(tor(frustum.near_left_top), tor(frustum.near_left_bottom), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.near_left_bottom), tor(frustum.near_right_bottom), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.near_right_bottom), tor(frustum.near_right_top), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.near_right_top), tor(frustum.near_left_top), c.DARKBLUE);
+
+                    c.DrawLine3D(tor(frustum.near_left_top), tor(frustum.far_left_top), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.near_left_bottom), tor(frustum.far_left_bottom), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.near_right_bottom), tor(frustum.far_right_bottom), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.near_right_top), tor(frustum.far_right_top), c.DARKBLUE);
+
+                    c.DrawLine3D(tor(frustum.far_left_top), tor(frustum.far_left_bottom), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.far_left_bottom), tor(frustum.far_right_bottom), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.far_right_bottom), tor(frustum.far_right_top), c.DARKBLUE);
+                    c.DrawLine3D(tor(frustum.far_right_top), tor(frustum.far_left_top), c.DARKBLUE);
                 }
             }
 

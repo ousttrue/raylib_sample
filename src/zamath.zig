@@ -3,9 +3,17 @@ const std = @import("std");
 const DEG2RAD = std.math.pi / 180.0;
 
 pub const Vec3 = struct {
-    x: f32,
-    y: f32,
-    z: f32,
+    x: f32 = 0,
+    y: f32 = 0,
+    z: f32 = 0,
+
+    pub fn negate(self: @This()) @This() {
+        return .{
+            .x = -self.x,
+            .y = -self.y,
+            .z = -self.z,
+        };
+    }
 
     pub fn dot(self: @This(), rhs: @This()) f32 {
         return self.x * rhs.x + self.y * rhs.y + self.z * rhs.z;
@@ -38,6 +46,13 @@ pub const Vec3 = struct {
             .z = self.z - rhs.z,
         };
     }
+};
+
+pub const Vec4 = struct {
+    x: f32 = 0,
+    y: f32 = 0,
+    z: f32 = 0,
+    w: f32 = 0,
 };
 
 pub const Mat3 = struct {
@@ -124,6 +139,32 @@ pub const Mat4 = struct {
     m31: f32 = 0,
     m32: f32 = 0,
     m33: f32 = 1,
+
+    pub fn row0(self: @This()) Vec4 {
+        return .{ .x = self.m00, .y = self.m01, .z = self.m02, .w = self.m03 };
+    }
+    pub fn row1(self: @This()) Vec4 {
+        return .{ .x = self.m10, .y = self.m11, .z = self.m12, .w = self.m13 };
+    }
+    pub fn row2(self: @This()) Vec4 {
+        return .{ .x = self.m20, .y = self.m21, .z = self.m22, .w = self.m23 };
+    }
+    pub fn row3(self: @This()) Vec4 {
+        return .{ .x = self.m30, .y = self.m31, .z = self.m32, .w = self.m03 };
+    }
+
+    pub fn right(self: @This()) Vec3 {
+        return .{ .x = self.m00, .y = self.m01, .z = self.m02 };
+    }
+    pub fn up(self: @This()) Vec3 {
+        return .{ .x = self.m10, .y = self.m11, .z = self.m12 };
+    }
+    pub fn forward(self: @This()) Vec3 {
+        return .{ .x = -self.m20, .y = -self.m21, .z = -self.m22 };
+    }
+    pub fn translation(self: @This()) Vec3 {
+        return .{ .x = self.m30, .y = self.m31, .z = self.m32 };
+    }
 
     pub fn transpose(self: @This()) Mat4 {
         return .{
@@ -246,9 +287,9 @@ pub const CameraProjection = struct {
     matrix: Mat4 = .{},
 
     // gluPerspective
-    fovy: f32 = 60.0 * (std.math.pi / 180.0),
-    z_near: f32 = 0.001,
-    z_far: f32 = 20.0,
+    fovy: f32 = 30.0 * (std.math.pi / 180.0),
+    z_near: f32 = 1.5,
+    z_far: f32 = 30.0,
 
     pub fn update_matrix(self: *@This(), viewport: Rect) void {
         const f = 1 / std.math.tan(self.fovy / 2);
@@ -350,6 +391,45 @@ pub const CameraOrbit = struct {
             .x = self.transform_matrix.m30,
             .y = self.transform_matrix.m31,
             .z = self.transform_matrix.m32,
+        };
+    }
+};
+
+fn get_point(x: Vec3, y: Vec3, z: Vec3, pos: Vec3, vertical: f32, horizontal: f32, distance: f32) Vec3 {
+    return pos.add(z.scale(distance).add(x.scale(distance * horizontal)).add(y.scale(distance * vertical)));
+}
+
+pub const Frustum = struct {
+    near_left_top: Vec3,
+    near_left_bottom: Vec3,
+    near_right_bottom: Vec3,
+    near_right_top: Vec3,
+    far_left_top: Vec3,
+    far_left_bottom: Vec3,
+    far_right_bottom: Vec3,
+    far_right_top: Vec3,
+
+    pub fn make(
+        transform: Mat4,
+        fovy: f32,
+        aspect: f32,
+        z_near: f32,
+        z_far: f32,
+    ) @This() {
+        const x = transform.right();
+        const y = transform.up();
+        const z = transform.forward();
+        const t = transform.translation();
+        const tan = std.math.tan(fovy / 2);
+        return .{
+            .near_left_top = get_point(x.negate(), y, z, t, tan, tan * aspect, z_near),
+            .near_left_bottom = get_point(x.negate(), y.negate(), z, t, tan, tan * aspect, z_near),
+            .near_right_bottom = get_point(x, y.negate(), z, t, tan, tan * aspect, z_near),
+            .near_right_top = get_point(x, y, z, t, tan, tan * aspect, z_near),
+            .far_left_top = get_point(x.negate(), y, z, t, tan, tan * aspect, z_far),
+            .far_left_bottom = get_point(x.negate(), y.negate(), z, t, tan, tan * aspect, z_far),
+            .far_right_bottom = get_point(x, y.negate(), z, t, tan, tan * aspect, z_far),
+            .far_right_top = get_point(x, y, z, t, tan, tan * aspect, z_far),
         };
     }
 };
