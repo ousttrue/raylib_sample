@@ -1,21 +1,37 @@
 const std = @import("std");
 const c = @cImport({
     @cInclude("raylib.h");
-    @cInclude("rcamera.h");
-    @cInclude("raymath.h");
     @cInclude("rlgl.h");
+    // @cInclude("rcamera.h");
+    // @cInclude("raymath.h");
 });
+const zamath = @import("zamath.zig");
 
 const Scene = struct {
     cubePosition: c.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
-    cameras: []*c.Camera,
+    rendertargets: []RenderTarget,
 
-    pub fn draw(self: @This(), current: *c.Camera) void {
-        c.BeginMode3D(current.*);
+    pub fn draw(self: @This(), current: *const RenderTarget) void {
+        // c.BeginMode3D(current.*);
+        c.rlDrawRenderBatchActive(); // Update and draw internal render batch
 
-        for (self.cameras) |camera| {
-            if (camera != current) {
-                c.DrawLine3D(camera.position, camera.target, c.DARKBLUE);
+        {
+            c.rlMatrixMode(c.RL_PROJECTION);
+            c.rlPushMatrix();
+            c.rlLoadIdentity();
+            c.rlMultMatrixf(&current.projection.matrix.m00);
+        }
+        {
+            c.rlMatrixMode(c.RL_MODELVIEW);
+            c.rlLoadIdentity();
+            c.rlMultMatrixf(&current.orbit.view_matrix.m00);
+        }
+
+        c.rlEnableDepthTest(); // Enable DEPTH_TEST for 3D
+
+        for (self.rendertargets) |rendertarget| {
+            if (&rendertarget != current) {
+                // c.DrawLine3D(camera.position, camera.target, c.DARKBLUE);
             }
         }
 
@@ -28,143 +44,78 @@ const Scene = struct {
     }
 };
 
-fn dolly(camera: *c.Camera3D) void {
-    const wheel = c.GetMouseWheelMoveV();
-    if (wheel.y > 0) {
-        const distance = c.Vector3Distance(camera.target, camera.position);
-        c.CameraMoveToTarget(camera, distance * 0.9 - distance);
-    } else if (wheel.y < 0) {
-        const distance = c.Vector3Distance(camera.target, camera.position);
-        c.CameraMoveToTarget(camera, distance * 1.1 - distance);
-    }
-}
-
-const OribtCamera = struct {
-    yawDegree: i32 = 0,
-    pitchDegree: i32 = 40,
-    shiftX: f32 = 0,
-    shiftY: f32 = 0,
-
-    const Self = @This();
-    fn MouseUpdateCamera(
-        self: *Self,
-        distance: f32,
-        fovy: f32,
-        rect: c.Rectangle,
-    ) bool {
-        const delta = c.GetMouseDelta();
-        var active = false;
-
-        // camera shift
-        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
-            const speed = distance * std.math.tan(fovy * 0.5) * 2.0 / rect.height;
-            self.shiftX += delta.x * speed;
-            self.shiftY += delta.y * speed;
-            active = true;
-        }
-
-        // yaw pitch
-        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
-            self.yawDegree -= @intFromFloat(delta.x);
-            self.pitchDegree += @intFromFloat(delta.y);
-            if (self.pitchDegree > 89) {
-                self.pitchDegree = 89;
-            } else if (self.pitchDegree < -89) {
-                self.pitchDegree = -89;
-            }
-            active = true;
-        }
-
-        return active;
-    }
-
-    fn update_view(self: @This(), camera: *c.Camera3D) void {
-        const distance = c.Vector3Distance(camera.target, camera.position);
-        const pitch = c.MatrixRotateX(
-            @as(f32, @floatFromInt(self.pitchDegree)) * c.DEG2RAD,
-        );
-        const yaw = c.MatrixRotateY(
-            @as(f32, @floatFromInt(self.yawDegree)) * c.DEG2RAD,
-        );
-        const translation = c.MatrixTranslate(
-            self.shiftX,
-            self.shiftY,
-            -distance,
-        );
-
-        const camera_transform = c.MatrixMultiply(
-            translation,
-            c.MatrixMultiply(pitch, yaw),
-        );
-
-        camera.position = .{
-            .x = camera_transform.m12,
-            .y = camera_transform.m13,
-            .z = camera_transform.m14,
-        };
-        const forward = c.Vector3{
-            .x = camera_transform.m8,
-            .y = camera_transform.m9,
-            .z = camera_transform.m10,
-        };
-        camera.target = c.Vector3Add(
-            camera.position,
-            c.Vector3Scale(forward, distance),
-        );
-    }
-};
-
-const View = struct {
-    rect: c.Rectangle = .{},
-    camera: c.Camera3D = .{},
-    orbit: OribtCamera = .{},
+const RenderTarget = struct {
+    viewport: zamath.Rect = .{ .x = 0, .y = 0, .width = 1, .height = 1 },
     render_texture: ?c.RenderTexture2D = null,
+    // view
+    orbit: zamath.CameraOrbit = .{},
+    // projection
+    projection: zamath.CameraProjection = .{},
+
     is_active: bool = false,
 
-    const Self = @This();
-
-    fn make(rect: c.Rectangle) Self {
-        return .{
-            .rect = rect,
-            .camera = c.Camera3D{
-                .position = .{ .x = 0.0, .y = 10.0, .z = 10.0 }, // Camera position
-                .target = .{ .x = 0.0, .y = 0.0, .z = 0.0 }, // Camera looking at point
-                .up = .{ .x = 0.0, .y = 1.0, .z = 0.0 }, // Camera up vector (rotation towards target)
-                .fovy = 45.0, // Camera field-of-view Y
-                .projection = c.CAMERA_PERSPECTIVE, // Camera mode type
+    fn make(rect: c.Rectangle) @This() {
+        var rt = RenderTarget{
+            .viewport = .{
+                .x = rect.x,
+                .y = rect.y,
+                .width = rect.width,
+                .height = rect.height,
             },
         };
+        rt.orbit.update_matrix();
+        rt.projection.update_matrix(rt.viewport);
+        return rt;
     }
 
     fn contains(self: Self, cursor: c.Vector2) bool {
-        if (cursor.x < self.rect.x) {
+        if (cursor.x < self.viewport.width) {
             return false;
         }
-        if (cursor.x > (self.rect.x + self.rect.width)) {
+        if (cursor.x > (self.viewport.x + self.viewport.width)) {
             return false;
         }
-        if (cursor.y < self.rect.y) {
+        if (cursor.y < self.viewport.y) {
             return false;
         }
-        if (cursor.y > (self.rect.y + self.rect.height)) {
+        if (cursor.y > (self.viewport.y + self.viewport.height)) {
             return false;
         }
         return true;
     }
 
     fn process(self: *Self) bool {
-        dolly(&self.camera);
+        const wheel = c.GetMouseWheelMoveV();
+        const delta = c.GetMouseDelta();
 
-        const distance = c.Vector3Distance(self.camera.target, self.camera.position);
-        self.is_active = self.orbit.MouseUpdateCamera(
-            distance,
-            self.camera.fovy,
-            self.rect,
-        );
-        if (self.is_active) {
-            self.orbit.update_view(&self.camera);
+        self.orbit.dolly(wheel.y);
+
+        var active = wheel.y != 0;
+        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
+            // yaw pitch
+            active = true;
+            self.orbit.yawDegree += @intFromFloat(delta.x);
+            self.orbit.pitchDegree += @intFromFloat(delta.y);
+            if (self.orbit.pitchDegree > 89) {
+                self.orbit.pitchDegree = 89;
+            } else if (self.orbit.pitchDegree < -89) {
+                self.orbit.pitchDegree = -89;
+            }
         }
-        return self.is_active;
+
+        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
+            // camera shift
+            active = true;
+            const speed = self.orbit.distance * std.math.tan(self.projection.fovy * 0.5) * 2.0 / self.viewport.height;
+            self.orbit.shiftX += delta.x * speed;
+            self.orbit.shiftY -= delta.y * speed;
+        }
+
+        if (active) {
+            self.orbit.update_matrix();
+            self.projection.update_matrix(self.viewport);
+        }
+        return active;
     }
 
     fn render(self: *Self, scene: Scene) void {
@@ -189,19 +140,19 @@ const View = struct {
             );
         }
 
-        scene.draw(&self.camera);
+        scene.draw(self);
 
         c.EndTextureMode();
 
         c.DrawTextureRec(
             render_texture.texture,
             .{
-                .width = self.rect.width,
-                .height = -self.rect.height,
+                .width = self.viewport.width,
+                .height = -self.viewport.height,
             },
             .{
-                .x = self.rect.x,
-                .y = self.rect.y,
+                .x = self.viewport.x,
+                .y = self.viewport.y,
             },
             c.WHITE,
         );
@@ -212,8 +163,8 @@ const View = struct {
             return render_texture;
         } else {
             const render_texture = c.LoadRenderTexture(
-                @intFromFloat(self.rect.width),
-                @intFromFloat(self.rect.height),
+                @intFromFloat(self.viewport.width),
+                @intFromFloat(self.viewport.height),
             );
             self.render_texture = render_texture;
             return render_texture;
@@ -222,8 +173,8 @@ const View = struct {
 };
 
 const Focus = struct {
-    views: [2]View,
-    active: ?*View = null,
+    rendertargets: [2]RenderTarget,
+    active: ?*RenderTarget = null,
 
     const Self = @This();
     fn make(screen_width: i32, screen_height: i32) Self {
@@ -231,14 +182,14 @@ const Focus = struct {
         // const half_height = @divTrunc(screen_height, 2);
 
         var focus = Focus{
-            .views = [_]View{
-                View.make(.{
+            .rendertargets = [_]RenderTarget{
+                RenderTarget.make(.{
                     .x = 0,
                     .y = 0,
                     .width = @as(f32, @floatFromInt(half_width)),
                     .height = @as(f32, @floatFromInt(screen_height)),
                 }),
-                View.make(.{
+                RenderTarget.make(.{
                     .x = @as(f32, @floatFromInt(half_width)),
                     .y = 0,
                     .width = @as(f32, @floatFromInt(half_width)),
@@ -246,26 +197,26 @@ const Focus = struct {
                 }),
             },
         };
-        for (&focus.views) |*view| {
-            _ = view.process();
+        for (&focus.rendertargets) |*rendertarget| {
+            _ = rendertarget.process();
         }
         return focus;
     }
 
-    fn get_active(self: *Self, cursor: c.Vector2) ?*View {
-        if (self.active) |view| {
-            return view;
+    fn get_active(self: *Self, cursor: c.Vector2) ?*RenderTarget {
+        if (self.active) |rendertarget| {
+            return rendertarget;
         } else {
-            for (&self.views) |*view| {
-                if (view.contains(cursor)) {
-                    return view;
+            for (&self.rendertargets) |*rendertarget| {
+                if (rendertarget.contains(cursor)) {
+                    return rendertarget;
                 }
             }
             return null;
         }
     }
 
-    fn set_active(self: *Self, active: ?*View) void {
+    fn set_active(self: *Self, active: ?*RenderTarget) void {
         self.active = active;
     }
 };
@@ -279,13 +230,8 @@ pub fn main() !void {
 
     var focus = Focus.make(w, h);
 
-    var cameras = [_]*c.Camera{
-        &focus.views[0].camera,
-        &focus.views[1].camera,
-    };
-
     const scene = Scene{
-        .cameras = &cameras,
+        .rendertargets = &focus.rendertargets,
     };
 
     while (!c.WindowShouldClose()) {
@@ -302,17 +248,17 @@ pub fn main() !void {
                 focus.set_active(null);
             }
         } else {
-            for (&focus.views) |*view| {
-                if (view.contains(cursor)) {
-                    if (view.process()) {
-                        focus.set_active(view);
+            for (&focus.rendertargets) |*rendertarget| {
+                if (rendertarget.contains(cursor)) {
+                    if (rendertarget.process()) {
+                        focus.set_active(rendertarget);
                     }
                 }
             }
         }
 
-        for (&focus.views) |*view| {
-            view.render(scene);
+        for (&focus.rendertargets) |*rendertarget| {
+            rendertarget.render(scene);
         }
 
         c.EndDrawing();
