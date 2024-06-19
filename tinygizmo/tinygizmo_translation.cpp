@@ -18,7 +18,7 @@ struct translation_plane_component : gizmo_component {
   drag(drag_state *drag, const gizmo_application_state &active_state,
        bool local_toggle, const minalg::rigid_transform &p) const override {
     auto plane_normal = get_axis(active_state, local_toggle, p.orientation);
-    auto plane = make_plane(plane_normal, drag->original_position);
+    plane plane(plane_normal, drag->original_position);
     auto t = active_state.ray.intersect_plane(plane);
     if (!t) {
       return {};
@@ -48,16 +48,17 @@ struct translation_axis_component : gizmo_component {
     auto axis = get_axis(active_state, local_toggle, p.orientation);
     auto plane_tangent = cross(axis, p.position - active_state.ray.origin);
     auto plane_normal = cross(axis, plane_tangent);
-    auto plane = make_plane(plane_normal, drag->original_position);
+    plane plane(plane_normal, drag->original_position);
     auto t = active_state.ray.intersect_plane(plane);
     if (!t) {
       return {};
     }
-    auto dst = active_state.ray.point(*t) - drag->click_offset;
+    auto dst = active_state.ray.point(*t);
 
     // Constrain object motion to be along the desired axis
     auto point = drag->original_position +
-                 axis * dot(dst - drag->original_position, axis);
+                 axis * dot(dst - drag->original_position, axis) -
+                 drag->click_offset;
     return minalg::rigid_transform(p.orientation, point, p.scale);
   }
 };
@@ -193,8 +194,7 @@ minalg::float3 position_drag(drag_state *drag,
                              const std::shared_ptr<gizmo_component> &active,
                              const minalg::rigid_transform &p) {
 
-  if (auto dst =
-          active->drag(drag, state, local_toggle, {.position = p.position})) {
+  if (auto dst = active->drag(drag, state, local_toggle, p)) {
     return dst->position;
   } else {
     return p.position;

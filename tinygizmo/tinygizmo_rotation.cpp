@@ -71,7 +71,7 @@ axis_rotation_dragger(drag_state *drag,
   minalg::rigid_transform original_pose = {start_orientation,
                                            drag->original_position};
   auto the_axis = original_pose.transform_vector(axis);
-  minalg::float4 the_plane = {the_axis, -dot(the_axis, drag->click_offset)};
+  plane the_plane(the_axis, drag->click_offset);
 
   auto t = active_state.ray.intersect_plane(the_plane);
   if (!t) {

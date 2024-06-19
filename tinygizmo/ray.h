@@ -5,17 +5,29 @@
 
 namespace tinygizmo {
 
+struct plane {
+  minalg::float3 normal;
+  float d;
+
+  plane(const minalg::float3 &n, const minalg::float3 &point_on_plane) {
+    normal = minalg::normalize(n);
+    d = -minalg::dot(normal, point_on_plane);
+  }
+};
+
 struct ray {
   minalg::float3 origin;
   minalg::float3 direction;
 
   minalg::float3 point(float t) const { return origin + direction * t; }
 
-  std::optional<float> intersect_plane(const minalg::float4 &plane) const {
-    float denom = dot(plane.xyz(), this->direction);
-    if (std::abs(denom) == 0)
-      return false;
-    return -dot(plane, minalg::float4(this->origin, 1)) / denom;
+  std::optional<float> intersect_plane(const plane &plane) const {
+    float denom = dot(plane.normal, this->direction);
+    if (std::abs(denom) == 0) {
+      // not intersect
+      return {};
+    }
+    return -(dot(plane.normal, this->origin) + plane.d) / denom;
   }
 
   bool intersect_triangle(const minalg::float3 &v0, const minalg::float3 &v1,

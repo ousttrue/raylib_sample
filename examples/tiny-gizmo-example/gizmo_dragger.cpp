@@ -39,17 +39,17 @@ void TranslationGizmo::begin(const Vector2 &cursor) {
   }
 
   if (this->active) {
-    auto ray_state = ray_map[this->gizmo_target];
     // begin drag
+    auto ray_state = ray_map[this->gizmo_target];
     auto ray = tinygizmo::scaling(ray_state.draw_scale, ray_state.local_ray);
-    // click point in gizmo local
-    this->drag_state = {
-        .original_position = ray_state.transform.position,
-        .click_offset = local_toggle
-                            ? ray_state.gizmo_transform.transform_vector(
-                                  ray.origin + ray.direction * ray_state.t)
-                            : ray.origin + ray.direction * ray_state.t,
-    };
+    this->drag_state = {.original_position = ray_state.transform.position,
+                        .click_offset = ray.point(ray_state.t)};
+    if (local_toggle) {
+      // click point in gizmo local
+      this->drag_state.click_offset =
+          ray_state.gizmo_transform.transform_vector(
+              this->drag_state.click_offset);
+    }
   }
 }
 
@@ -62,11 +62,10 @@ void TranslationGizmo::drag(const DragState &state, int w, int h,
           .position = *(minalg::float3 *)&target->position,
           .scale = *(minalg::float3 *)&target->scale,
       };
-      auto [_0, gizmo_transform, _2] =
-          tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
-      auto position =
-          tinygizmo::position_drag(&drag_state, gizmo_state, local_toggle,
-                                   this->active, gizmo_transform);
+      // auto [_0, gizmo_transform, _2] =
+      //     tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
+      auto position = tinygizmo::position_drag(&drag_state, gizmo_state,
+                                               local_toggle, this->active, src);
       target->position = *(Vector3 *)&position;
     }
   }
