@@ -248,7 +248,7 @@ pub const CameraProjection = struct {
     // gluPerspective
     fovy: f32 = 60.0 * (std.math.pi / 180.0),
     z_near: f32 = 0.001,
-    z_far: f32 = 100.0,
+    z_far: f32 = 20.0,
 
     pub fn update_matrix(self: *@This(), viewport: Rect) void {
         const f = 1 / std.math.tan(self.fovy / 2);
@@ -282,8 +282,9 @@ pub const CameraOrbit = struct {
     // right: (1, 0, 0)
     // up: (0, 1, 0)
     // forward:  (0, 0, -1)
-    view: EuclideanTransform = .{},
+    // view: EuclideanTransform = .{},
     view_matrix: Mat4 = .{},
+    transform_matrix: Mat4 = .{},
 
     yawDegree: i32 = 0,
     pitchDegree: i32 = 40,
@@ -294,10 +295,8 @@ pub const CameraOrbit = struct {
     pub fn dolly(self: *@This(), wheel: f32) void {
         if (wheel > 0) {
             self.distance *= 0.9;
-            self.view.position = self.view.position.add(self.view.forward().scale(self.distance));
         } else if (wheel < 0) {
             self.distance *= 1.1;
-            self.view.position = self.view.position.add(self.view.forward().scale(self.distance));
         }
     }
 
@@ -309,16 +308,48 @@ pub const CameraOrbit = struct {
         const yaw = Mat3.make_rotate_y(
             @as(f32, @floatFromInt(self.yawDegree)) * DEG2RAD,
         );
+        const rot = Mat4.from_mat3(yaw.multiply(pitch));
         const translation = Mat4.make_translate(
             self.shiftX,
             self.shiftY,
             -self.distance,
         );
-        // self.view_matrix =
-        //     translation.multiply(
-        //     Mat4.from_mat3(pitch.multiply(yaw)),
-        // );
-        self.view_matrix =
-            Mat4.from_mat3(yaw.multiply(pitch)).multiply(translation);
+        self.view_matrix = rot.multiply(translation);
+
+        self.transform_matrix =
+            Mat4.make_translate(
+            -self.shiftX,
+            -self.shiftY,
+            self.distance,
+        ).multiply(rot.transpose());
+    }
+
+    pub fn right(self: @This()) Vec3 {
+        return .{
+            .x = self.transform_matrix.m00,
+            .y = self.transform_matrix.m01,
+            .z = self.transform_matrix.m02,
+        };
+    }
+    pub fn up(self: @This()) Vec3 {
+        return .{
+            .x = self.transform_matrix.m10,
+            .y = self.transform_matrix.m11,
+            .z = self.transform_matrix.m12,
+        };
+    }
+    pub fn forward(self: @This()) Vec3 {
+        return .{
+            .x = -self.transform_matrix.m20,
+            .y = -self.transform_matrix.m21,
+            .z = -self.transform_matrix.m22,
+        };
+    }
+    pub fn position(self: @This()) Vec3 {
+        return .{
+            .x = self.transform_matrix.m30,
+            .y = self.transform_matrix.m31,
+            .z = self.transform_matrix.m32,
+        };
     }
 };

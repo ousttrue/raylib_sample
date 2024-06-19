@@ -4,6 +4,14 @@ const zamath = @import("zamath.zig");
 const layout = @import("layout.zig");
 const c = layout.c;
 
+fn to_raylib(v: zamath.Vec3) c.Vector3 {
+    return .{
+        .x = v.x,
+        .y = v.y,
+        .z = v.z,
+    };
+}
+
 const Scene = struct {
     cubePosition: layout.c.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
 
@@ -12,7 +20,6 @@ const Scene = struct {
         rendertargets: []layout.RenderTarget,
         current: *const layout.RenderTarget,
     ) void {
-        // c.BeginMode3D(current.*);
         c.rlDrawRenderBatchActive(); // Update and draw internal render batch
 
         {
@@ -32,7 +39,17 @@ const Scene = struct {
         {
             for (rendertargets) |rendertarget| {
                 if (&rendertarget != current) {
-                    // c.DrawLine3D(camera.position, camera.target, c.DARKBLUE);
+                    const b = rendertarget.orbit.position();
+                    const e = b.add(rendertarget.orbit.forward().scale(rendertarget.projection.z_far));
+                    c.DrawLine3D(.{
+                        .x = b.x,
+                        .y = b.y,
+                        .z = b.z,
+                    }, .{
+                        .x = e.x,
+                        .y = e.y,
+                        .z = e.z,
+                    }, c.DARKBLUE);
                 }
             }
 
