@@ -15,6 +15,9 @@ pub const RenderTarget = struct {
     // projection
     projection: zamath.CameraProjection = .{},
 
+    cursor_x: f32 = 0,
+    cursor_y: f32 = 0,
+
     pub fn make() @This() {
         var rendertarget = RenderTarget{};
         rendertarget.orbit.update_matrix();
@@ -22,14 +25,27 @@ pub const RenderTarget = struct {
         return rendertarget;
     }
 
-    pub fn set_viewport(self: *@This(), x: f32, y: f32, w: f32, h: f32) void {
+    pub fn set_viewport_cursor(
+        self: *@This(),
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        cursor_x: f32,
+        cursor_y: f32,
+    ) bool {
         self.viewport.x = x;
         self.viewport.y = y;
-        if (self.viewport.width != w or self.viewport.height != h) {
-            self.viewport.width = w;
-            self.viewport.height = h;
-            self.render_texture = null;
+        self.cursor_x = cursor_x - self.viewport.x;
+        self.cursor_y = cursor_y - self.viewport.y;
+        if (self.viewport.width == w and self.viewport.height == h) {
+            return false;
         }
+
+        self.viewport.width = w;
+        self.viewport.height = h;
+        self.render_texture = null;
+        return true;
     }
 
     fn contains(self: @This(), x: f32, y: f32) bool {
@@ -48,13 +64,10 @@ pub const RenderTarget = struct {
         return true;
     }
 
-    fn process(self: *@This()) bool {
-        const wheel = c.GetMouseWheelMoveV();
-        const delta = c.GetMouseDelta();
+    fn process_mouseevent(self: *@This(), wheel: f32, delta: c.Vector2) bool {
+        self.orbit.dolly(wheel);
 
-        self.orbit.dolly(wheel.y);
-
-        var active = wheel.y != 0;
+        var active = wheel != 0;
         if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
             // yaw pitch
             active = true;
@@ -95,8 +108,7 @@ pub const RenderTarget = struct {
         }
     }
 
-    pub fn begin(self: *@This(), active: bool) c.Texture2D {
-        _ = active; // autofix
+    pub fn begin(self: *@This()) c.Texture2D {
         const render_texture = self.get_or_create_render_texture();
 
         c.BeginTextureMode(render_texture);
@@ -108,41 +120,33 @@ pub const RenderTarget = struct {
         );
         c.ClearBackground(c.SKYBLUE);
 
-        // if (active) {
-        //     c.DrawText(
-        //         c.TextFormat(
-        //             "yaw: %d, pitch: %d, shift: %.3f, %.3f",
-        //             self.orbit.yawDegree,
-        //             self.orbit.pitchDegree,
-        //             self.orbit.shiftX,
-        //             self.orbit.shiftY,
-        //         ),
-        //         0,
-        //         0,
-        //         20,
-        //         c.LIGHTGRAY,
-        //     );
-        // }
-        c.DrawText(
-            c.TextFormat(
-                "x: %.0f, y: %.0f, width: %.0f, height: %.0f",
-                self.viewport.x,
-                self.viewport.y,
-                self.viewport.width,
-                self.viewport.height,
-            ),
-            0,
-            0,
-            20,
-            c.LIGHTGRAY,
-        );
-
         return render_texture.texture;
+    }
+
+    pub fn begin_camera3D(self: @This()) void {
+        c.rlDrawRenderBatchActive(); // Update and draw internal render batch
+
+        {
+            c.rlMatrixMode(c.RL_PROJECTION);
+            c.rlPushMatrix();
+            c.rlLoadIdentity();
+            c.rlMultMatrixf(&self.projection.matrix.m00);
+        }
+        {
+            c.rlMatrixMode(c.RL_MODELVIEW);
+            c.rlLoadIdentity();
+            c.rlMultMatrixf(&self.orbit.view_matrix.m00);
+        }
+
+        c.rlEnableDepthTest(); // Enable DEPTH_TEST for 3D
+    }
+
+    pub fn end_camera3D(_: @This()) void {
+        c.EndMode3D();
     }
 
     pub fn end(self: @This(), texture: c.Texture2D) void {
         c.EndTextureMode();
-
         c.DrawTextureRec(
             texture,
             .{
@@ -155,6 +159,29 @@ pub const RenderTarget = struct {
             },
             c.WHITE,
         );
+    }
+
+    pub fn mouse_near_far(self: @This()) struct { zamath.Vec3, zamath.Vec3 } {
+        const x = self.orbit.transform_matrix.right();
+        const y = self.orbit.transform_matrix.up();
+        const z = self.orbit.transform_matrix.forward();
+        const t = self.orbit.transform_matrix.translation();
+        const tan = std.math.tan(self.projection.fovy / 2);
+        // const near = self.projection.z_near;
+        const far = self.projection.z_far;
+        const aspect = self.viewport.width / self.viewport.height;
+
+        const half_width = self.viewport.width / 2;
+        const half_height = self.viewport.height / 2;
+
+        const mouse_h = (self.cursor_x - half_width) / half_width;
+        const mouse_v = -(self.cursor_y - half_height) / half_height;
+        const horizontal = tan * aspect * mouse_h;
+        const vertical = tan * mouse_v;
+        // const p0 = t.add(z.scale(near).add(x.scale(near * horizontal)).add(y.scale(near * vertical)));
+        const p1 = t.add(z.scale(far).add(x.scale(far * horizontal)).add(y.scale(far * vertical)));
+
+        return .{ t, p1 };
     }
 };
 
@@ -175,7 +202,7 @@ pub const Layout = struct {
         self.rendertargets.deinit();
     }
 
-    fn get_active(self: *@This(), x: f32, y: f32) ?*RenderTarget {
+    fn get_active_or_hover(self: *@This(), x: f32, y: f32) ?*RenderTarget {
         if (self.active) |rendertarget| {
             return rendertarget;
         } else {
@@ -192,33 +219,50 @@ pub const Layout = struct {
         self.active = active;
     }
 
-    pub fn update(self: *@This(), w: i32, h: i32, _x: i32, y: i32) void {
-        const width: i32 = @divTrunc(w, 2);
-        var x: f32 = 0;
+    pub fn update(
+        self: *@This(),
+        viewport_width: i32,
+        viewport_height: i32,
+        wheel: f32,
+        cursor: c.Vector2,
+        cursor_delta: c.Vector2,
+    ) void {
+        const half_width: i32 = @divTrunc(viewport_width, 2);
+        var left: f32 = 0;
         for (self.rendertargets.items) |*rendertarget| {
-            rendertarget.set_viewport(
-                x,
+            if (rendertarget.set_viewport_cursor(
+                left,
                 0,
-                @floatFromInt(width),
-                @floatFromInt(h),
-            );
-            x += @floatFromInt(width);
+                @floatFromInt(half_width),
+                @floatFromInt(viewport_height),
+                cursor.x,
+                cursor.y,
+            )) {
+                rendertarget.projection.update_matrix(rendertarget.viewport);
+            }
+            left += @floatFromInt(half_width);
         }
 
-        if (self.get_active(@floatFromInt(_x), @floatFromInt(y))) |active| {
-            if (active.process()) {
+        if (self.get_active_or_hover(
+            cursor.x,
+            cursor.y,
+        )) |active| {
+            if (active.process_mouseevent(wheel, cursor_delta)) {
                 self.set_active(active);
             } else {
                 self.set_active(null);
             }
         } else {
-            for (self.rendertargets.items) |*rendertarget| {
-                if (rendertarget.contains(@floatFromInt(_x), @floatFromInt(y))) {
-                    if (rendertarget.process()) {
-                        self.set_active(rendertarget);
-                    }
-                }
-            }
+            // for (self.rendertargets.items) |*rendertarget| {
+            //     if (rendertarget.contains(
+            //         cursor.x,
+            //         cursor.y,
+            //     )) {
+            //         if (rendertarget.process_mouseevent(wheel, cursor_delta)) {
+            //             self.set_active(rendertarget);
+            //         }
+            //     }
+            // }
         }
     }
 };

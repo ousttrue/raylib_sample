@@ -287,7 +287,7 @@ pub const CameraProjection = struct {
     matrix: Mat4 = .{},
 
     // gluPerspective
-    fovy: f32 = 30.0 * (std.math.pi / 180.0),
+    fovy: f32 = 60.0 * (std.math.pi / 180.0),
     z_near: f32 = 1.5,
     z_far: f32 = 30.0,
 
@@ -330,8 +330,8 @@ pub const CameraOrbit = struct {
     yawDegree: i32 = 0,
     pitchDegree: i32 = 40,
     shiftX: f32 = 0,
-    shiftY: f32 = -5,
-    distance: f32 = 5,
+    shiftY: f32 = 0,
+    distance: f32 = 10,
 
     pub fn dolly(self: *@This(), wheel: f32) void {
         if (wheel > 0) {
