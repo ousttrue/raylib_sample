@@ -40,13 +40,7 @@ const Scene = struct {
         // frustom
         for (rendertargets) |*rendertarget| {
             if (rendertarget != current) {
-                draw_frustum(zamath.Frustum.make(
-                    rendertarget.orbit.transform_matrix,
-                    rendertarget.projection.fovy,
-                    rendertarget.viewport.width / rendertarget.viewport.height,
-                    rendertarget.projection.z_near,
-                    rendertarget.projection.z_far,
-                ));
+                draw_frustum(rendertarget.frustum());
 
                 // mouse ray
                 const start, const end = rendertarget.mouse_near_far();
@@ -65,9 +59,13 @@ const Scene = struct {
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
-    c.SetConfigFlags(c.FLAG_WINDOW_RESIZABLE);
+    c.SetConfigFlags(c.FLAG_VSYNC_HINT | c.FLAG_WINDOW_RESIZABLE);
     c.InitWindow(1600, 1200, "experiment");
     defer c.CloseWindow();
+
+    c.SetTargetFPS(60);
+    // c.rlImGuiSetup(true);
+    // defer c.rlImGuiShutdown();
 
     var root = try layout.Layout.make(allocator);
     defer root.deinit();
@@ -78,7 +76,7 @@ pub fn main() !void {
     var previousTime: f64 = c.GetTime(); // Previous time measure
     var currentTime: f64 = 0.0; // Current time measure
     var updateDrawTime: f64 = 0.0; // Update + Draw time
-    var waitTime: f64 = 0.0; // Wait time (if target fps required)
+    // var waitTime: f64 = 0.0; // Wait time (if target fps required)
     var deltaTime: f64 = 0.0; // Frame time (Update + Draw + Wait time)
     const targetFPS = 60.0;
 
@@ -102,10 +100,10 @@ pub fn main() !void {
                 c.DrawText(
                     c.TextFormat(
                         "x: %.0f, y: %.0f, width: %.0f, height: %.0f",
-                        rendertarget.viewport.x,
-                        rendertarget.viewport.y,
-                        rendertarget.viewport.width,
-                        rendertarget.viewport.height,
+                        rendertarget.camera.viewport.x,
+                        rendertarget.camera.viewport.y,
+                        rendertarget.camera.viewport.width,
+                        rendertarget.camera.viewport.height,
                     ),
                     0,
                     0,
@@ -130,17 +128,17 @@ pub fn main() !void {
         currentTime = c.GetTime();
         updateDrawTime = currentTime - previousTime;
 
-        if (targetFPS > 0) // We want a fixed frame rate
-        {
-            waitTime = (1.0 / targetFPS) - updateDrawTime;
-            if (waitTime > 0.0) {
-                c.WaitTime(waitTime);
-                currentTime = c.GetTime();
-                deltaTime = currentTime - previousTime;
-            }
-        } else {
-            deltaTime = updateDrawTime; // Framerate could be variable
-        }
+        // if (targetFPS > 0) // We want a fixed frame rate
+        // {
+        //     waitTime = (1.0 / targetFPS) - updateDrawTime;
+        //     if (waitTime > 0.0) {
+        //         c.WaitTime(waitTime);
+        //         currentTime = c.GetTime();
+        //         deltaTime = currentTime - previousTime;
+        //     }
+        // } else {
+        deltaTime = updateDrawTime; // Framerate could be variable
+        // }
 
         previousTime = currentTime;
     }

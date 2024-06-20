@@ -284,17 +284,14 @@ pub const Rect = struct {
 };
 
 pub const CameraProjection = struct {
-    matrix: Mat4 = .{},
-
-    // gluPerspective
     fovy: f32 = 60.0 * (std.math.pi / 180.0),
     z_near: f32 = 1.5,
     z_far: f32 = 30.0,
 
-    pub fn update_matrix(self: *@This(), viewport: Rect) void {
+    // gluPerspective
+    pub fn calc_matrix(self: *@This(), viewport: Rect) Mat4 {
         const f = 1 / std.math.tan(self.fovy / 2);
-        // const aspect = @as(f32, @intFromFloat(self.view_width)) / @as(f32, @intFromFloat(self.view_height));
-        self.matrix = .{
+        return .{
             .m00 = f / viewport.width * viewport.height,
             .m01 = 0,
             .m02 = 0,
@@ -319,14 +316,6 @@ pub const CameraProjection = struct {
 };
 
 pub const CameraOrbit = struct {
-    // right handed
-    // right: (1, 0, 0)
-    // up: (0, 1, 0)
-    // forward:  (0, 0, -1)
-    // view: EuclideanTransform = .{},
-    view_matrix: Mat4 = .{},
-    transform_matrix: Mat4 = .{},
-
     yawDegree: i32 = 0,
     pitchDegree: i32 = 40,
     shiftX: f32 = 0,
@@ -341,7 +330,7 @@ pub const CameraOrbit = struct {
         }
     }
 
-    pub fn update_matrix(self: *@This()) void {
+    pub fn calc_matrix(self: *@This()) struct { Mat4, Mat4 } {
         // const distance = c.Vector3Distance(camera.target, camera.position);
         const pitch = Mat3.make_rotate_x(
             @as(f32, @floatFromInt(self.pitchDegree)) * DEG2RAD,
@@ -355,14 +344,16 @@ pub const CameraOrbit = struct {
             self.shiftY,
             -self.distance,
         );
-        self.view_matrix = rot.multiply(translation);
+        const view_matrix = rot.multiply(translation);
 
-        self.transform_matrix =
+        const transform_matrix =
             Mat4.make_translate(
             -self.shiftX,
             -self.shiftY,
             self.distance,
         ).multiply(rot.transpose());
+
+        return .{ view_matrix, transform_matrix };
     }
 
     pub fn right(self: @This()) Vec3 {
@@ -432,4 +423,16 @@ pub const Frustum = struct {
             .far_right_top = get_point(x, y, z, t, tan, tan * aspect, z_far),
         };
     }
+};
+
+pub const Camera = struct {
+    // viewport / mouse
+    viewport: Rect = .{ .x = 0, .y = 0, .width = 1, .height = 1 },
+    cursor_x: f32 = 0,
+    cursor_y: f32 = 0,
+    // view
+    view_matrix: Mat4 = .{},
+    transform_matrix: Mat4 = .{},
+    // projection
+    projection_matrix: Mat4 = .{},
 };

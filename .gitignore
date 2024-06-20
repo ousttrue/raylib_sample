@@ -6,3 +6,5 @@ prefix
 subprojects/*
 !subprojects/glfw.wrap
 !subprojects/glew.wrap
+
+imgui.ini
