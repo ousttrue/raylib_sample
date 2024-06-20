@@ -210,6 +210,9 @@ pub fn build(b: *std.Build) void {
         exe.addCSourceFile(.{
             .file = b.path("rlImGui/rlImGui.cpp"),
         });
+        exe.addCSourceFile(.{
+            .file = b.path("src/internal.cpp"),
+        });
         exe.linkLibrary(imgui_compile);
 
         exe.linkLibC();

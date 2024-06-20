@@ -3,6 +3,7 @@ const std = @import("std");
 const zamath = @import("zamath.zig");
 const layout = @import("layout.zig");
 const c = layout.c;
+pub extern fn Custom_ButtonBehaviorMiddleRight() void;
 
 fn tor(v: zamath.Vec3) c.Vector3 {
     return .{
@@ -75,8 +76,6 @@ const Scene = struct {
 };
 
 pub fn main() !void {
-    // const allocator = std.heap.page_allocator;
-
     c.SetConfigFlags(c.FLAG_VSYNC_HINT | c.FLAG_WINDOW_RESIZABLE);
     c.InitWindow(1600, 1200, "experiment");
     defer c.CloseWindow();
@@ -85,34 +84,27 @@ pub fn main() !void {
     c.rlImGuiSetup(true);
     defer c.rlImGuiShutdown();
 
-    // var root = try layout.Layout.make(allocator);
-    // defer root.deinit();
-
     const scene = Scene{};
 
     // Custom timming variables
     var previousTime: f64 = c.GetTime(); // Previous time measure
     var currentTime: f64 = 0.0; // Current time measure
     var updateDrawTime: f64 = 0.0; // Update + Draw time
-    // var waitTime: f64 = 0.0; // Wait time (if target fps required)
     var deltaTime: f64 = 0.0; // Frame time (Update + Draw + Wait time)
-    const targetFPS = 60.0;
 
     var camera = zamath.Camera{};
     var camera_projection = zamath.CameraProjection{};
     var camera_orbit = zamath.CameraOrbit{};
     camera.view_matrix, camera.transform_matrix = camera_orbit.calc_matrix();
+    var rendertarget = layout.RenderTarget{};
 
     while (!c.WindowShouldClose()) {
-        if (targetFPS < 0) targetFPS = 0;
-
         const w = c.GetScreenWidth();
         const h = c.GetScreenHeight();
         const cursor = c.GetMousePosition();
         const cursor_delta = c.GetMouseDelta();
         const wheel = c.GetMouseWheelMoveV();
 
-        // root.update(w, h, wheel.y, cursor, cursor_delta);
         if (camera.set_viewport_cursor(
             0,
             0,
@@ -144,25 +136,6 @@ pub fn main() !void {
         {
             c.BeginDrawing();
             c.ClearBackground(c.RAYWHITE);
-            // for (root.rendertargets.items) |*rendertarget| {
-            //     const texture = rendertarget.begin();
-            //
-            //     c.DrawText(
-            //         c.TextFormat(
-            //             "x: %.0f, y: %.0f, width: %.0f, height: %.0f",
-            //             rendertarget.camera.viewport.x,
-            //             rendertarget.camera.viewport.y,
-            //             rendertarget.camera.viewport.width,
-            //             rendertarget.camera.viewport.height,
-            //         ),
-            //         0,
-            //         0,
-            //         20,
-            //         c.LIGHTGRAY,
-            //     );
-            //
-            //     rendertarget.end(texture);
-            // }
             {
                 begin_camera3D(&camera.projection_matrix.m00, &camera.view_matrix.m00);
                 scene.draw();
@@ -172,7 +145,38 @@ pub fn main() !void {
             c.DrawText(c.TextFormat("CURRENT FPS: %.0f", (1.0 / deltaTime)), c.GetScreenWidth() - 220, 40, 20, c.GREEN);
 
             {
+                // IMGUI
                 c.rlImGuiBegin();
+
+                {
+                    c.igPushStyleVar_Vec2(c.ImGuiStyleVar_WindowPadding, .{ .x = 0, .y = 0 });
+                    defer c.igPopStyleVar(1);
+                    var open_fbo = true;
+                    if (c.igBegin("fbo", &open_fbo, c.ImGuiWindowFlags_NoScrollbar | c.ImGuiWindowFlags_NoScrollWithMouse)) {
+                        c.igPushStyleVar_Vec2(c.ImGuiStyleVar_FramePadding, .{ .x = 0, .y = 0 });
+                        defer c.igPopStyleVar(1);
+                        // const pos = c.igGetCursorScreenPos();
+                        var size = c.ImVec2{};
+                        c.igGetContentRegionAvail(@ptrCast(&size));
+
+                        if (size.x > 0 and size.y > 0) {
+                            if (rendertarget.begin(@intFromFloat(size.x), @intFromFloat(size.y))) |texture| {
+                                _ = c.igImageButton(
+                                    "fbo",
+                                    @constCast(@ptrCast(&texture)),
+                                    size,
+                                    .{ .x = 0, .y = 1 },
+                                    .{ .x = 1, .y = 0 },
+                                    .{ .x = 1, .y = 1, .z = 1, .w = 1 },
+                                    .{ .x = 1, .y = 1, .z = 1, .w = 1 },
+                                );
+                                Custom_ButtonBehaviorMiddleRight();
+                                rendertarget.end();
+                            }
+                        }
+                    }
+                    c.igEnd();
+                }
 
                 // show ImGui Content
                 var open = true;
@@ -185,22 +189,10 @@ pub fn main() !void {
             c.EndDrawing();
         }
 
-        // c.SwapScreenBuffer(); // Flip the back buffer to screen (front buffer)
         currentTime = c.GetTime();
         updateDrawTime = currentTime - previousTime;
 
-        // if (targetFPS > 0) // We want a fixed frame rate
-        // {
-        //     waitTime = (1.0 / targetFPS) - updateDrawTime;
-        //     if (waitTime > 0.0) {
-        //         c.WaitTime(waitTime);
-        //         currentTime = c.GetTime();
-        //         deltaTime = currentTime - previousTime;
-        //     }
-        // } else {
         deltaTime = updateDrawTime; // Framerate could be variable
-        // }
-
         previousTime = currentTime;
     }
 }
