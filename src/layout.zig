@@ -65,29 +65,6 @@ pub const RenderTarget = struct {
         //     c.WHITE,
         // );
     }
-
-    // pub fn mouse_near_far(self: @This()) struct { zamath.Vec3, zamath.Vec3 } {
-    //     const x = self.camera.transform_matrix.right();
-    //     const y = self.camera.transform_matrix.up();
-    //     const z = self.camera.transform_matrix.forward();
-    //     const t = self.camera.transform_matrix.translation();
-    //     const tan = std.math.tan(self.camera_projection.fovy / 2);
-    //     // const near = self.projection.z_near;
-    //     const far = self.camera_projection.z_far;
-    //     const aspect = self.camera.viewport.width / self.camera.viewport.height;
-    //
-    //     const half_width = self.camera.viewport.width / 2;
-    //     const half_height = self.camera.viewport.height / 2;
-    //
-    //     const mouse_h = (self.camera.cursor_x - half_width) / half_width;
-    //     const mouse_v = -(self.camera.cursor_y - half_height) / half_height;
-    //     const horizontal = tan * aspect * mouse_h;
-    //     const vertical = tan * mouse_v;
-    //     // const p0 = t.add(z.scale(near).add(x.scale(near * horizontal)).add(y.scale(near * vertical)));
-    //     const p1 = t.add(z.scale(far).add(x.scale(far * horizontal)).add(y.scale(far * vertical)));
-    //
-    //     return .{ t, p1 };
-    // }
 };
 
 pub const Layout = struct {

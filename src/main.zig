@@ -64,17 +64,6 @@ const Scene = struct {
     cubePosition: layout.c.Vector3 = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
 
     pub fn draw(self: @This()) void {
-        // frustom
-        // for (rendertargets) |*rendertarget| {
-        //     if (rendertarget != current) {
-        //         draw_frustum(rendertarget.frustum());
-        //
-        //         // mouse ray
-        //         const start, const end = rendertarget.mouse_near_far();
-        //         c.DrawLine3D(tor(start), tor(end), c.YELLOW);
-        //     }
-        // }
-
         // local scene
         c.DrawCube(self.cubePosition, 2.0, 2.0, 2.0, c.RED);
         c.DrawCubeWires(self.cubePosition, 2.0, 2.0, 2.0, c.MAROON);
@@ -87,6 +76,16 @@ const View = struct {
     camera: zamath.Camera = .{},
     camera_projection: zamath.CameraProjection = .{},
     camera_orbit: zamath.CameraOrbit = .{},
+
+    pub fn frustum(self: @This()) zamath.Frustum {
+        return zamath.Frustum.make(
+            self.camera.transform_matrix,
+            self.camera_projection.fovy,
+            self.camera.aspect(),
+            self.camera_projection.z_near,
+            self.camera_projection.z_far,
+        );
+    }
 
     pub fn update_projection_matrix(self: *@This()) void {
         self.camera.projection_matrix = self.camera_projection.calc_matrix(self.camera.viewport);
@@ -128,6 +127,29 @@ const View = struct {
         );
         scene.draw();
         end_camera3D();
+    }
+
+    pub fn mouse_near_far(self: @This()) struct { zamath.Vec3, zamath.Vec3 } {
+        const x = self.camera.transform_matrix.right();
+        const y = self.camera.transform_matrix.up();
+        const z = self.camera.transform_matrix.forward();
+        const t = self.camera.transform_matrix.translation();
+        const tan = std.math.tan(self.camera_projection.fovy / 2);
+        // const near = self.projection.z_near;
+        const far = self.camera_projection.z_far;
+        const aspect = self.camera.viewport.width / self.camera.viewport.height;
+
+        const half_width = self.camera.viewport.width / 2;
+        const half_height = self.camera.viewport.height / 2;
+
+        const mouse_h = (self.camera.cursor_x - half_width) / half_width;
+        const mouse_v = -(self.camera.cursor_y - half_height) / half_height;
+        const horizontal = tan * aspect * mouse_h;
+        const vertical = tan * mouse_v;
+        // const p0 = t.add(z.scale(near).add(x.scale(near * horizontal)).add(y.scale(near * vertical)));
+        const p1 = t.add(z.scale(far).add(x.scale(far * horizontal)).add(y.scale(far * vertical)));
+
+        return .{ t, p1 };
     }
 };
 
@@ -191,6 +213,12 @@ pub fn main() !void {
             c.BeginDrawing();
             c.ClearBackground(c.RAYWHITE);
             root_view.draw(&scene);
+            {
+                draw_frustum(fbo_view.frustum());
+                // mouse ray
+                const start, const end = fbo_view.mouse_near_far();
+                c.DrawLine3D(tor(start), tor(end), c.YELLOW);
+            }
 
             c.DrawText(c.TextFormat("CURRENT FPS: %.0f", (1.0 / deltaTime)), c.GetScreenWidth() - 220, 40, 20, c.GREEN);
 
@@ -248,6 +276,10 @@ pub fn main() !void {
                                 }
 
                                 fbo_view.draw(&scene);
+                                draw_frustum(root_view.frustum());
+                                // mouse ray
+                                const start, const end = root_view.mouse_near_far();
+                                c.DrawLine3D(tor(start), tor(end), c.YELLOW);
 
                                 rendertarget.end();
                             }

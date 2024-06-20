@@ -458,6 +458,10 @@ pub const Camera = struct {
     // projection
     projection_matrix: Mat4 = .{},
 
+    pub fn aspect(self: @This()) f32 {
+        return self.viewport.width / self.viewport.height;
+    }
+
     pub fn set_viewport_cursor(
         self: *@This(),
         x: f32,
