@@ -13,6 +13,14 @@ fn tor(v: zamath.Vec3) c.Vector3 {
     };
 }
 
+const CursorState = enum {
+    None,
+    // mouse up / cursor on widget
+    Hover,
+    // mouse down / dragging
+    Active,
+};
+
 fn draw_frustum(frustum: zamath.Frustum) void {
     c.DrawLine3D(tor(frustum.near_left_top), tor(frustum.near_left_bottom), c.DARKBLUE);
     c.DrawLine3D(tor(frustum.near_left_bottom), tor(frustum.near_right_bottom), c.DARKBLUE);
@@ -30,7 +38,7 @@ fn draw_frustum(frustum: zamath.Frustum) void {
     c.DrawLine3D(tor(frustum.far_right_top), tor(frustum.far_left_top), c.DARKBLUE);
 }
 
-pub fn begin_camera3D(projection: *f32, view: *f32) void {
+pub fn begin_camera3D(projection: *const f32, view: *const f32) void {
     c.rlDrawRenderBatchActive(); // Update and draw internal render batch
 
     {
@@ -75,6 +83,54 @@ const Scene = struct {
     }
 };
 
+const View = struct {
+    camera: zamath.Camera = .{},
+    camera_projection: zamath.CameraProjection = .{},
+    camera_orbit: zamath.CameraOrbit = .{},
+
+    pub fn update_projection_matrix(self: *@This()) void {
+        self.camera.projection_matrix = self.camera_projection.calc_matrix(self.camera.viewport);
+    }
+
+    pub fn update_view_matrix(self: *@This()) void {
+        self.camera.view_matrix, self.camera.transform_matrix = self.camera_orbit.calc_matrix();
+    }
+
+    pub fn update(
+        self: *@This(),
+        cursor_delta_x: f32,
+        cursor_delta_y: f32,
+        h: f32,
+    ) void {
+        var active = false;
+        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
+            self.camera_orbit.yawpitch(cursor_delta_x, cursor_delta_y);
+            active = true;
+        }
+        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
+            self.camera_orbit.shift(
+                cursor_delta_x,
+                cursor_delta_y,
+                h,
+                self.camera_projection.fovy,
+            );
+            active = true;
+        }
+        if (active) {
+            self.update_view_matrix();
+        }
+    }
+
+    pub fn draw(self: @This(), scene: *Scene) void {
+        begin_camera3D(
+            &self.camera.projection_matrix.m00,
+            &self.camera.view_matrix.m00,
+        );
+        scene.draw();
+        end_camera3D();
+    }
+};
+
 pub fn main() !void {
     c.SetConfigFlags(c.FLAG_VSYNC_HINT | c.FLAG_WINDOW_RESIZABLE);
     c.InitWindow(1600, 1200, "experiment");
@@ -84,7 +140,7 @@ pub fn main() !void {
     c.rlImGuiSetup(true);
     defer c.rlImGuiShutdown();
 
-    const scene = Scene{};
+    var scene = Scene{};
 
     // Custom timming variables
     var previousTime: f64 = c.GetTime(); // Previous time measure
@@ -92,55 +148,49 @@ pub fn main() !void {
     var updateDrawTime: f64 = 0.0; // Update + Draw time
     var deltaTime: f64 = 0.0; // Frame time (Update + Draw + Wait time)
 
-    var camera = zamath.Camera{};
-    var camera_projection = zamath.CameraProjection{};
-    var camera_orbit = zamath.CameraOrbit{};
-    camera.view_matrix, camera.transform_matrix = camera_orbit.calc_matrix();
+    var root_view = View{};
+    root_view.update_view_matrix();
+    var fbo_view = View{};
+    fbo_view.update_view_matrix();
+
     var rendertarget = layout.RenderTarget{};
 
-    while (!c.WindowShouldClose()) {
-        const w = c.GetScreenWidth();
-        const h = c.GetScreenHeight();
-        const cursor = c.GetMousePosition();
-        const cursor_delta = c.GetMouseDelta();
-        const wheel = c.GetMouseWheelMoveV();
+    const io = c.igGetIO();
 
-        if (camera.set_viewport_cursor(
+    while (!c.WindowShouldClose()) {
+        const w: f32 = @floatFromInt(c.GetScreenWidth());
+        const h: f32 = @floatFromInt(c.GetScreenHeight());
+        const cursor = c.GetMousePosition();
+        if (root_view.camera.set_viewport_cursor(
             0,
             0,
-            @floatFromInt(w),
-            @floatFromInt(h),
+            w,
+            h,
             cursor.x,
             cursor.y,
         )) {
-            camera.projection_matrix = camera_projection.calc_matrix(camera.viewport);
+            root_view.update_projection_matrix();
         }
 
-        var active = false;
-        if (wheel.y != 0) {
-            camera_orbit.dolly(wheel.y);
-            active = true;
-        }
-        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
-            camera_orbit.yawpitch(cursor_delta.x, cursor_delta.y);
-            active = true;
-        }
-        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
-            camera_orbit.shift(cursor_delta.x, cursor_delta.y, camera.viewport, camera_projection.fovy);
-            active = true;
-        }
-        if (active) {
-            camera.view_matrix, camera.transform_matrix = camera_orbit.calc_matrix();
+        const cursor_delta = c.GetMouseDelta();
+        const wheel = c.GetMouseWheelMoveV();
+
+        if (!io.*.WantCaptureMouse) {
+            root_view.update(
+                cursor_delta.x,
+                cursor_delta.y,
+                h,
+            );
+            if (wheel.y != 0) {
+                root_view.camera_orbit.dolly(wheel.y);
+                root_view.update_view_matrix();
+            }
         }
 
         {
             c.BeginDrawing();
             c.ClearBackground(c.RAYWHITE);
-            {
-                begin_camera3D(&camera.projection_matrix.m00, &camera.view_matrix.m00);
-                scene.draw();
-                end_camera3D();
-            }
+            root_view.draw(&scene);
 
             c.DrawText(c.TextFormat("CURRENT FPS: %.0f", (1.0 / deltaTime)), c.GetScreenWidth() - 220, 40, 20, c.GREEN);
 
@@ -155,11 +205,23 @@ pub fn main() !void {
                     if (c.igBegin("fbo", &open_fbo, c.ImGuiWindowFlags_NoScrollbar | c.ImGuiWindowFlags_NoScrollWithMouse)) {
                         c.igPushStyleVar_Vec2(c.ImGuiStyleVar_FramePadding, .{ .x = 0, .y = 0 });
                         defer c.igPopStyleVar(1);
-                        // const pos = c.igGetCursorScreenPos();
+                        var pos = c.ImVec2{};
+                        c.igGetCursorScreenPos(@ptrCast(&pos));
                         var size = c.ImVec2{};
                         c.igGetContentRegionAvail(@ptrCast(&size));
 
                         if (size.x > 0 and size.y > 0) {
+                            if (fbo_view.camera.set_viewport_cursor(
+                                pos.x,
+                                pos.y,
+                                size.x,
+                                size.y,
+                                cursor.x,
+                                cursor.y,
+                            )) {
+                                fbo_view.update_projection_matrix();
+                            }
+
                             if (rendertarget.begin(@intFromFloat(size.x), @intFromFloat(size.y))) |texture| {
                                 _ = c.igImageButton(
                                     "fbo",
@@ -171,6 +233,22 @@ pub fn main() !void {
                                     .{ .x = 1, .y = 1, .z = 1, .w = 1 },
                                 );
                                 Custom_ButtonBehaviorMiddleRight();
+
+                                if (c.igIsItemActive()) {
+                                    fbo_view.update(
+                                        cursor_delta.x,
+                                        cursor_delta.y,
+                                        size.y,
+                                    );
+                                } else if (c.igIsItemHovered(0)) {
+                                    if (wheel.y != 0) {
+                                        fbo_view.camera_orbit.dolly(wheel.y);
+                                        fbo_view.update_view_matrix();
+                                    }
+                                }
+
+                                fbo_view.draw(&scene);
+
                                 rendertarget.end();
                             }
                         }

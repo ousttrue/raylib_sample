@@ -340,8 +340,14 @@ pub const CameraOrbit = struct {
         }
     }
 
-    pub fn shift(self: *@This(), cursor_dx: f32, cursor_dy: f32, viewport: Rect, fovy: f32) void {
-        const speed = self.distance * std.math.tan(fovy * 0.5) * 2.0 / viewport.height;
+    pub fn shift(
+        self: *@This(),
+        cursor_dx: f32,
+        cursor_dy: f32,
+        viewport_height: f32,
+        fovy: f32,
+    ) void {
+        const speed = self.distance * std.math.tan(fovy * 0.5) * 2.0 / viewport_height;
         self.shiftX += cursor_dx * speed;
         self.shiftY -= cursor_dy * speed;
     }
