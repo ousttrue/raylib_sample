@@ -330,6 +330,22 @@ pub const CameraOrbit = struct {
         }
     }
 
+    pub fn yawpitch(self: *@This(), cursor_dx: f32, cursor_dy: f32) void {
+        self.yawDegree += @intFromFloat(cursor_dx);
+        self.pitchDegree += @intFromFloat(cursor_dy);
+        if (self.pitchDegree > 89) {
+            self.pitchDegree = 89;
+        } else if (self.pitchDegree < -89) {
+            self.pitchDegree = -89;
+        }
+    }
+
+    pub fn shift(self: *@This(), cursor_dx: f32, cursor_dy: f32, viewport: Rect, fovy: f32) void {
+        const speed = self.distance * std.math.tan(fovy * 0.5) * 2.0 / viewport.height;
+        self.shiftX += cursor_dx * speed;
+        self.shiftY -= cursor_dy * speed;
+    }
+
     pub fn calc_matrix(self: *@This()) struct { Mat4, Mat4 } {
         // const distance = c.Vector3Distance(camera.target, camera.position);
         const pitch = Mat3.make_rotate_x(
@@ -435,4 +451,26 @@ pub const Camera = struct {
     transform_matrix: Mat4 = .{},
     // projection
     projection_matrix: Mat4 = .{},
+
+    pub fn set_viewport_cursor(
+        self: *@This(),
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        cursor_x: f32,
+        cursor_y: f32,
+    ) bool {
+        self.viewport.x = x;
+        self.viewport.y = y;
+        self.cursor_x = cursor_x - self.viewport.x;
+        self.cursor_y = cursor_y - self.viewport.y;
+        if (self.viewport.width == w and self.viewport.height == h) {
+            return false;
+        }
+
+        self.viewport.width = w;
+        self.viewport.height = h;
+        return true;
+    }
 };

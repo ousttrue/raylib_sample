@@ -202,6 +202,16 @@ pub fn build(b: *std.Build) void {
         });
         b.installArtifact(exe);
         exe.addIncludePath(b.path("raylib"));
+
+        // rlImGui
+        exe.addIncludePath(b.path("rlImGui"));
+        exe.addIncludePath(b.path("cimgui-1.90.8dock"));
+        exe.addIncludePath(b.path("cimgui-1.90.8dock/imgui"));
+        exe.addCSourceFile(.{
+            .file = b.path("rlImGui/rlImGui.cpp"),
+        });
+        exe.linkLibrary(imgui_compile);
+
         exe.linkLibC();
         exe.linkLibrary(raylib_compile);
     }

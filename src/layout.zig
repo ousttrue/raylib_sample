@@ -3,6 +3,10 @@ pub const c = @cImport({
     @cInclude("rlgl.h");
     // @cInclude("rcamera.h");
     // @cInclude("raymath.h");
+    @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", "");
+    @cDefine("IMGUI_DISABLE_OBSOLETE_FUNCTIONS", "1");
+    @cInclude("cimgui.h");
+    @cInclude("rlImGui.h");
 });
 const std = @import("std");
 const zamath = @import("zamath.zig");
@@ -23,32 +27,6 @@ pub const RenderTarget = struct {
         );
     }
 
-    pub fn set_viewport_cursor(
-        self: *@This(),
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        cursor_x: f32,
-        cursor_y: f32,
-    ) void {
-        self.camera.viewport.x = x;
-        self.camera.viewport.y = y;
-        self.camera.cursor_x = cursor_x - self.camera.viewport.x;
-        self.camera.cursor_y = cursor_y - self.camera.viewport.y;
-        if (self.camera.viewport.width == w and self.camera.viewport.height == h) {
-            return;
-        }
-
-        self.camera.viewport.width = w;
-        self.camera.viewport.height = h;
-        self.render_texture = null;
-
-        self.camera.projection_matrix = self.camera_projection.calc_matrix(
-            self.camera.viewport,
-        );
-    }
-
     fn contains(self: @This(), x: f32, y: f32) bool {
         if (x < self.camera.viewport.x) {
             return false;
@@ -65,31 +43,10 @@ pub const RenderTarget = struct {
         return true;
     }
 
-    fn process_mouseevent(self: *@This(), wheel: f32, delta: c.Vector2) bool {
-        self.camera_orbit.dolly(wheel);
-
-        var active = wheel != 0;
-        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT)) {
-            // yaw pitch
-            active = true;
-            self.camera_orbit.yawDegree += @intFromFloat(delta.x);
-            self.camera_orbit.pitchDegree += @intFromFloat(delta.y);
-            if (self.camera_orbit.pitchDegree > 89) {
-                self.camera_orbit.pitchDegree = 89;
-            } else if (self.camera_orbit.pitchDegree < -89) {
-                self.camera_orbit.pitchDegree = -89;
-            }
-        }
-
-        if (c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE)) {
-            // camera shift
-            active = true;
-            const speed = self.camera_orbit.distance * std.math.tan(self.camera_projection.fovy * 0.5) * 2.0 / self.camera.viewport.height;
-            self.camera_orbit.shiftX += delta.x * speed;
-            self.camera_orbit.shiftY -= delta.y * speed;
-        }
-
-        return active;
+    pub fn update_projection_matrix(self: *@This()) void {
+        self.camera.projection_matrix = self.camera_projection.calc_matrix(
+            self.camera.viewport,
+        );
     }
 
     pub fn update_view_matrix(self: *@This()) void {
@@ -122,28 +79,6 @@ pub const RenderTarget = struct {
         c.ClearBackground(c.SKYBLUE);
 
         return render_texture.texture;
-    }
-
-    pub fn begin_camera3D(self: @This()) void {
-        c.rlDrawRenderBatchActive(); // Update and draw internal render batch
-
-        {
-            c.rlMatrixMode(c.RL_PROJECTION);
-            c.rlPushMatrix();
-            c.rlLoadIdentity();
-            c.rlMultMatrixf(&self.camera.projection_matrix.m00);
-        }
-        {
-            c.rlMatrixMode(c.RL_MODELVIEW);
-            c.rlLoadIdentity();
-            c.rlMultMatrixf(&self.camera.view_matrix.m00);
-        }
-
-        c.rlEnableDepthTest(); // Enable DEPTH_TEST for 3D
-    }
-
-    pub fn end_camera3D(_: @This()) void {
-        c.EndMode3D();
     }
 
     pub fn end(self: @This(), texture: c.Texture2D) void {
@@ -236,14 +171,18 @@ pub const Layout = struct {
         const half_width: i32 = @divTrunc(viewport_width, 2);
         var left: f32 = 0;
         for (self.rendertargets.items) |*rendertarget| {
-            rendertarget.set_viewport_cursor(
+            if (rendertarget.camera.set_viewport_cursor(
                 left,
                 0,
                 @floatFromInt(half_width),
                 @floatFromInt(viewport_height),
                 cursor.x,
                 cursor.y,
-            );
+            )) {
+                rendertarget.render_texture = null;
+                rendertarget.update_projection_matrix();
+            }
+
             left += @floatFromInt(half_width);
         }
 
