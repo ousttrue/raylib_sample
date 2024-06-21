@@ -163,7 +163,11 @@ pub fn main() !void {
     var scene: Scene = .{};
     var root_view: View = .{};
     var rendertarget: layout.RenderTarget = .{};
-    var fbo_view: View = .{};
+    var fbo_view: View = .{
+        .camera_projection = .{
+            .z_far = 100,
+        },
+    };
     root_view.update_view_matrix();
     fbo_view.update_view_matrix();
 
