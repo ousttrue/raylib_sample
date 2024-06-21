@@ -16,8 +16,8 @@ pub fn main() void {
     var model = c.LoadModelFromMesh(c.GenMeshTorus(0.3, 1.5, 16.0, 16.0));
     defer c.UnloadModel(model);
 
-    var gizmo = raygizmo.rgizmo_create();
-    defer raygizmo.rgizmo_unload();
+    var gizmo = raygizmo.RGizmo.load();
+    defer gizmo.unload();
 
     while (!c.WindowShouldClose()) {
         c.BeginDrawing();
@@ -27,10 +27,10 @@ pub fn main() void {
                 .y = model.transform.m13,
                 .z = model.transform.m14,
             };
-            raygizmo.rgizmo_update(&gizmo, camera, position);
+            gizmo.new_frame(camera, position);
             model.transform = c.MatrixMultiply(
                 model.transform,
-                raygizmo.rgizmo_get_tranform(gizmo, position),
+                gizmo.get_tranform(position),
             );
 
             c.ClearBackground(c.BLACK);
@@ -42,7 +42,7 @@ pub fn main() void {
             }
             c.EndMode3D();
 
-            raygizmo.rgizmo_draw(&gizmo, camera, position);
+            gizmo.draw(camera, position);
         }
         c.EndDrawing();
     }
