@@ -71,9 +71,9 @@ const examples = [_]Program{
         },
     },
     .{
-        .name = "raygizmo",
-        .path = "examples/others/raygizmo.zig",
-        .includes = &.{"raygizmo"},
+        .name = "raygizmo_example",
+        .path = "examples/others/raygizmo_example.zig",
+        // .includes = &.{"raygizmo"},
     },
     // .{
     //     .name = "bvhview",
@@ -193,6 +193,11 @@ pub fn build(b: *std.Build) void {
 
     const imgui_compile = imgui_build.compile(b, target, optimize);
 
+    const raygizmo = b.createModule(.{
+        .root_source_file = b.path("raygizmo//raygizmo.zig"),
+    });
+    raygizmo.addIncludePath(b.path("raylib/"));
+
     {
         const exe = b.addExecutable(.{
             .name = "raylib_sample",
@@ -270,5 +275,7 @@ pub fn build(b: *std.Build) void {
             const timeline_c_path = gen_step.add("tmp.c", src);
             example.addCSourceFile(.{ .file = timeline_c_path });
         }
+
+        example.root_module.addImport("raygizmo", raygizmo);
     }
 }
