@@ -1,9 +1,6 @@
+pub const c = @import("c.zig");
 const std = @import("std");
-pub const c = @cImport({
-    @cInclude("raylib.h");
-    @cInclude("rlgl.h");
-    @cInclude("raymath.h");
-});
+const picker = @import("picker.zig");
 
 pub const RGizmoState = enum {
     RGIZMO_STATE_COLD,
@@ -47,36 +44,19 @@ pub const RGizmo = struct {
     view: View,
     state: RGizmoState = .RGIZMO_STATE_COLD,
 
-    PICKING_FBO: c_uint = 0,
-    PICKING_TEXTURE: c_uint = 0,
+    picker: picker.Picker = .{},
 
     pub fn load() RGizmo {
         // Load shader
         const SHADER = c.LoadShaderFromMemory(SHADER_VERT, SHADER_FRAG);
         const SHADER_CAMERA_POSITION_LOC = c.GetShaderLocation(SHADER, "cameraPosition");
         const SHADER_GIZMO_POSITION_LOC = c.GetShaderLocation(SHADER, "gizmoPosition");
-        // Load picking fbo
-        const PICKING_FBO = c.rlLoadFramebuffer(PICKING_FBO_WIDTH, PICKING_FBO_HEIGHT);
-        if (PICKING_FBO == 0) {
-            c.TraceLog(c.LOG_ERROR, "RAYGIZMO: Failed to create picking fbo");
-            std.c.exit(1);
-        }
-        c.rlEnableFramebuffer(PICKING_FBO);
-        const PICKING_TEXTURE = c.rlLoadTexture(null, PICKING_FBO_WIDTH, PICKING_FBO_HEIGHT, c.RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
-        c.rlActiveDrawBuffers(1);
-        c.rlFramebufferAttach(PICKING_FBO, PICKING_TEXTURE, c.RL_ATTACHMENT_COLOR_CHANNEL0, c.RL_ATTACHMENT_TEXTURE2D, 0);
-        if (!c.rlFramebufferComplete(PICKING_FBO)) {
-            c.TraceLog(c.LOG_ERROR, "RAYGIZMO: Picking fbo is not complete");
-            std.c.exit(1);
-        }
-        c.TraceLog(c.LOG_INFO, "RAYGIZMO: Gizmo loaded");
 
         return .{
             .SHADER = SHADER,
             .SHADER_CAMERA_POSITION_LOC = SHADER_CAMERA_POSITION_LOC,
             .SHADER_GIZMO_POSITION_LOC = SHADER_GIZMO_POSITION_LOC,
-            .PICKING_FBO = PICKING_FBO,
-            .PICKING_TEXTURE = PICKING_TEXTURE,
+            .picker = picker.Picker.load(),
             .view = .{
                 .size = 0.12,
                 .handle_draw_thickness = 5.0,
@@ -91,78 +71,40 @@ pub const RGizmo = struct {
     }
 
     pub fn unload(self: @This()) void {
+        self.picker.unload();
         c.UnloadShader(self.SHADER);
-        c.rlUnloadFramebuffer(self.PICKING_FBO);
-        c.rlUnloadTexture(self.PICKING_TEXTURE);
         c.TraceLog(c.LOG_INFO, "RAYGIZMO: Gizmo unloaded");
     }
 
     pub fn get_tranform(self: *@This(), position: c.Vector3) c.Matrix {
-        const translation = c.MatrixTranslate(self.update.translation.x, self.update.translation.y, self.update.translation.z);
+        const translation = c.MatrixTranslate(
+            self.update.translation.x,
+            self.update.translation.y,
+            self.update.translation.z,
+        );
 
-        const rotation = c.MatrixMultiply(c.MatrixMultiply(c.MatrixTranslate(-position.x, -position.y, -position.z), c.MatrixRotate(self.update.axis, self.update.angle)), c.MatrixTranslate(position.x, position.y, position.z));
+        const rotation = c.MatrixMultiply(
+            c.MatrixMultiply(c.MatrixTranslate(-position.x, -position.y, -position.z), c.MatrixRotate(self.update.axis, self.update.angle)),
+            c.MatrixTranslate(position.x, position.y, position.z),
+        );
 
         const transform = c.MatrixMultiply(translation, rotation);
 
         return transform;
     }
 
+    fn _get_pick_id(
+        self: *@This(),
+        camera: c.Camera,
+        position: c.Vector3,
+    ) ?u8 {
+        self.picker.begin();
+        self._draw(camera, position, PickColors);
+        return self.picker.end();
+    }
+
     pub fn new_frame(self: *@This(), camera: c.Camera3D, position: c.Vector3) void {
-        // -------------------------------------------------------------------
-        // Draw gizmo into the picking fbo for the mouse pixel-picking
-        c.rlEnableFramebuffer(self.PICKING_FBO);
-        c.rlViewport(0, 0, PICKING_FBO_WIDTH, PICKING_FBO_HEIGHT);
-        c.rlClearColor(0, 0, 0, 0);
-        c.rlClearScreenBuffers();
-        c.rlDisableColorBlend();
 
-        const colors = HandleColors{
-            .rot = .{
-                .x = .{ .r = @intFromEnum(HandleId.ROT_HANDLE_X), .g = 0, .b = 0, .a = 0 },
-                .y = .{ .r = @intFromEnum(HandleId.ROT_HANDLE_Y), .g = 0, .b = 0, .a = 0 },
-                .z = .{ .r = @intFromEnum(HandleId.ROT_HANDLE_Z), .g = 0, .b = 0, .a = 0 },
-            },
-            .axis = .{
-                .x = .{ .r = @intFromEnum(HandleId.AXIS_HANDLE_X), .g = 0, .b = 0, .a = 0 },
-                .y = .{ .r = @intFromEnum(HandleId.AXIS_HANDLE_Y), .g = 0, .b = 0, .a = 0 },
-                .z = .{ .r = @intFromEnum(HandleId.AXIS_HANDLE_Z), .g = 0, .b = 0, .a = 0 },
-            },
-            .plane = .{
-                .x = .{ .r = @intFromEnum(HandleId.PLANE_HANDLE_X), .g = 0, .b = 0, .a = 0 },
-                .y = .{ .r = @intFromEnum(HandleId.PLANE_HANDLE_Y), .g = 0, .b = 0, .a = 0 },
-                .z = .{ .r = @intFromEnum(HandleId.PLANE_HANDLE_Z), .g = 0, .b = 0, .a = 0 },
-            },
-        };
-
-        self._draw(camera, position, colors);
-
-        c.rlDisableFramebuffer();
-        c.rlEnableColorBlend();
-        c.rlViewport(0, 0, c.GetScreenWidth(), c.GetScreenHeight());
-
-        // -------------------------------------------------------------------
-        // Pick the pixel under the mouse cursor
-        const mouse_position = c.GetMousePosition();
-        const pixels = c.rlReadTexturePixels(
-            self.PICKING_TEXTURE,
-            PICKING_FBO_WIDTH,
-            PICKING_FBO_HEIGHT,
-            c.RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
-        );
-
-        const x_fract = c.Clamp(mouse_position.x / @as(f32, @floatFromInt(c.GetScreenWidth())), 0.0, 1.0);
-        const y_fract = c.Clamp(1.0 - (mouse_position.y / @as(f32, @floatFromInt(c.GetScreenHeight()))), 0.0, 1.0);
-        const x = PICKING_FBO_WIDTH * x_fract;
-        const y = PICKING_FBO_HEIGHT * y_fract;
-        const idx: usize = @intFromFloat(4 * (y * PICKING_FBO_WIDTH + x));
-        var picked_id: u8 = 0;
-        if (pixels) |p| {
-            picked_id = @as([*c]u8, @ptrCast(p))[idx];
-        }
-
-        std.c.free(pixels);
-
-        // -------------------------------------------------------------------
         // Update gizmo
         self.update.angle = 0.0;
         self.update.translation = c.Vector3Zero();
@@ -171,20 +113,22 @@ pub const RGizmo = struct {
         if (!is_lmb_down) self.state = .RGIZMO_STATE_COLD;
 
         if (@intFromEnum(self.state) < @intFromEnum(RGizmoState.RGIZMO_STATE_ACTIVE)) {
-            if (picked_id < @intFromEnum(HandleId.HANDLE_Y)) {
-                self.update.axis = X_AXIS;
-            } else if (picked_id < @intFromEnum(HandleId.HANDLE_Z)) {
-                self.update.axis = Y_AXIS;
-            } else {
-                self.update.axis = Z_AXIS;
-            }
+            if (self._get_pick_id(camera, position)) |picked_id| {
+                if (picked_id < @intFromEnum(HandleId.HANDLE_Y)) {
+                    self.update.axis = X_AXIS;
+                } else if (picked_id < @intFromEnum(HandleId.HANDLE_Z)) {
+                    self.update.axis = Y_AXIS;
+                } else {
+                    self.update.axis = Z_AXIS;
+                }
 
-            if (picked_id % 4 == 1) {
-                self.state = if (is_lmb_down) .RGIZMO_STATE_ACTIVE_ROT else .RGIZMO_STATE_HOT_ROT;
-            } else if (picked_id % 4 == 2) {
-                self.state = if (is_lmb_down) .RGIZMO_STATE_ACTIVE_AXIS else .RGIZMO_STATE_HOT_AXIS;
-            } else if (picked_id % 4 == 3) {
-                self.state = if (is_lmb_down) .RGIZMO_STATE_ACTIVE_PLANE else .RGIZMO_STATE_HOT_PLANE;
+                if (picked_id % 4 == 1) {
+                    self.state = if (is_lmb_down) .RGIZMO_STATE_ACTIVE_ROT else .RGIZMO_STATE_HOT_ROT;
+                } else if (picked_id % 4 == 2) {
+                    self.state = if (is_lmb_down) .RGIZMO_STATE_ACTIVE_AXIS else .RGIZMO_STATE_HOT_AXIS;
+                } else if (picked_id % 4 == 3) {
+                    self.state = if (is_lmb_down) .RGIZMO_STATE_ACTIVE_PLANE else .RGIZMO_STATE_HOT_PLANE;
+                }
             }
         }
 
@@ -429,9 +373,6 @@ const SHADER_FRAG =
     \\}
 ;
 
-const PICKING_FBO_WIDTH = 512;
-const PICKING_FBO_HEIGHT = 512;
-
 const X_AXIS = c.Vector3{ .x = 1.0, .y = 0.0, .z = 0.0 };
 const Y_AXIS = c.Vector3{ .x = 0.0, .y = 1.0, .z = 0.0 };
 const Z_AXIS = c.Vector3{ .x = 0.0, .y = 0.0, .z = 1.0 };
@@ -472,6 +413,25 @@ const HandleColors = struct {
 
 const Handles = struct {
     arr: [3]Handle,
+};
+
+// Draw gizmo into the picking fbo for the mouse pixel-picking
+const PickColors = HandleColors{
+    .rot = .{
+        .x = .{ .r = @intFromEnum(HandleId.ROT_HANDLE_X), .g = 0, .b = 0, .a = 0 },
+        .y = .{ .r = @intFromEnum(HandleId.ROT_HANDLE_Y), .g = 0, .b = 0, .a = 0 },
+        .z = .{ .r = @intFromEnum(HandleId.ROT_HANDLE_Z), .g = 0, .b = 0, .a = 0 },
+    },
+    .axis = .{
+        .x = .{ .r = @intFromEnum(HandleId.AXIS_HANDLE_X), .g = 0, .b = 0, .a = 0 },
+        .y = .{ .r = @intFromEnum(HandleId.AXIS_HANDLE_Y), .g = 0, .b = 0, .a = 0 },
+        .z = .{ .r = @intFromEnum(HandleId.AXIS_HANDLE_Z), .g = 0, .b = 0, .a = 0 },
+    },
+    .plane = .{
+        .x = .{ .r = @intFromEnum(HandleId.PLANE_HANDLE_X), .g = 0, .b = 0, .a = 0 },
+        .y = .{ .r = @intFromEnum(HandleId.PLANE_HANDLE_Y), .g = 0, .b = 0, .a = 0 },
+        .z = .{ .r = @intFromEnum(HandleId.PLANE_HANDLE_Z), .g = 0, .b = 0, .a = 0 },
+    },
 };
 
 fn sort_handles(h0: Handle, h1: Handle, h2: Handle) Handles {
