@@ -484,3 +484,8 @@ pub const Camera = struct {
         return true;
     }
 };
+
+pub const Ray = struct {
+    origin: Vec3,
+    dir: Vec3,
+};

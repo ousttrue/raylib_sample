@@ -50,6 +50,21 @@ const Scene = struct {
     }
 };
 
+const TranslationGizmo = struct {
+    transform: zamath.Mat4 = .{},
+
+    fn ray_intersect(self: @This(), ray: zamath.Ray) ?f32 {
+        _ = self; // autofix
+        _ = ray; // autofix
+        return null;
+    }
+
+    fn draw(self: @This(), color: c.Color) void {
+        _ = color; // autofix
+        _ = self; // autofix
+    }
+};
+
 pub fn main() !void {
     c.SetConfigFlags(c.FLAG_VSYNC_HINT | c.FLAG_WINDOW_RESIZABLE);
     c.InitWindow(1600, 1200, "experiment");
@@ -80,6 +95,8 @@ pub fn main() !void {
     root_view.update_view_matrix();
     fbo_view.update_view_matrix();
 
+    var t_x = TranslationGizmo{};
+
     while (!c.WindowShouldClose()) {
         const w: f32 = @floatFromInt(c.GetScreenWidth());
         const h: f32 = @floatFromInt(c.GetScreenHeight());
@@ -108,6 +125,12 @@ pub fn main() !void {
                 root_view.camera_orbit.dolly(wheel.y);
                 root_view.update_view_matrix();
             }
+        }
+
+        var hit = false;
+        if (t_x.ray_intersect(root_view.ray())) |t| {
+            _ = t;
+            hit = true;
         }
 
         // show ImGui Content
@@ -232,6 +255,8 @@ pub fn main() !void {
                 defer root_view.end_camera3D();
 
                 scene.draw();
+
+                t_x.draw(if (hit) c.YELLOW else c.BEIGE);
             }
 
             c.DrawText(c.TextFormat("CURRENT FPS: %.0f", (1.0 / deltaTime)), c.GetScreenWidth() - 220, 40, 20, c.GREEN);

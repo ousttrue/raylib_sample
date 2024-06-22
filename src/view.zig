@@ -7,6 +7,13 @@ pub const View = struct {
     camera_projection: zamath.CameraProjection = .{},
     camera_orbit: zamath.CameraOrbit = .{},
 
+    pub fn ray(self: @This()) zamath.Ray {
+        return .{
+            .origin = self.camera.transform_matrix.translation(),
+            .dir = self.camera.transform_matrix.forward(),
+        };
+    }
+
     pub fn frustum(self: @This()) zamath.Frustum {
         return zamath.Frustum.make(
             self.camera.transform_matrix,
