@@ -18,7 +18,7 @@ pub const DragState = struct {
 
 pub fn GenericDragger(comptime Dragger: type) type {
     return struct {
-        draggable: Dragger,
+        draggable: *Dragger,
         state: DragState = .{},
         _button: bool = false,
 
@@ -65,8 +65,8 @@ pub fn GenericDragger(comptime Dragger: type) type {
     };
 }
 
-pub fn make_dragger(dragger: anytype) GenericDragger(@TypeOf(dragger)) {
-    return GenericDragger(@TypeOf(dragger)){
+pub fn make_dragger(dragger: anytype) GenericDragger(@TypeOf(dragger.*)) {
+    return GenericDragger(@TypeOf(dragger.*)){
         .draggable = dragger,
     };
 }

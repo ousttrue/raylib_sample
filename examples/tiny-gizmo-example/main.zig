@@ -1,9 +1,11 @@
 // This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
+const std = @import("std");
 const c = @import("c.zig");
 const orbit_camera = @import("orbit_camera.zig");
 const rdrag = @import("rdrag.zig");
 const drawable = @import("drawable.zig");
+const gizmo_dragger = @import("gizmo_dragger.zig");
 const teapot = @cImport({
     @cInclude("teapot.h");
 });
@@ -24,10 +26,10 @@ pub fn main() !void {
     };
     try b.load_slice(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
 
-    // std::list<std::shared_ptr<Drawable>> scene{
-    //     a,
-    //     b,
-    // };
+    var scene = [_]*const drawable.Drawable{
+        &a,
+        &b,
+    };
 
     var orbit = orbit_camera.OrbitCamera{};
     var camera = c.Camera3D{
@@ -39,21 +41,24 @@ pub fn main() !void {
     };
     orbit.update_view(&camera);
 
-    var right_drag = rdrag.make_dragger(orbit_camera.CameraYawPitchDragger{
+    var yawpitch = orbit_camera.CameraYawPitchDragger{
         ._camera = &camera,
         ._orbit = &orbit,
-    });
+    };
+    var right_drag = rdrag.make_dragger(&yawpitch);
 
-    var middle_drag = rdrag.make_dragger(orbit_camera.CameraShiftDragger{
+    var shift = orbit_camera.CameraShiftDragger{
         ._camera = &camera,
         ._orbit = &orbit,
-    });
+    };
+    var middle_drag = rdrag.make_dragger(&shift);
 
-    // auto gizmo = std::make_shared<TRSGizmo>(&camera, scene);
+    var gizmo = gizmo_dragger.TRSGizmo{
+        ._camera = &camera,
+        ._scene = &scene,
+    };
     // Drawable gizmo_mesh;
-    // Drag left_drag{
-    //     .draggable = gizmo,
-    // };
+    var left_drag = rdrag.make_dragger(&gizmo);
 
     while (!c.WindowShouldClose()) {
         const w = c.GetScreenWidth();
@@ -81,7 +86,7 @@ pub fn main() !void {
             c.rlDisableBackfaceCulling();
             c.ClearBackground(c.RAYWHITE);
 
-            //     left_drag.process(w, h, cursor, IsMouseButtonDown(MOUSE_BUTTON_LEFT));
+            left_drag.process(w, h, cursor, c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT));
             right_drag.process(w, h, cursor, c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT));
             middle_drag.process(w, h, cursor, c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE));
 
