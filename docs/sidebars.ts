@@ -26,9 +26,9 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'compoenent',
+      label: 'component',
       items: [
-        'compoenent/index',
+        'component/index',
       ],
     },
 

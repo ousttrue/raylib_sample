@@ -2,21 +2,21 @@
 
 ## T
 
-- lcoal x, y, z 軸移動
-- world x, y, z 軸移動
-- local xy, yz, zx 平面移動
-- world xy, yz, zx 平面移動
-- 視点平面移動
+- Arrow: lcoal x, y, z 軸移動
+- Arrow: world x, y, z 軸移動
+- Rect: local xy, yz, zx 平面移動
+- Rect: world xy, yz, zx 平面移動
+- Cube: 視点平面移動
 
 ## R
 
-- local x, y, z 軸回転(円盤上下面)
-- world x, y, z 軸回転(円盤上下面)
-- 視点平面回転- local x, y, z 軸回転(円盤側面 あとで)
-- world x, y, z 軸回転(円盤側面 あとで)
+- Circle: local x, y, z 軸回転(円盤上下面)
+- Circle: world x, y, z 軸回転(円盤上下面)
+- Circle: 視点平面回転- local x, y, z 軸回転(円盤側面 あとで)
+- Cylinder: world x, y, z 軸回転(円盤側面 あとで)
 
 ## S
 
-- local x, y, z 軸拡大縮小
-- world x, y, z 軸拡大縮小
-- xyz(unifoorm) 拡大縮小
+- Arrow: local x, y, z 軸拡大縮小
+- Arrow: world x, y, z 軸拡大縮小
+- Cube: yz(unifoorm) 拡大縮小
