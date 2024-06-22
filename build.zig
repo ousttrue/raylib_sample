@@ -176,11 +176,10 @@ const examples = [_]Program{
             "rlImGui/rlImGui.cpp",
         },
     },
-    //
-    // .{
-    //     .name = "tinygizmo",
-    //     .path = "examples/tiny-gizmo-example/example-main.zig",
-    // },
+    .{
+        .name = "tinygizmo",
+        .path = "examples/tiny-gizmo-example/main.zig",
+    },
 };
 
 pub fn build(b: *std.Build) void {
@@ -194,9 +193,14 @@ pub fn build(b: *std.Build) void {
     const imgui_compile = imgui_build.compile(b, target, optimize);
 
     const raygizmo = b.createModule(.{
-        .root_source_file = b.path("raygizmo//raygizmo.zig"),
+        .root_source_file = b.path("raygizmo/raygizmo.zig"),
     });
-    raygizmo.addIncludePath(b.path("raylib/"));
+    raygizmo.addIncludePath(b.path("raylib"));
+
+    const tinygizmo = b.createModule(.{
+        .root_source_file = b.path("tinygizmo/main.zig"),
+    });
+    tinygizmo.addIncludePath(b.path("tinygizmo"));
 
     {
         const exe = b.addExecutable(.{
@@ -277,5 +281,6 @@ pub fn build(b: *std.Build) void {
         }
 
         example.root_module.addImport("raygizmo", raygizmo);
+        example.root_module.addImport("tinygizmo", tinygizmo);
     }
 }
