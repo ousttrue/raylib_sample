@@ -1,17 +1,8 @@
+// This is free and unencumbered software released into the public domain.
+// For more information, please refer to <http://unlicense.org>
 const c = @import("c.zig");
 const orbit_camera = @import("orbit_camera.zig");
 const rdrag = @import("rdrag.zig");
-// // This is free and unencumbered software released into the public domain.
-// // For more information, please refer to <http://unlicense.org>
-// #include <assert.h>
-// #include <raylib/external/glad.h>
-//
-// #include "drawable.h"
-// #include "gizmo_dragger.h"
-// #include "orbit_camera.h"
-// #include "rdrag.h"
-// #include "teapot.h"
-// #include <rlgl.h>
 
 pub fn main() void {
     c.InitWindow(1280, 800, "tiny-gizmo-example-app");
@@ -44,14 +35,16 @@ pub fn main() void {
     };
     orbit.update_view(&camera);
 
-    var right_drag = rdrag.make_dragger(orbit_camera.CameraYawPitchDragger){
-        .draggable = .{ ._camera = &camera, ._orbit = &orbit },
-    };
+    var right_drag = rdrag.make_dragger(orbit_camera.CameraYawPitchDragger{
+        ._camera = &camera,
+        ._orbit = &orbit,
+    });
 
-    // Drag middle_drag{
-    //     .draggable = std::make_shared<CameraShiftDragger>(&camera, &orbit),
-    // };
-    //
+    var middle_drag = rdrag.make_dragger(orbit_camera.CameraShiftDragger{
+        ._camera = &camera,
+        ._orbit = &orbit,
+    });
+
     // auto gizmo = std::make_shared<TRSGizmo>(&camera, scene);
     // Drawable gizmo_mesh;
     // Drag left_drag{
@@ -86,7 +79,7 @@ pub fn main() void {
 
             //     left_drag.process(w, h, cursor, IsMouseButtonDown(MOUSE_BUTTON_LEFT));
             right_drag.process(w, h, cursor, c.IsMouseButtonDown(c.MOUSE_BUTTON_RIGHT));
-            //     middle_drag.process(w, h, cursor, IsMouseButtonDown(MOUSE_BUTTON_MIDDLE));
+            middle_drag.process(w, h, cursor, c.IsMouseButtonDown(c.MOUSE_BUTTON_MIDDLE));
 
             {
                 c.BeginMode3D(camera);

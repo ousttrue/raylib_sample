@@ -99,11 +99,11 @@ pub const CameraShiftDragger = struct {
         const delta = c.Vector2Subtract(cursor, self._last);
         self._last = cursor;
         const distance = c.Vector3Distance(self._camera.target, self._camera.position);
-        self._orbit.Shift(delta, distance, self._camera.fovy, .{
-            0,
-            0,
-            w,
-            h,
+        self._orbit.shift(delta, distance, self._camera.fovy, .{
+            .x = 0,
+            .y = 0,
+            .width = @floatFromInt(w),
+            .height = @floatFromInt(h),
         });
         self._orbit.update_view(self._camera);
     }
