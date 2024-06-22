@@ -3,23 +3,27 @@
 const c = @import("c.zig");
 const orbit_camera = @import("orbit_camera.zig");
 const rdrag = @import("rdrag.zig");
+const drawable = @import("drawable.zig");
+const teapot = @cImport({
+    @cInclude("teapot.h");
+});
 
-pub fn main() void {
+pub fn main() !void {
     c.InitWindow(1280, 800, "tiny-gizmo-example-app");
     defer c.CloseWindow();
 
-    // auto a = std::make_shared<Drawable>();
-    // a->name = "first-example-gizmo";
-    // a->position = {-2, 0, 0};
-    // a->load({(Vertex *)teapot_vertices, _countof(teapot_vertices) / 6},
-    //         teapot_triangles, false);
-    //
-    // auto b = std::make_shared<Drawable>();
-    // b->name = "second-example-gizmo";
-    // b->position = {2, 0, 0};
-    // b->load({(Vertex *)teapot_vertices, _countof(teapot_vertices) / 6},
-    //         teapot_triangles, false);
-    //
+    var a = drawable.Drawable{
+        .name = "first-example-gizmo",
+        .position = .{ .x = -2, .y = 0, .z = 0 },
+    };
+    try a.load_slice(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
+
+    var b = drawable.Drawable{
+        .name = "second-example-gizmo",
+        .position = .{ .x = 2, .y = 0, .z = 0 },
+    };
+    try b.load_slice(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
+
     // std::list<std::shared_ptr<Drawable>> scene{
     //     a,
     //     b,
@@ -83,9 +87,9 @@ pub fn main() void {
 
             {
                 c.BeginMode3D(camera);
-                //       // teapot
-                //       a->draw();
-                //       b->draw();
+                // teapot
+                a.draw();
+                b.draw();
                 c.DrawGrid(10, 1.0);
 
                 // draw gizmo
