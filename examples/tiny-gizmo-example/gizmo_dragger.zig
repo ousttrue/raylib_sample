@@ -12,7 +12,7 @@ pub const TranslationGizmo = struct {
     // tinygizmo::drag_state drag_state;
 
     local_toggle: bool = true,
-    gizmo_state: tinygizmo.gizmo_application_state = .{},
+    gizmo_state: tinygizmo.FrameState = .{},
 
     pub fn begin(self: *@This(), cursor: c.Vector2) void {
         _ = cursor; // autofix
@@ -105,8 +105,8 @@ pub const TRSGizmo = struct {
     active_hotkey: Hotkey = .{},
     last_hotkey: Hotkey = .{},
 
-    active_state: tinygizmo.gizmo_application_state = .{},
-    last_state: tinygizmo.gizmo_application_state = .{},
+    active_state: tinygizmo.FrameState = .{},
+    last_state: tinygizmo.FrameState = .{},
     local_toggle: bool = true,
 
     //   std::shared_ptr<TranslationGizmo> _t,
@@ -192,10 +192,10 @@ pub const TRSGizmo = struct {
 
         self.last_state = self.active_state;
         self.active_state = .{
-            .mouse_left = c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT),
+            .mouse_down = c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT),
             // optional flag to draw the gizmos at a constant screen-space
             // scale gizmo_state.screenspace_scale = 80.f; camera projection
-            .viewport_size = .{ @floatFromInt(w), @floatFromInt(h) },
+            .viewport_size = .{ .x = @floatFromInt(w), .y = @floatFromInt(h) },
             .ray = .{
                 .origin = .{
                     .x = ray.position.x,
@@ -209,7 +209,7 @@ pub const TRSGizmo = struct {
                 },
             },
             .cam_yfov = 1.0,
-            .cam_rotation = .{ .x = rot.x, .y = rot.y, .z = rot.z, .w = rot.w },
+            .cam_orientation = .{ .x = rot.x, .y = rot.y, .z = rot.z, .w = rot.w },
         };
 
         self._active.gizmo_state = self.active_state;
@@ -244,7 +244,7 @@ pub const TRSGizmo = struct {
         //     };
 
         for (self.scene) |target| {
-            const src = tinygizmo.rigid_transform.RigidTransform{
+            const src = tinygizmo.RigidTransform{
                 .orientation = .{
                     .x = target.rotation.x,
                     .y = target.rotation.y,
