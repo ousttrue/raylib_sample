@@ -1,233 +1,34 @@
 #include "gizmo_dragger.h"
-
-struct RayState {
-  tinygizmo::RigidTransform transform;
-  float draw_scale;
-  tinygizmo::RigidTransform gizmo_transform;
-  tinygizmo::Ray local_ray;
-  float t;
-};
-
-void TranslationGizmo::begin(const Vector2 &cursor) {
-  float best_t = std::numeric_limits<float>::infinity();
-  std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
-  for (auto &target : this->_scene) {
-    tinygizmo::RigidTransform src{
-        .orientation = *(tinygizmo::Quaternion *)&target->rotation,
-        .position = *(tinygizmo::Float3 *)&target->position,
-        .scale = *(tinygizmo::Float3 *)&target->scale,
-    };
-    auto [draw_scale, gizmo_transform, local_ray] =
-        gizmo_state.gizmo_transform_and_local_ray(local_toggle, src);
-    // ray intersection
-    auto [updated_state, t] = tinygizmo::position_intersect(local_ray);
-    if (updated_state) {
-      ray_map.insert({target,
-                      {
-                          .transform = src,
-                          .draw_scale = draw_scale,
-                          .gizmo_transform = gizmo_transform,
-                          .local_ray = local_ray,
-                          .t = t,
-                      }});
-      if (t < best_t) {
-        this->active = updated_state;
-        this->gizmo_target = target;
-      }
-    }
-  }
-
-  if (this->active) {
-    // begin drag
-    auto ray_state = ray_map[this->gizmo_target];
-    auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-    this->drag_state = {.original_position = ray_state.transform.position,
-                        .click_offset = ray.point(ray_state.t)};
-    if (local_toggle) {
-      // click point in gizmo local
-      this->drag_state.click_offset =
-          ray_state.gizmo_transform.transform_vector(
-              this->drag_state.click_offset);
-    }
-  }
-}
-
-void TranslationGizmo::drag(const DragState &state, int w, int h,
-                            const Vector2 &cursor) {
-  for (auto &target : this->_scene) {
-    if (this->active && this->gizmo_target == target) {
-      tinygizmo::RigidTransform src{
-          .orientation = *(tinygizmo::Quaternion *)&target->rotation,
-          .position = *(tinygizmo::Float3 *)&target->position,
-          .scale = *(tinygizmo::Float3 *)&target->scale,
-      };
-      // auto [_0, gizmo_transform, _2] =
-      //     tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
-      auto position = tinygizmo::position_drag(&drag_state, gizmo_state,
-                                               local_toggle, this->active, src);
-      target->position = *(Vector3 *)&position;
-    }
-  }
-}
-
-void RotationGizmo::begin(const Vector2 &cursor) {
-  float best_t = std::numeric_limits<float>::infinity();
-  std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
-  for (auto &target : this->_scene) {
-    tinygizmo::RigidTransform src{
-        .orientation = *(tinygizmo::Quaternion *)&target->rotation,
-        .position = *(tinygizmo::Float3 *)&target->position,
-        .scale = *(tinygizmo::Float3 *)&target->scale,
-    };
-    auto [draw_scale, gizmo_transform, local_ray] =
-        gizmo_state.gizmo_transform_and_local_ray(local_toggle, src);
-    // ray intersection
-    auto [updated_state, t] = tinygizmo::rotation_intersect(local_ray);
-    if (updated_state) {
-      ray_map.insert({target,
-                      {
-                          .transform = src,
-                          .draw_scale = draw_scale,
-                          .gizmo_transform = gizmo_transform,
-                          .local_ray = local_ray,
-                          .t = t,
-                      }});
-      if (t < best_t) {
-        this->active = updated_state;
-        this->gizmo_target = target;
-      }
-    }
-  }
-
-  if (this->active) {
-    auto ray_state = ray_map[this->gizmo_target];
-    // begin drag
-    auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-    // click point in gizmo local
-    this->drag_state = {
-        .original_position = ray_state.transform.position,
-        // .click_offset = local_toggle
-        //                     ? ray_state.gizmo_transform.transform_vector(
-        //                           ray.origin + ray.direction * ray_state.t)
-        //                     : ray.origin + ray.direction * ray_state.t,
-        .click_offset = ray_state.transform.transform_point(
-            ray.origin + ray.direction.scale(ray_state.t)),
-        .original_orientation = ray_state.transform.orientation,
-    };
-  }
-}
-
-void RotationGizmo::drag(const DragState &state, int w, int h,
-                         const Vector2 &cursor) {
-  for (auto &target : this->_scene) {
-    if (this->active && this->gizmo_target == target) {
-      tinygizmo::RigidTransform src{
-          .orientation = *(tinygizmo::Quaternion *)&target->rotation,
-          .position = *(tinygizmo::Float3 *)&target->position,
-          .scale = *(tinygizmo::Float3 *)&target->scale,
-      };
-      auto [_0, gizmo_transform, _2] =
-          gizmo_state.gizmo_transform_and_local_ray(local_toggle, src);
-
-      auto rotation =
-          tinygizmo::rotation_drag(&drag_state, gizmo_state, local_toggle,
-                                   this->active, gizmo_transform);
-      target->rotation = *(Vector4 *)&rotation;
-    }
-  }
-}
-
-void ScalingGizmo::begin(const Vector2 &cursor) {
-  float best_t = std::numeric_limits<float>::infinity();
-  std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
-  for (auto &target : this->_scene) {
-    tinygizmo::RigidTransform src{
-        .orientation = *(tinygizmo::Quaternion *)&target->rotation,
-        .position = *(tinygizmo::Float3 *)&target->position,
-        .scale = *(tinygizmo::Float3 *)&target->scale,
-    };
-    auto [draw_scale, gizmo_transform, local_ray] =
-        gizmo_state.gizmo_transform_and_local_ray(local_toggle, src);
-    // ray intersection
-    auto [updated_state, t] = tinygizmo::scaling_intersect(local_ray);
-    if (updated_state) {
-      ray_map.insert({target,
-                      {
-                          .transform = src,
-                          .draw_scale = draw_scale,
-                          .gizmo_transform = gizmo_transform,
-                          .local_ray = local_ray,
-                          .t = t,
-                      }});
-      if (t < best_t) {
-        this->active = updated_state;
-        this->gizmo_target = target;
-      }
-    }
-  }
-
-  if (this->active) {
-    auto ray_state = ray_map[this->gizmo_target];
-    // begin drag
-    auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-    // click point in gizmo local
-    this->drag_state = {
-        // .click_offset = local_toggle
-        //                     ? ray_state.gizmo_transform.transform_vector(
-        //                           ray.origin + ray.direction * ray_state.t)
-        //                     : ray.origin + ray.direction * ray_state.t,
-        .click_offset = ray_state.transform.transform_point(
-            ray.origin + ray.direction.scale(ray_state.t)),
-        .original_scale = ray_state.transform.scale,
-    };
-  }
-}
-
-void ScalingGizmo::drag(const DragState &state, int w, int h,
-                        const Vector2 &cursor) {
-  for (auto &target : this->_scene) {
-    if (this->active && this->gizmo_target == target) {
-      tinygizmo::RigidTransform src{
-          .orientation = *(tinygizmo::Quaternion *)&target->rotation,
-          .position = *(tinygizmo::Float3 *)&target->position,
-          .scale = *(tinygizmo::Float3 *)&target->scale,
-      };
-      // auto [_0, gizmo_transform, _2] =
-      //     tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
-      auto scale = tinygizmo::scaling_drag(
-          &drag_state, gizmo_state, local_toggle, this->active, src, uniform);
-      target->scale = *(Vector3 *)&scale;
-    }
-  }
-}
+#include <iostream>
 
 void TRSGizmo::hotkey(int w, int h, const Vector2 &cursor,
                       const struct hotkey &hotkey) {
   if (hotkey.hotkey_ctrl == true) {
-    if (last_hotkey.hotkey_translate == false &&
+    if (_last_hotkey.hotkey_translate == false &&
         hotkey.hotkey_translate == true) {
-      _active = _t;
-    } else if (last_hotkey.hotkey_rotate == false &&
-               hotkey.hotkey_rotate == true) {
-      _active = _r;
-    } else if (last_hotkey.hotkey_scale == false &&
-               hotkey.hotkey_scale == true) {
-      _active = _s;
+      _visible = _t;
+    }
+    if (_last_hotkey.hotkey_rotate == false && hotkey.hotkey_rotate == true) {
+      _visible = _r;
+    }
+    if (_last_hotkey.hotkey_scale == false && hotkey.hotkey_scale == true) {
+      _visible = _s;
     }
 
-    local_toggle = (!last_hotkey.hotkey_local && hotkey.hotkey_local)
-                       ? !local_toggle
-                       : local_toggle;
+    if (hotkey.hotkey_local) {
+      _local_toggle = !_local_toggle;
+      std::cout << "_local_toggle: " << _local_toggle << std::endl;
+    }
   }
-  last_hotkey = active_hotkey;
-  active_hotkey = hotkey;
+  _last_hotkey = _active_hotkey;
+  _active_hotkey = hotkey;
 
   auto ray = GetMouseRay(cursor, *_camera);
   auto rot =
       QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
 
-  last_state = active_state;
-  active_state = {
+  _last_state = _active_state;
+  _active_state = {
       .mouse_down = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
       // optional flag to draw the gizmos at a constant screen-space
       // scale gizmo_state.screenspace_scale = 80.f; camera projection
@@ -240,35 +41,32 @@ void TRSGizmo::hotkey(int w, int h, const Vector2 &cursor,
       .cam_yfov = 1.0f,
       .cam_orientation = {rot.x, rot.y, rot.z, rot.w},
   };
-
-  _active->gizmo_state = active_state;
-  _active->local_toggle = local_toggle;
 }
 
 void TRSGizmo::load(Drawable *drawable) {
-  positions.clear();
-  colors.clear();
-  indices.clear();
+  _positions.clear();
+  _colors.clear();
+  _indices.clear();
   tinygizmo::AddTriangleFunc add_world_triangle =
       [self = this](const tinygizmo::Float4 &rgba, const tinygizmo::Float3 &p0,
                     const tinygizmo::Float3 &p1, const tinygizmo::Float3 &p2) {
         //
-        auto offset = self->positions.size();
+        auto offset = self->_positions.size();
         Color color{
             static_cast<unsigned char>(std::max(0.0f, rgba.x) * 255),
             static_cast<unsigned char>(std::max(0.0f, rgba.y) * 255),
             static_cast<unsigned char>(std::max(0.0f, rgba.z) * 255),
             static_cast<unsigned char>(std::max(0.0f, rgba.w) * 255),
         };
-        self->positions.push_back({p0.x, p0.y, p0.z});
-        self->positions.push_back({p1.x, p1.y, p1.z});
-        self->positions.push_back({p2.x, p2.y, p2.z});
-        self->colors.push_back(color);
-        self->colors.push_back(color);
-        self->colors.push_back(color);
-        self->indices.push_back(offset + 0);
-        self->indices.push_back(offset + 1);
-        self->indices.push_back(offset + 2);
+        self->_positions.push_back({p0.x, p0.y, p0.z});
+        self->_positions.push_back({p1.x, p1.y, p1.z});
+        self->_positions.push_back({p2.x, p2.y, p2.z});
+        self->_colors.push_back(color);
+        self->_colors.push_back(color);
+        self->_colors.push_back(color);
+        self->_indices.push_back(offset + 0);
+        self->_indices.push_back(offset + 1);
+        self->_indices.push_back(offset + 2);
       };
 
   for (auto &target : this->_scene) {
@@ -276,19 +74,18 @@ void TRSGizmo::load(Drawable *drawable) {
                                   *(tinygizmo::Float3 *)&target->position,
                                   *(tinygizmo::Float3 *)&target->scale);
     auto [draw_scale, p, ray] =
-        active_state.gizmo_transform_and_local_ray(local_toggle, src);
+        _active_state.gizmo_transform_and_local_ray(_local_toggle, src);
 
     auto modelMatrix = p.matrix();
     auto scaleMatrix =
         tinygizmo::Float4x4::scaling(draw_scale, draw_scale, draw_scale);
     modelMatrix = modelMatrix * scaleMatrix;
 
-    // tinygizmo::position_draw(add_world_triangle, nullptr, modelMatrix);
-    _active->draw(add_world_triangle, modelMatrix);
+    _visible->draw(_active, add_world_triangle, modelMatrix);
   }
 
-  if (positions.size() && indices.size()) {
-    drawable->load(positions.size(), positions.data(), colors.data(),
-                   indices.size(), indices.data(), true);
+  if (_positions.size() && _indices.size()) {
+    drawable->load(_positions.size(), _positions.data(), _colors.data(),
+                   _indices.size(), _indices.data(), true);
   }
 }

@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
         .hotkey_translate = IsKeyDown(KEY_T),
         .hotkey_rotate = IsKeyDown(KEY_R),
         .hotkey_scale = IsKeyDown(KEY_S),
-        .hotkey_local = IsKeyDown(KEY_L),
+        .hotkey_local = IsKeyPressed(KEY_L),
     };
     gizmo->hotkey(w, h, cursor, active_hotkey);
 

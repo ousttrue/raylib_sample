@@ -42,14 +42,14 @@ struct FrameState {
 };
 
 struct DragState {
-  // Original position of an object being manipulated with a gizmo
-  Float3 original_position;
   // Offset from position of grabbed object to coordinates of clicked point
   Float3 click_offset;
-  // Original scale of an object being manipulated with a gizmo
-  Float3 original_scale;
+  // Original position of an object being manipulated with a gizmo
+  Float3 original_position;
   // Original orientation of an object being manipulated with a gizmo
   Quaternion original_orientation;
+  // Original scale of an object being manipulated with a gizmo
+  Float3 original_scale;
 };
 
 } // namespace tinygizmo
