@@ -43,6 +43,17 @@
             "name": "tinygizmo",
             "type": "cppvsdbg",
             "request": "launch",
+            "program": "${workspaceFolder}/builddir/tiny-gizmo-example.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "tinygizmo(zig)",
+            "type": "cppvsdbg",
+            "request": "launch",
             // "program": "${workspaceFolder}/builddir/tiny-gizmo-example.exe",
             // "program": "${workspaceFolder}/builddir/hello.exe",
             // "program": "${workspaceFolder}/zig-out/bin/raylib_sample.exe",
@@ -53,5 +64,6 @@
             "environment": [],
             "console": "integratedTerminal"
         }
+
     ]
 }

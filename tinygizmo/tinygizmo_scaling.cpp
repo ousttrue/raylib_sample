@@ -1,4 +1,5 @@
 #include "tinygizmo_scaling.h"
+#include <memory>
 
 namespace tinygizmo {
 
@@ -54,12 +55,12 @@ inline void flush_to_zero(Float3 &f) {
     f.z = 0.f;
 }
 
-static RigidTransform
-axis_scale_dragger(drag_state *drag,
-                   const gizmo_application_state &active_state,
-                   bool local_toggle, const Float3 &axis,
-                   const RigidTransform &src, bool uniform) {
-  if (!active_state.mouse_left) {
+static RigidTransform axis_scale_dragger(DragState *drag,
+                                         const FrameState &active_state,
+                                         bool local_toggle, const Float3 &axis,
+                                         const RigidTransform &src,
+                                         bool uniform) {
+  if (!active_state.mouse_down) {
     return src;
   }
 
@@ -85,7 +86,7 @@ axis_scale_dragger(drag_state *drag,
 
   auto distance = active_state.ray.point(t);
 
-  Float3 offset_on_axis = (distance - drag->click_offset) * axis;
+  auto offset_on_axis = (distance - drag->click_offset).mult_each(axis);
   flush_to_zero(offset_on_axis);
   Float3 new_scale = drag->original_scale + offset_on_axis;
 
@@ -94,14 +95,10 @@ axis_scale_dragger(drag_state *drag,
                 : Float3(clamp(new_scale.x, 0.01f, 1000.f),
                          clamp(new_scale.y, 0.01f, 1000.f),
                          clamp(new_scale.z, 0.01f, 1000.f));
-  if (active_state.snap_scale) {
-    scale = snap(scale, active_state.snap_scale);
-  }
   return RigidTransform(src.orientation, src.position, scale);
 }
 
-Float3 scaling_drag(drag_state *drag, const gizmo_application_state &state,
-                    bool local_toggle,
+Float3 scaling_drag(DragState *drag, const FrameState &state, bool local_toggle,
                     const std::shared_ptr<gizmo_component> &active,
                     const RigidTransform &src, bool uniform) {
 
@@ -139,8 +136,8 @@ void scaling_draw(const AddTriangleFunc &add_world_triangle,
   };
 
   for (auto c : draw_components) {
-    add_triangles(add_world_triangle, modelMatrix, c->mesh,
-                  (c == active) ? c->base_color : c->highlight_color);
+    c->mesh.add_triangles(add_world_triangle, modelMatrix,
+                          (c == active) ? c->base_color : c->highlight_color);
   }
 }
 

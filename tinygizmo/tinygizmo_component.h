@@ -16,7 +16,7 @@ struct gizmo_component {
   virtual ~gizmo_component() {}
 
   virtual std::optional<RigidTransform>
-  drag(drag_state *drag, const gizmo_application_state &active_state,
+  drag(DragState *drag, const FrameState &active_state,
        bool local_toggle, const RigidTransform &src) const {
     return {};
   }

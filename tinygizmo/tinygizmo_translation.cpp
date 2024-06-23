@@ -2,11 +2,6 @@
 #include <assert.h>
 #include <optional>
 
-// ray plane
-// up, right
-// delta
-// axis
-
 namespace tinygizmo {
 
 std::vector<Float2> arrow_points = {
@@ -15,13 +10,13 @@ std::vector<Float2> arrow_points = {
 struct translation_plane_component : gizmo_component {
   using gizmo_component::gizmo_component;
 
-  virtual Float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
+  virtual Float3 get_axis(const FrameState &state, bool local_toggle,
                           const Quaternion &rotation) const = 0;
 
-  std::optional<RigidTransform>
-  drag(drag_state *drag, const gizmo_application_state &active_state,
-       bool local_toggle, const RigidTransform &p) const override {
+  std::optional<RigidTransform> drag(DragState *drag,
+                                     const FrameState &active_state,
+                                     bool local_toggle,
+                                     const RigidTransform &p) const override {
     auto plane_normal = get_axis(active_state, local_toggle, p.orientation);
     auto plane =
         Plane::from_normal_and_position(plane_normal, drag->original_position);
@@ -42,13 +37,13 @@ struct translation_plane_component : gizmo_component {
 struct translation_axis_component : gizmo_component {
   using gizmo_component::gizmo_component;
 
-  virtual Float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
+  virtual Float3 get_axis(const FrameState &state, bool local_toggle,
                           const Quaternion &rotation) const = 0;
 
-  std::optional<RigidTransform>
-  drag(drag_state *drag, const gizmo_application_state &active_state,
-       bool local_toggle, const RigidTransform &p) const override {
+  std::optional<RigidTransform> drag(DragState *drag,
+                                     const FrameState &active_state,
+                                     bool local_toggle,
+                                     const RigidTransform &p) const override {
     // First apply a plane translation dragger with a plane that contains the
     // desired axis and is oriented to face the camera
     auto axis = get_axis(active_state, local_toggle, p.orientation);
@@ -65,7 +60,7 @@ struct translation_axis_component : gizmo_component {
 
     // Constrain object motion to be along the desired axis
     auto point = drag->original_position +
-                 axis * Float3::dot(dst - drag->original_position, axis) -
+                 axis.scale(Float3::dot(dst - drag->original_position, axis)) -
                  drag->click_offset;
     return RigidTransform(p.orientation, point, p.scale);
   }
@@ -78,7 +73,7 @@ struct translation_x_component : translation_axis_component {
                                                16, arrow_points),
             Float4{1, 0.5f, 0.5f, 1.f}, Float4{1, 0, 0, 1.f}) {}
 
-  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+  Float3 get_axis(const FrameState &state, bool local_toggle,
                   const Quaternion &rotation) const override {
     return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
   }
@@ -91,7 +86,7 @@ struct translation_y_component : translation_axis_component {
                                                16, arrow_points),
             Float4{0.5f, 1, 0.5f, 1.f}, Float4{0, 1, 0, 1.f}) {}
 
-  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+  Float3 get_axis(const FrameState &state, bool local_toggle,
                   const Quaternion &rotation) const override {
     return (local_toggle) ? rotation.ydir() : Float3{0, 1, 0};
   }
@@ -104,7 +99,7 @@ struct translation_z_component : translation_axis_component {
                                                16, arrow_points),
             Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f}) {}
 
-  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+  Float3 get_axis(const FrameState &state, bool local_toggle,
                   const Quaternion &rotation) const override {
     return (local_toggle) ? rotation.zdir() : Float3{0, 0, 1};
   }
@@ -117,7 +112,7 @@ struct translation_yz_component : translation_plane_component {
                                             {0.01f, 0.75f, 0.75f}),
             Float4{0.5f, 1, 1, 0.5f}, Float4{0, 1, 1, 0.6f}) {}
 
-  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+  Float3 get_axis(const FrameState &state, bool local_toggle,
                   const Quaternion &rotation) const override {
     return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
   }
@@ -130,7 +125,7 @@ struct translation_zx_component : translation_plane_component {
                                             {0.75f, 0.01f, 0.75f}),
             Float4{1, 0.5f, 1, 0.5f}, Float4{1, 0, 1, 0.6f}) {}
 
-  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+  Float3 get_axis(const FrameState &state, bool local_toggle,
                   const Quaternion &rotation) const override {
     return (local_toggle) ? rotation.ydir() : Float3{0, 1, 0};
   }
@@ -143,7 +138,7 @@ struct translation_xy_component : translation_plane_component {
                                             {0.75f, 0.75f, 0.01f}),
             Float4{1, 1, 0.5f, 0.5f}, Float4{1, 1, 0, 0.6f}) {}
 
-  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+  Float3 get_axis(const FrameState &state, bool local_toggle,
                   const Quaternion &rotation) const override {
     return (local_toggle) ? rotation.zdir() : Float3{0, 0, 1};
   }
@@ -156,7 +151,7 @@ struct translation_xyz_component : translation_plane_component {
                                             {0.05f, 0.05f, 0.05f}),
             Float4{0.9f, 0.9f, 0.9f, 0.25f}, Float4{1, 1, 1, 0.35f}) {}
 
-  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+  Float3 get_axis(const FrameState &state, bool local_toggle,
                   const Quaternion &) const override {
     return -state.cam_orientation.zdir();
   }
@@ -188,7 +183,7 @@ position_intersect(const Ray &ray) {
   return {updated_state, best_t};
 }
 
-Float3 position_drag(drag_state *drag, const gizmo_application_state &state,
+Float3 position_drag(DragState *drag, const FrameState &state,
                      bool local_toggle,
                      const std::shared_ptr<gizmo_component> &active,
                      const RigidTransform &p) {
@@ -204,9 +199,8 @@ void position_draw(const AddTriangleFunc &add_world_triangle,
                    const std::shared_ptr<gizmo_component> &active,
                    const Float4x4 &modelMatrix) {
   for (auto c : _gizmo_components) {
-    auto mesh = c->mesh;
     auto color = (c == active) ? c->base_color : c->highlight_color;
-    add_triangles(add_world_triangle, modelMatrix, mesh, color);
+    c->mesh.add_triangles(add_world_triangle, modelMatrix, color);
   }
 }
 

@@ -11,11 +11,11 @@ protected:
   std::list<std::shared_ptr<Drawable>> _scene;
   std::shared_ptr<Drawable> gizmo_target;
   std::shared_ptr<tinygizmo::gizmo_component> active;
-  tinygizmo::drag_state drag_state;
+  tinygizmo::DragState drag_state;
 
 public:
   Gizmo(std::list<std::shared_ptr<Drawable>> &scene) : _scene(scene) {}
-  tinygizmo::gizmo_application_state gizmo_state;
+  tinygizmo::FrameState gizmo_state;
   bool local_toggle;
 
   void end(const Vector2 &) override {
@@ -79,8 +79,8 @@ class TRSGizmo : public Dragger {
 
   hotkey active_hotkey{0};
   hotkey last_hotkey{0};
-  tinygizmo::gizmo_application_state active_state;
-  tinygizmo::gizmo_application_state last_state;
+  tinygizmo::FrameState active_state;
+  tinygizmo::FrameState last_state;
   bool local_toggle{true};
 
   std::shared_ptr<TranslationGizmo> _t;

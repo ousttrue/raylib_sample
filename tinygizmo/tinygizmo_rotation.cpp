@@ -1,5 +1,6 @@
 #include "tinygizmo_rotation.h"
 #include <assert.h>
+#include <memory>
 
 namespace tinygizmo {
 
@@ -52,11 +53,57 @@ make_rotation_quat_between_vectors_snapped(const Float3 &from, const Float3 &to,
                                      snappedAcos);
 }
 
-static RigidTransform axis_rotation_dragger(
-    drag_state *drag, const gizmo_application_state &active_state,
-    bool local_toggle, const Float3 &axis, const RigidTransform &src, bool);
+static RigidTransform axis_rotation_dragger(DragState *drag,
+                                            const FrameState &active_state,
+                                            bool local_toggle,
+                                            const Float3 &axis,
+                                            const RigidTransform &src, bool) {
+  auto start_orientation =
+      local_toggle ? drag->original_orientation : Quaternion{0, 0, 0, 1};
 
-Float4 rotation_drag(drag_state *drag, const gizmo_application_state &state,
+  if (!active_state.mouse_down) {
+    return src;
+  }
+
+  RigidTransform original_pose = {
+      start_orientation,
+      drag->original_position,
+  };
+  auto the_axis = original_pose.transform_vector(axis);
+  auto the_plane =
+      Plane::from_normal_and_position(the_axis, drag->click_offset);
+
+  auto t = active_state.ray.intersect_plane(the_plane);
+  if (!t) {
+    return src;
+  }
+
+  auto center_of_rotation =
+      drag->original_position +
+      the_axis.scale(
+          Float3::dot(the_axis, drag->click_offset - drag->original_position));
+  auto arm1 = (drag->click_offset - center_of_rotation).normalize();
+  auto arm2 = (active_state.ray.point(*t) - center_of_rotation).normalize();
+
+  float d = Float3::dot(arm1, arm2);
+  if (d > 0.999f) {
+    return RigidTransform(start_orientation, src.position, src.scale);
+  }
+
+  float angle = std::acos(d);
+  if (angle < 0.001f) {
+    return RigidTransform(start_orientation, src.position, src.scale);
+  }
+
+  auto a = Float3::cross(arm1, arm2).normalize();
+  return RigidTransform{
+      .orientation = Quaternion::from_axis_angle(a, angle) * start_orientation,
+      .position = src.position,
+      .scale = src.scale,
+  };
+}
+
+Float4 rotation_drag(DragState *drag, const FrameState &state,
                      bool local_toggle,
                      const std::shared_ptr<gizmo_component> &active,
                      const RigidTransform &src) {
@@ -90,8 +137,8 @@ void rotation_draw(const AddTriangleFunc &add_world_triangle,
   };
 
   for (auto c : draw_interactions) {
-    add_triangles(add_world_triangle, modelMatrix, c->mesh,
-                  (c == active) ? c->base_color : c->highlight_color);
+    c->mesh.add_triangles(add_world_triangle, modelMatrix,
+                          (c == active) ? c->base_color : c->highlight_color);
   }
 
   //   Float4 orientation;
