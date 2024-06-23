@@ -1,20 +1,13 @@
 // This is free and unencumbered software released into the public domain.
 // For more information, please refer to <http://unlicense.org>
 #pragma once
-#include "minalg.hpp"
-#include "ray.h"
-#include "rigid_transform.h"
-#include <array>
+#include "tinygizmo_alg.h"
 #include <functional>
 #include <string>
 
 namespace tinygizmo {
 
-inline minalg::float3 snap(const minalg::float3 &value, const float snap) {
-  if (snap > 0.0f)
-    return minalg::float3(floor(value / snap) * snap);
-  return value;
-}
+inline Float3 snap(const Float3 &value, const float snap);
 
 // 32 bit Fowler-Noll-Vo Hash
 inline uint32_t hash_fnv1a(std::string_view str) {
@@ -42,36 +35,33 @@ struct gizmo_application_state {
   // Radians used for snapping rotation quaternions (i.e. PI/8 or PI/16)
   float snap_rotation = 0.f;
   // 3d viewport used to render the view
-  std::array<float, 2> viewport_size;
-  ray ray;
+  Float2 viewport_size;
+  Ray ray;
   float cam_yfov;
-  minalg::float4 cam_orientation;
+  Quaternion cam_orientation;
 
   // This will calculate a scale constant based on the number of screenspace
   // pixels passed as pixel_scale.
-  float calc_scale_screenspace(const minalg::float3 position) const {
-    float dist = length(position - this->ray.origin);
+  float calc_scale_screenspace(const Float3 position) const {
+    float dist = (position - this->ray.origin).length();
     return std::tan(this->cam_yfov) * dist *
-           (_screenspace_scale / this->viewport_size[1]);
+           (_screenspace_scale / this->viewport_size.y);
   }
-  float scale_screenspace(const minalg::float3 &position) const {
+  float scale_screenspace(const Float3 &position) const {
     return (_screenspace_scale > 0.f) ? calc_scale_screenspace(position) : 1.f;
   }
 };
 
-inline minalg::float3 transform_coord(const minalg::float4x4 &transform,
-                                      const minalg::float3 &coord) {
-  auto r = mul(transform, minalg::float4(coord, 1));
-  return (r.xyz() / r.w);
+inline Float3 transform_coord(const Float4x4 &m, const Float3 &coord) {
+  auto r = m.transform(Float4::make(coord, 1));
+  return (r.xyz() * (1.0 / r.w));
 }
 
-using AddTriangleFunc = std::function<void(
-    const std::array<float, 4> &rgba, const std::array<float, 3> &p0,
-    const std::array<float, 3> &p1, const std::array<float, 3> &p2)>;
+using AddTriangleFunc = std::function<void(const Float4 &rgba, const Float3 &p0,
+                                           const Float3 &p1, const Float3 &p2)>;
 inline void add_triangles(const AddTriangleFunc &add_triangle,
-                          const minalg::float4x4 &modelMatrix,
-                          const geometry_mesh &mesh,
-                          const minalg::float4 &color) {
+                          const Float4x4 &modelMatrix, const GeometryMesh &mesh,
+                          const Float4 &color) {
   for (auto &t : mesh.triangles) {
     auto v0 = mesh.vertices[t.x];
     auto v1 = mesh.vertices[t.y];
@@ -90,35 +80,36 @@ inline void add_triangles(const AddTriangleFunc &add_triangle,
   }
 }
 
-inline ray transform(const minalg::rigid_transform &p, const ray &r) {
+inline Ray transform(const RigidTransform &p, const Ray &r) {
   return {p.transform_point(r.origin), p.transform_vector(r.direction)};
 }
 
-inline ray detransform(const minalg::rigid_transform &p, const ray &r) {
+inline Ray detransform(const RigidTransform &p, const Ray &r) {
   return {p.detransform_point(r.origin), p.detransform_vector(r.direction)};
 }
 
-inline ray scaling(const float scale, const ray &r) {
+inline Ray scaling(const float scale, const Ray &r) {
   return {
       .origin = r.origin * scale,
       .direction = r.direction * scale,
   };
 }
 
-inline ray descale(const float scale, const ray &r) {
+inline Ray descale(const float scale, const Ray &r) {
   return {
-      .origin = r.origin / scale,
-      .direction = r.direction / scale,
+      .origin = r.origin * (1.0f / scale),
+      .direction = r.direction * (1.0f / scale),
   };
 }
 
-inline std::tuple<float, minalg::rigid_transform, ray>
+inline std::tuple<float, RigidTransform, Ray>
 gizmo_transform(const gizmo_application_state &active_state, bool local_toggle,
-                const minalg::rigid_transform &src) {
+                const RigidTransform &src) {
   auto draw_scale = active_state.scale_screenspace(src.position);
-  auto p = minalg::rigid_transform(local_toggle ? src.orientation
-                                                : minalg::float4(0, 0, 0, 1),
-                                   src.position);
+  auto p = RigidTransform{
+      .orientation = local_toggle ? src.orientation : Quaternion{0, 0, 0, 1},
+      .position = src.position,
+  };
   auto ray = detransform(p, active_state.ray);
   ray = descale(draw_scale, ray);
   return {draw_scale, p, ray};
@@ -126,13 +117,13 @@ gizmo_transform(const gizmo_application_state &active_state, bool local_toggle,
 
 struct drag_state {
   // Original position of an object being manipulated with a gizmo
-  minalg::float3 original_position;
+  Float3 original_position;
   // Offset from position of grabbed object to coordinates of clicked point
-  minalg::float3 click_offset;
+  Float3 click_offset;
   // Original scale of an object being manipulated with a gizmo
-  minalg::float3 original_scale;
+  Float3 original_scale;
   // Original orientation of an object being manipulated with a gizmo
-  minalg::float4 original_orientation;
+  Quaternion original_orientation;
 };
 
 } // namespace tinygizmo

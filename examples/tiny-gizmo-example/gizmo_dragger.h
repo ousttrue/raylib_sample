@@ -25,7 +25,7 @@ public:
   }
 
   virtual void draw(const tinygizmo::AddTriangleFunc &add_triangle,
-                    const minalg::float4x4 &modelMatrix) = 0;
+                    const tinygizmo::Float4x4 &modelMatrix) = 0;
 };
 
 class TranslationGizmo : public Gizmo {
@@ -35,7 +35,7 @@ public:
   void drag(const DragState &state, int w, int h,
             const Vector2 &cursor) override;
   void draw(const tinygizmo::AddTriangleFunc &add_triangle,
-            const minalg::float4x4 &modelMatrix) override {
+            const tinygizmo::Float4x4 &modelMatrix) override {
     tinygizmo::position_draw(add_triangle, active, modelMatrix);
   }
 };
@@ -47,7 +47,7 @@ public:
   void drag(const DragState &state, int w, int h,
             const Vector2 &cursor) override;
   void draw(const tinygizmo::AddTriangleFunc &add_triangle,
-            const minalg::float4x4 &modelMatrix) override {
+            const tinygizmo::Float4x4 &modelMatrix) override {
     tinygizmo::rotation_draw(add_triangle, active, modelMatrix);
   }
 };
@@ -60,7 +60,7 @@ public:
   void drag(const DragState &state, int w, int h,
             const Vector2 &cursor) override;
   void draw(const tinygizmo::AddTriangleFunc &add_triangle,
-            const minalg::float4x4 &modelMatrix) override {
+            const tinygizmo::Float4x4 &modelMatrix) override {
     tinygizmo::scaling_draw(add_triangle, active, modelMatrix);
   }
 };

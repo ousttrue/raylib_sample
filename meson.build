@@ -40,7 +40,7 @@ endif
 executable(
     'tiny-gizmo-example',
     [
-        'examples/tiny-gizmo-example/example-main.cpp',
+        'examples/tiny-gizmo-example/main.cpp',
         'examples/tiny-gizmo-example/drawable.cpp',
         'examples/tiny-gizmo-example/gizmo_dragger.cpp',
         'tinygizmo/tinygizmo_translation.cpp',

@@ -4,16 +4,15 @@
 namespace tinygizmo {
 
 std::tuple<std::shared_ptr<gizmo_component>, float>
-rotation_intersect(const ray &ray);
+rotation_intersect(const Ray &ray);
 
-minalg::float4 rotation_drag(drag_state *drag,
-                             const gizmo_application_state &state,
-                             bool local_toggle,
-                             const std::shared_ptr<gizmo_component> &active,
-                             const minalg::rigid_transform &p);
+Float4 rotation_drag(drag_state *drag, const gizmo_application_state &state,
+                     bool local_toggle,
+                     const std::shared_ptr<gizmo_component> &active,
+                     const RigidTransform &p);
 
 void rotation_draw(const AddTriangleFunc &add_world_triangle,
                    const std::shared_ptr<gizmo_component> &active,
-                   const minalg::float4x4 &modelMatrix);
+                   const Float4x4 &modelMatrix);
 
 } // namespace tinygizmo

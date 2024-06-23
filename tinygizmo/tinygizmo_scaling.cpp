@@ -6,27 +6,26 @@ template <typename T> T clamp(const T &val, const T &min, const T &max) {
   return std::min(std::max(val, min), max);
 }
 
-std::vector<minalg::float2> mace_points = {{0.25f, 0},    {0.25f, 0.05f},
-                                           {1, 0.05f},    {1, 0.1f},
-                                           {1.25f, 0.1f}, {1.25f, 0}};
+std::vector<Float2> mace_points = {{0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f},
+                                   {1, 0.1f},  {1.25f, 0.1f},  {1.25f, 0}};
 
 auto _scale_x = std::make_shared<gizmo_component>(
-    geometry_mesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16,
-                                        mace_points),
-    minalg::float4{1, 0.5f, 0.5f, 1.f}, minalg::float4{1, 0, 0, 1.f});
+    GeometryMesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16,
+                                       mace_points),
+    Float4{1, 0.5f, 0.5f, 1.f}, Float4{1, 0, 0, 1.f});
 
 auto _scale_y = std::make_shared<gizmo_component>(
-    geometry_mesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16,
-                                        mace_points),
-    minalg::float4{0.5f, 1, 0.5f, 1.f}, minalg::float4{0, 1, 0, 1.f});
+    GeometryMesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16,
+                                       mace_points),
+    Float4{0.5f, 1, 0.5f, 1.f}, Float4{0, 1, 0, 1.f});
 
 auto _scale_z = std::make_shared<gizmo_component>(
-    geometry_mesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16,
-                                        mace_points),
-    minalg::float4{0.5f, 0.5f, 1, 1.f}, minalg::float4{0, 0, 1, 1.f});
+    GeometryMesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16,
+                                       mace_points),
+    Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f});
 
 std::tuple<std::shared_ptr<gizmo_component>, float>
-scaling_intersect(const ray &ray) {
+scaling_intersect(const Ray &ray) {
 
   float best_t = std::numeric_limits<float>::infinity(), t;
   std::shared_ptr<gizmo_component> updated_state = {};
@@ -46,7 +45,7 @@ scaling_intersect(const ray &ray) {
   return {updated_state, best_t};
 }
 
-inline void flush_to_zero(minalg::float3 &f) {
+inline void flush_to_zero(Float3 &f) {
   if (std::abs(f.x) < 0.02f)
     f.x = 0.f;
   if (std::abs(f.y) < 0.02f)
@@ -55,60 +54,60 @@ inline void flush_to_zero(minalg::float3 &f) {
     f.z = 0.f;
 }
 
-static minalg::rigid_transform
+static RigidTransform
 axis_scale_dragger(drag_state *drag,
                    const gizmo_application_state &active_state,
-                   bool local_toggle, const minalg::float3 &axis,
-                   const minalg::rigid_transform &src, bool uniform) {
+                   bool local_toggle, const Float3 &axis,
+                   const RigidTransform &src, bool uniform) {
   if (!active_state.mouse_left) {
     return src;
   }
 
-  const minalg::float3 plane_tangent =
-      cross(axis, src.position - active_state.ray.origin);
-  const minalg::float3 plane_normal = cross(axis, plane_tangent);
+  auto plane_tangent =
+      Float3::cross(axis, src.position - active_state.ray.origin);
+  auto plane_normal = Float3::cross(axis, plane_tangent);
 
   // Define the plane to contain the original position of the object
-  const minalg::float3 plane_point = src.position;
+  auto plane_point = src.position;
 
   // If an intersection exists between the ray and the plane, place the
   // object at that point
-  const float denom = dot(active_state.ray.direction, plane_normal);
-  if (std::abs(denom) == 0)
+  auto denom = Float3::dot(active_state.ray.direction, plane_normal);
+  if (std::abs(denom) == 0) {
     return src;
+  }
 
-  const float t =
-      dot(plane_point - active_state.ray.origin, plane_normal) / denom;
-  if (t < 0)
+  auto t =
+      Float3::dot(plane_point - active_state.ray.origin, plane_normal) / denom;
+  if (t < 0) {
     return src;
+  }
 
   auto distance = active_state.ray.point(t);
-  ;
 
-  minalg::float3 offset_on_axis = (distance - drag->click_offset) * axis;
+  Float3 offset_on_axis = (distance - drag->click_offset) * axis;
   flush_to_zero(offset_on_axis);
-  minalg::float3 new_scale = drag->original_scale + offset_on_axis;
+  Float3 new_scale = drag->original_scale + offset_on_axis;
 
-  minalg::float3 scale =
-      (uniform) ? minalg::float3(clamp(dot(distance, new_scale), 0.01f, 1000.f))
-                : minalg::float3(clamp(new_scale.x, 0.01f, 1000.f),
-                                 clamp(new_scale.y, 0.01f, 1000.f),
-                                 clamp(new_scale.z, 0.01f, 1000.f));
+  Float3 scale =
+      (uniform) ? Float3(clamp(Float3::dot(distance, new_scale), 0.01f, 1000.f))
+                : Float3(clamp(new_scale.x, 0.01f, 1000.f),
+                         clamp(new_scale.y, 0.01f, 1000.f),
+                         clamp(new_scale.z, 0.01f, 1000.f));
   if (active_state.snap_scale) {
     scale = snap(scale, active_state.snap_scale);
   }
-  return minalg::rigid_transform(src.orientation, src.position, scale);
+  return RigidTransform(src.orientation, src.position, scale);
 }
 
-minalg::float3 scaling_drag(drag_state *drag,
-                            const gizmo_application_state &state,
-                            bool local_toggle,
-                            const std::shared_ptr<gizmo_component> &active,
-                            const minalg::rigid_transform &src, bool uniform) {
+Float3 scaling_drag(drag_state *drag, const gizmo_application_state &state,
+                    bool local_toggle,
+                    const std::shared_ptr<gizmo_component> &active,
+                    const RigidTransform &src, bool uniform) {
 
   auto scale = src.scale;
   if (active) {
-    minalg::rigid_transform _src{
+    RigidTransform _src{
         .orientation = {0, 0, 0, 1},
         .position = src.position,
         .scale = scale,
@@ -132,7 +131,7 @@ minalg::float3 scaling_drag(drag_state *drag,
 
 void scaling_draw(const AddTriangleFunc &add_world_triangle,
                   const std::shared_ptr<gizmo_component> &active,
-                  const minalg::float4x4 &modelMatrix) {
+                  const Float4x4 &modelMatrix) {
   std::vector<std::shared_ptr<gizmo_component>> draw_components{
       _scale_x,
       _scale_y,

@@ -9,28 +9,29 @@
 
 namespace tinygizmo {
 
-std::vector<minalg::float2> arrow_points = {
+std::vector<Float2> arrow_points = {
     {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
 
 struct translation_plane_component : gizmo_component {
   using gizmo_component::gizmo_component;
 
-  virtual minalg::float3 get_axis(const gizmo_application_state &state,
-                                  bool local_toggle,
-                                  const minalg::float4 &rotation) const = 0;
+  virtual Float3 get_axis(const gizmo_application_state &state,
+                          bool local_toggle,
+                          const Quaternion &rotation) const = 0;
 
-  std::optional<minalg::rigid_transform>
+  std::optional<RigidTransform>
   drag(drag_state *drag, const gizmo_application_state &active_state,
-       bool local_toggle, const minalg::rigid_transform &p) const override {
+       bool local_toggle, const RigidTransform &p) const override {
     auto plane_normal = get_axis(active_state, local_toggle, p.orientation);
-    plane plane(plane_normal, drag->original_position);
+    auto plane =
+        Plane::from_normal_and_position(plane_normal, drag->original_position);
     auto t = active_state.ray.intersect_plane(plane);
     if (!t) {
       return {};
     }
     auto dst = active_state.ray.point(*t) - drag->click_offset;
 
-    return minalg::rigid_transform{
+    return RigidTransform{
         .orientation = p.orientation,
         .position = dst,
         .scale = p.scale,
@@ -41,19 +42,21 @@ struct translation_plane_component : gizmo_component {
 struct translation_axis_component : gizmo_component {
   using gizmo_component::gizmo_component;
 
-  virtual minalg::float3 get_axis(const gizmo_application_state &state,
-                                  bool local_toggle,
-                                  const minalg::float4 &rotation) const = 0;
+  virtual Float3 get_axis(const gizmo_application_state &state,
+                          bool local_toggle,
+                          const Quaternion &rotation) const = 0;
 
-  std::optional<minalg::rigid_transform>
+  std::optional<RigidTransform>
   drag(drag_state *drag, const gizmo_application_state &active_state,
-       bool local_toggle, const minalg::rigid_transform &p) const override {
+       bool local_toggle, const RigidTransform &p) const override {
     // First apply a plane translation dragger with a plane that contains the
     // desired axis and is oriented to face the camera
     auto axis = get_axis(active_state, local_toggle, p.orientation);
-    auto plane_tangent = cross(axis, p.position - active_state.ray.origin);
-    auto plane_normal = cross(axis, plane_tangent);
-    plane plane(plane_normal, drag->original_position);
+    auto plane_tangent =
+        Float3::cross(axis, p.position - active_state.ray.origin);
+    auto plane_normal = Float3::cross(axis, plane_tangent);
+    auto plane =
+        Plane::from_normal_and_position(plane_normal, drag->original_position);
     auto t = active_state.ray.intersect_plane(plane);
     if (!t) {
       return {};
@@ -62,108 +65,100 @@ struct translation_axis_component : gizmo_component {
 
     // Constrain object motion to be along the desired axis
     auto point = drag->original_position +
-                 axis * dot(dst - drag->original_position, axis) -
+                 axis * Float3::dot(dst - drag->original_position, axis) -
                  drag->click_offset;
-    return minalg::rigid_transform(p.orientation, point, p.scale);
+    return RigidTransform(p.orientation, point, p.scale);
   }
 };
 
 struct translation_x_component : translation_axis_component {
   translation_x_component()
       : translation_axis_component(
-            geometry_mesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1},
-                                                16, arrow_points),
-            minalg::float4{1, 0.5f, 0.5f, 1.f}, minalg::float4{1, 0, 0, 1.f}) {}
+            GeometryMesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1},
+                                               16, arrow_points),
+            Float4{1, 0.5f, 0.5f, 1.f}, Float4{1, 0, 0, 1.f}) {}
 
-  minalg::float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
-                          const minalg::float4 &rotation) const override {
-    return (local_toggle) ? qxdir(rotation) : minalg::float3{1, 0, 0};
+  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+                  const Quaternion &rotation) const override {
+    return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
   }
 };
 
 struct translation_y_component : translation_axis_component {
   translation_y_component()
       : translation_axis_component(
-            geometry_mesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0},
-                                                16, arrow_points),
-            minalg::float4{0.5f, 1, 0.5f, 1.f}, minalg::float4{0, 1, 0, 1.f}) {}
+            GeometryMesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0},
+                                               16, arrow_points),
+            Float4{0.5f, 1, 0.5f, 1.f}, Float4{0, 1, 0, 1.f}) {}
 
-  minalg::float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
-                          const minalg::float4 &rotation) const override {
-    return (local_toggle) ? qydir(rotation) : minalg::float3{0, 1, 0};
+  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+                  const Quaternion &rotation) const override {
+    return (local_toggle) ? rotation.ydir() : Float3{0, 1, 0};
   }
 };
 
 struct translation_z_component : translation_axis_component {
   translation_z_component()
       : translation_axis_component(
-            geometry_mesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0},
-                                                16, arrow_points),
-            minalg::float4{0.5f, 0.5f, 1, 1.f}, minalg::float4{0, 0, 1, 1.f}) {}
+            GeometryMesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0},
+                                               16, arrow_points),
+            Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f}) {}
 
-  minalg::float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
-                          const minalg::float4 &rotation) const override {
-    return (local_toggle) ? qzdir(rotation) : minalg::float3{0, 0, 1};
+  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+                  const Quaternion &rotation) const override {
+    return (local_toggle) ? rotation.zdir() : Float3{0, 0, 1};
   }
 };
 
 struct translation_yz_component : translation_plane_component {
   translation_yz_component()
       : translation_plane_component(
-            geometry_mesh::make_box_geometry({-0.01f, 0.25, 0.25},
-                                             {0.01f, 0.75f, 0.75f}),
-            minalg::float4{0.5f, 1, 1, 0.5f}, minalg::float4{0, 1, 1, 0.6f}) {}
+            GeometryMesh::make_box_geometry({-0.01f, 0.25, 0.25},
+                                            {0.01f, 0.75f, 0.75f}),
+            Float4{0.5f, 1, 1, 0.5f}, Float4{0, 1, 1, 0.6f}) {}
 
-  minalg::float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
-                          const minalg::float4 &rotation) const override {
-    return (local_toggle) ? qxdir(rotation) : minalg::float3{1, 0, 0};
+  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+                  const Quaternion &rotation) const override {
+    return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
   }
 };
 
 struct translation_zx_component : translation_plane_component {
   translation_zx_component()
       : translation_plane_component(
-            geometry_mesh::make_box_geometry({0.25, -0.01f, 0.25},
-                                             {0.75f, 0.01f, 0.75f}),
-            minalg::float4{1, 0.5f, 1, 0.5f}, minalg::float4{1, 0, 1, 0.6f}) {}
+            GeometryMesh::make_box_geometry({0.25, -0.01f, 0.25},
+                                            {0.75f, 0.01f, 0.75f}),
+            Float4{1, 0.5f, 1, 0.5f}, Float4{1, 0, 1, 0.6f}) {}
 
-  minalg::float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
-                          const minalg::float4 &rotation) const override {
-    return (local_toggle) ? qydir(rotation) : minalg::float3{0, 1, 0};
+  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+                  const Quaternion &rotation) const override {
+    return (local_toggle) ? rotation.ydir() : Float3{0, 1, 0};
   }
 };
 
 struct translation_xy_component : translation_plane_component {
   translation_xy_component()
       : translation_plane_component(
-            geometry_mesh::make_box_geometry({0.25, 0.25, -0.01f},
-                                             {0.75f, 0.75f, 0.01f}),
-            minalg::float4{1, 1, 0.5f, 0.5f}, minalg::float4{1, 1, 0, 0.6f}) {}
+            GeometryMesh::make_box_geometry({0.25, 0.25, -0.01f},
+                                            {0.75f, 0.75f, 0.01f}),
+            Float4{1, 1, 0.5f, 0.5f}, Float4{1, 1, 0, 0.6f}) {}
 
-  minalg::float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
-                          const minalg::float4 &rotation) const override {
-    return (local_toggle) ? qzdir(rotation) : minalg::float3{0, 0, 1};
+  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+                  const Quaternion &rotation) const override {
+    return (local_toggle) ? rotation.zdir() : Float3{0, 0, 1};
   }
 };
 
 struct translation_xyz_component : translation_plane_component {
   translation_xyz_component()
       : translation_plane_component(
-            geometry_mesh::make_box_geometry({-0.05f, -0.05f, -0.05f},
-                                             {0.05f, 0.05f, 0.05f}),
-            minalg::float4{0.9f, 0.9f, 0.9f, 0.25f},
-            minalg::float4{1, 1, 1, 0.35f}) {}
+            GeometryMesh::make_box_geometry({-0.05f, -0.05f, -0.05f},
+                                            {0.05f, 0.05f, 0.05f}),
+            Float4{0.9f, 0.9f, 0.9f, 0.25f}, Float4{1, 1, 1, 0.35f}) {}
 
-  minalg::float3 get_axis(const gizmo_application_state &state,
-                          bool local_toggle,
-                          const minalg::float4 &) const override {
-    return -minalg::qzdir(state.cam_orientation);
+  Float3 get_axis(const gizmo_application_state &state, bool local_toggle,
+                  const Quaternion &) const override {
+    return -state.cam_orientation.zdir();
   }
 };
 
@@ -180,7 +175,7 @@ std::shared_ptr<gizmo_component> _gizmo_components[] = {
 };
 
 std::tuple<std::shared_ptr<gizmo_component>, float>
-position_intersect(const ray &ray) {
+position_intersect(const Ray &ray) {
   float best_t = std::numeric_limits<float>::infinity();
   std::shared_ptr<gizmo_component> updated_state = {};
   float t;
@@ -193,11 +188,10 @@ position_intersect(const ray &ray) {
   return {updated_state, best_t};
 }
 
-minalg::float3 position_drag(drag_state *drag,
-                             const gizmo_application_state &state,
-                             bool local_toggle,
-                             const std::shared_ptr<gizmo_component> &active,
-                             const minalg::rigid_transform &p) {
+Float3 position_drag(drag_state *drag, const gizmo_application_state &state,
+                     bool local_toggle,
+                     const std::shared_ptr<gizmo_component> &active,
+                     const RigidTransform &p) {
 
   if (auto dst = active->drag(drag, state, local_toggle, p)) {
     return dst->position;
@@ -208,7 +202,7 @@ minalg::float3 position_drag(drag_state *drag,
 
 void position_draw(const AddTriangleFunc &add_world_triangle,
                    const std::shared_ptr<gizmo_component> &active,
-                   const minalg::float4x4 &modelMatrix) {
+                   const Float4x4 &modelMatrix) {
   for (auto c : _gizmo_components) {
     auto mesh = c->mesh;
     auto color = (c == active) ? c->base_color : c->highlight_color;
