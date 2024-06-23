@@ -201,7 +201,7 @@ pub fn build(b: *std.Build) void {
     raygizmo.addIncludePath(b.path("raylib"));
 
     const tinygizmo = b.createModule(.{
-        .root_source_file = b.path("tinygizmo/main.zig"),
+        .root_source_file = b.path("tinygizmo/tinygizmo.zig"),
     });
     tinygizmo.addIncludePath(b.path("tinygizmo"));
 

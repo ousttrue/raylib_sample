@@ -11,6 +11,8 @@ const teapot = @cImport({
 });
 
 pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
     c.InitWindow(1280, 800, "tiny-gizmo-example-app");
     defer c.CloseWindow();
 
@@ -53,11 +55,12 @@ pub fn main() !void {
     };
     var middle_drag = rdrag.make_dragger(&shift);
 
-    var gizmo = gizmo_dragger.TRSGizmo{
-        ._camera = &camera,
-        ._scene = &scene,
+    var gizmo = gizmo_dragger.TRSGizmo.init(allocator, &camera, &scene);
+    defer gizmo.deinit();
+
+    var gizmo_mesh = drawable.Drawable{
+        .name = "gizmo-mesh",
     };
-    // Drawable gizmo_mesh;
     var left_drag = rdrag.make_dragger(&gizmo);
 
     while (!c.WindowShouldClose()) {
@@ -65,14 +68,14 @@ pub fn main() !void {
         const h = c.GetScreenHeight();
         const cursor = c.GetMousePosition();
 
-        //   hotkey active_hotkey = {
-        //       .hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL),
-        //       .hotkey_translate = IsKeyDown(KEY_T),
-        //       .hotkey_rotate = IsKeyDown(KEY_R),
-        //       .hotkey_scale = IsKeyDown(KEY_S),
-        //       .hotkey_local = IsKeyDown(KEY_L),
-        //   };
-        //   gizmo->hotkey(w, h, cursor, active_hotkey);
+        const active_hotkey = gizmo_dragger.Hotkey{
+            .hotkey_ctrl = c.IsKeyDown(c.KEY_LEFT_CONTROL),
+            .hotkey_translate = c.IsKeyDown(c.KEY_T),
+            .hotkey_rotate = c.IsKeyDown(c.KEY_R),
+            .hotkey_scale = c.IsKeyDown(c.KEY_S),
+            .hotkey_local = c.IsKeyDown(c.KEY_L),
+        };
+        gizmo.process_hotkey(w, h, cursor, active_hotkey);
 
         // camera
         orbit_camera.dolly(&camera);
@@ -82,7 +85,7 @@ pub fn main() !void {
             c.BeginDrawing();
             c.rlEnableDepthTest();
             c.rlEnableColorBlend();
-            // c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
+            c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
             c.rlDisableBackfaceCulling();
             c.ClearBackground(c.RAYWHITE);
 
@@ -99,8 +102,8 @@ pub fn main() !void {
 
                 // draw gizmo
                 c.glClear(c.GL_DEPTH_BUFFER_BIT);
-                //       gizmo->load(&gizmo_mesh);
-                //       gizmo_mesh.draw();
+                gizmo.load(&gizmo_mesh);
+                gizmo_mesh.draw();
                 c.EndMode3D();
             }
 
