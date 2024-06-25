@@ -19,11 +19,11 @@ pub const TranslationGizmo = struct {
         _ = self; // autofix
         // float best_t = std::numeric_limits<float>::infinity();
         // std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
-        // for (auto &target : this->_scene) {
+        // for (auto &target : this._scene) {
         //   minalg::rigid_transform src{
-        //       .orientation = *(minalg::float4 *)&target->rotation,
-        //       .position = *(minalg::float3 *)&target->position,
-        //       .scale = *(minalg::float3 *)&target->scale,
+        //       .orientation = *(minalg::float4 *)&target.rotation,
+        //       .position = *(minalg::float3 *)&target.position,
+        //       .scale = *(minalg::float3 *)&target.scale,
         //   };
         //   auto [draw_scale, gizmo_transform, local_ray] =
         //       tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
@@ -39,23 +39,23 @@ pub const TranslationGizmo = struct {
         //                         .t = t,
         //                     }});
         //     if (t < best_t) {
-        //       this->active = updated_state;
-        //       this->gizmo_target = target;
+        //       this.active = updated_state;
+        //       this.gizmo_target = target;
         //     }
         //   }
         // }
         //
-        // if (this->active) {
+        // if (this.active) {
         //   // begin drag
-        //   auto ray_state = ray_map[this->gizmo_target];
+        //   auto ray_state = ray_map[this.gizmo_target];
         //   auto ray = tinygizmo::scaling(ray_state.draw_scale, ray_state.local_ray);
-        //   this->drag_state = {.original_position = ray_state.transform.position,
+        //   this.drag_state = {.original_position = ray_state.transform.position,
         //                       .click_offset = ray.point(ray_state.t)};
         //   if (local_toggle) {
         //     // click point in gizmo local
-        //     this->drag_state.click_offset =
+        //     this.drag_state.click_offset =
         //         ray_state.gizmo_transform.transform_vector(
-        //             this->drag_state.click_offset);
+        //             this.drag_state.click_offset);
         //   }
         // }
     }
@@ -216,32 +216,36 @@ pub const TRSGizmo = struct {
         self._active.local_toggle = self.local_toggle;
     }
 
+    fn add_world_triangle(
+        user: *anyopaque,
+        rgba: tinygizmo.Float4,
+        p0: tinygizmo.Float3,
+        p1: tinygizmo.Float3,
+        p2: tinygizmo.Float3,
+    ) void {
+        const self = @as(*TRSGizmo, user);
+        const offset = self._positions.size();
+        const color = c.Color{
+            .r = (std.math.max(0.0, rgba.x) * 255),
+            .g = (std.math.max(0.0, rgba.y) * 255),
+            .b = (std.math.max(0.0, rgba.z) * 255),
+            .a = (std.math.max(0.0, rgba.w) * 255),
+        };
+        self._positions.push_back(.{ p0.x, p0.y, p0.z });
+        self._positions.push_back(.{ p1.x, p1.y, p1.z });
+        self._positions.push_back(.{ p2.x, p2.y, p2.z });
+        self._colors.push_back(color);
+        self._colors.push_back(color);
+        self._colors.push_back(color);
+        self._indices.push_back(offset + 0);
+        self._indices.push_back(offset + 1);
+        self._indices.push_back(offset + 2);
+    }
+
     pub fn load(self: *@This(), _: *drawable.Drawable) void {
         self.positions.clearRetainingCapacity();
         self.colors.clearRetainingCapacity();
         self.indices.clearRetainingCapacity();
-        // tinygizmo::AddTriangleFunc add_world_triangle =
-        //     [self = this](
-        //         const std::array<float, 4> &rgba, const std::array<float, 3> &p0,
-        //         const std::array<float, 3> &p1, const std::array<float, 3> &p2) {
-        //       //
-        //       auto offset = self->positions.size();
-        //       Color color{
-        //           static_cast<unsigned char>(std::max(0.0f, rgba[0]) * 255),
-        //           static_cast<unsigned char>(std::max(0.0f, rgba[1]) * 255),
-        //           static_cast<unsigned char>(std::max(0.0f, rgba[2]) * 255),
-        //           static_cast<unsigned char>(std::max(0.0f, rgba[3]) * 255),
-        //       };
-        //       self->positions.push_back({p0[0], p0[1], p0[2]});
-        //       self->positions.push_back({p1[0], p1[1], p1[2]});
-        //       self->positions.push_back({p2[0], p2[1], p2[2]});
-        //       self->colors.push_back(color);
-        //       self->colors.push_back(color);
-        //       self->colors.push_back(color);
-        //       self->indices.push_back(offset + 0);
-        //       self->indices.push_back(offset + 1);
-        //       self->indices.push_back(offset + 2);
-        //     };
 
         for (self.scene) |target| {
             const src = tinygizmo.RigidTransform{
@@ -262,28 +266,22 @@ pub const TRSGizmo = struct {
                     .z = target.scale.z,
                 },
             };
-            _ = src; // autofix
-            // const draw_scale, const p, const ray =
-            //     tinygizmo.gizmo_transform(
-            //     self.active_state,
-            //     self.local_toggle,
-            //     src,
-            // );
-            // _ = draw_scale;
-            // _ = p;
-            // _ = ray;
-            //
-            //   minalg::float4x4 modelMatrix = p.matrix();
-            //   minalg::float4x4 scaleMatrix = scaling_matrix(minalg::float3(draw_scale));
-            //   modelMatrix = mul(modelMatrix, scaleMatrix);
-            //
-            //   // tinygizmo::position_draw(add_world_triangle, nullptr, modelMatrix);
-            //   _active->draw(add_world_triangle, modelMatrix);
-            // }
-            //
-            // if (positions.size() && indices.size()) {
-            //   drawable->load(positions.size(), positions.data(), colors.data(),
-            //                  indices.size(), indices.data(), true);
+            const draw_scale, const p, const ray =
+                self.active_state.gizmo_transform_and_local_ray(self.local_toggle, src);
+            _ = ray; // autofix
+
+            const scaleMatrix =
+                tinygizmo.Float4x4.scaling(draw_scale, draw_scale, draw_scale);
+            const modelMatrix = p.matrix().mul(scaleMatrix);
+            _ = modelMatrix; // autofix
+
+            // tinygizmo.translation_draw(self, add_world_triangle, self.active, modelMatrix);
         }
+
+        // if (_positions.size() && _indices.size()) {
+        //   drawable.load(_positions.size(), _positions.data(), _colors.data(),
+        //                  _indices.size(), _indices.data(), true);
+        // }
+        //
     }
 };
