@@ -28,7 +28,7 @@ pub fn main() !void {
     };
     try b.load_floats(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
 
-    var scene = [_]*const drawable.Drawable{
+    var scene = [_]*drawable.Drawable{
         &a,
         &b,
     };

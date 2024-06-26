@@ -218,6 +218,7 @@ public:
                             .t = t,
                         }});
         if (t < best_t) {
+          best_t= t;
           this->_active = updated_state;
           this->_gizmo_target = target;
         }

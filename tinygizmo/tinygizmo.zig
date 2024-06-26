@@ -72,9 +72,9 @@ pub const Float3 = struct {
 
     pub fn mult_each(self: @This(), rhs: @This()) @This() {
         return .{
-            self.x * rhs.x,
-            self.y * rhs.y,
-            self.z * rhs.z,
+            .x = self.x * rhs.x,
+            .y = self.y * rhs.y,
+            .z = self.z * rhs.z,
         };
     }
 
@@ -347,7 +347,7 @@ pub const RigidTransform = struct {
         return self.orientation.inverse().rotate(vec).div_each(self.scale);
     }
     pub fn transform_point(self: @This(), p: Float3) Float3 {
-        return self.position + transform_vector(p);
+        return self.position.add(self.transform_vector(p));
     }
     pub fn detransform_point(self: @This(), p: Float3) Float3 {
         return self.detransform_vector(p.sub(self.position));
@@ -529,7 +529,7 @@ pub const Ray = struct {
         const e2 = v2.sub(v0);
         const h = Float3.cross(self.direction, e2);
         const a = Float3.dot(e1, h);
-        if (std.math.abs(a) == 0) {
+        if (@abs(a) == 0) {
             return null;
         }
 
@@ -555,20 +555,25 @@ pub const Ray = struct {
     }
 
     pub fn intersect_mesh(self: @This(), mesh: GeometryMesh) ?f32 {
-        const best_t = std.math.inf(f32);
-        var best_tri: i32 = -1;
-        for (mesh.triangles, 0..) |tri, i| {
-            if (self.intersect_triangle(mesh.vertices[tri.x].position, mesh.vertices[tri.y].position, mesh.vertices[tri.z].position)) |t| {
+        var best_t = std.math.inf(f32);
+        var best_tri: ?usize = null;
+        for (mesh.triangles.items, 0..) |tri, i| {
+            if (self.intersect_triangle(
+                mesh.vertices.items[tri.x].position,
+                mesh.vertices.items[tri.y].position,
+                mesh.vertices.items[tri.z].position,
+            )) |t| {
                 if (t < best_t) {
                     best_t = t;
                     best_tri = i;
                 }
             }
         }
-        if (best_tri == -1) {
+        if (best_tri) |_| {
+            return best_t;
+        } else {
             return null;
         }
-        return best_t;
     }
 };
 
@@ -612,13 +617,13 @@ pub const FrameState = struct {
 
 pub const DragState = struct {
     // Original position of an object being manipulated with a gizmo
-    original_position: Float3,
+    original_position: Float3 = .{ .x = 0, .y = 0, .z = 0 },
     // Offset from position of grabbed object to coordinates of clicked point
-    click_offset: Float3,
+    click_offset: Float3 = .{ .x = 0, .y = 0, .z = 0 },
     // Original scale of an object being manipulated with a gizmo
-    original_scale: Float3,
+    original_scale: Float3 = .{ .x = 0, .y = 0, .z = 0 },
     // Original orientation of an object being manipulated with a gizmo
-    original_orientation: Quaternion,
+    original_orientation: Quaternion = .{ .x = 0, .y = 0, .z = 0, .w = 1 },
 };
 
 // std::vector<Float2> arrow_points = {
@@ -926,24 +931,18 @@ pub const System = struct {
         }
     }
 
-    pub fn translation_intersect(self: @This(), ray: Ray) ?struct { GizmoComponent, f32 } {
+    pub fn translation_intersect(self: @This(), ray: Ray) struct { ?GizmoComponent, f32 } {
         var best_t = std.math.inf(f32);
         var updated_state: ?GizmoComponent = null;
-        // std::shared_ptr<gizmo_component> updated_state = {};
-        var t: f32 = 0;
-
         for (self.translations.items) |c| {
-            if (ray.intersect_mesh(c.mesh, &t) and t < best_t) {
-                updated_state = c;
-                best_t = t;
+            if (ray.intersect_mesh(c.mesh)) |t| {
+                if (t < best_t) {
+                    updated_state = c;
+                    best_t = t;
+                }
             }
         }
-
-        if (updated_state) |c| {
-            return .{ c, best_t };
-        } else {
-            return null;
-        }
+        return .{ updated_state, best_t };
     }
 
     // Float3 position_drag(DragState *drag, const FrameState &state,
