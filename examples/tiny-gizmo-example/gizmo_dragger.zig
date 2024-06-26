@@ -8,7 +8,7 @@ pub const TranslationGizmo = struct {
 
     // std::list<std::shared_ptr<Drawable>> _scene;
     // std::shared_ptr<Drawable> gizmo_target;
-    // std::shared_ptr<tinygizmo::gizmo_component> active;
+    active_component: ?*tinygizmo.GizmoComponent = null,
     // tinygizmo::drag_state drag_state;
 
     local_toggle: bool = true,
@@ -112,7 +112,7 @@ pub const TRSGizmo = struct {
     //   std::shared_ptr<TranslationGizmo> _t,
     //   std::shared_ptr<RotationGizmo> _r,
     //   std::shared_ptr<ScalingGizmo> _s,
-    _active: TranslationGizmo = .{},
+    translation: TranslationGizmo = .{},
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -134,21 +134,12 @@ pub const TRSGizmo = struct {
         self.indices.deinit();
     }
 
-    // public:
-    //   TRSGizmo(Camera *camera, std::list<std::shared_ptr<Drawable>> &scene)
-    //       : _camera(camera), _scene(scene) {
-    //     _t = std::make_shared<TranslationGizmo>(_scene);
-    //     _r = std::make_shared<RotationGizmo>(_scene);
-    //     _s = std::make_shared<ScalingGizmo>(_scene);
-    //     _active = _t;
-    //   }
-
     pub fn begin(self: *@This(), cursor: c.Vector2) void {
-        self._active.begin(cursor);
+        self.translation.begin(cursor);
     }
 
     pub fn end(self: *@This(), cursor: c.Vector2) void {
-        self._active.end(cursor);
+        self.translation.end(cursor);
     }
 
     pub fn drag(
@@ -158,7 +149,7 @@ pub const TRSGizmo = struct {
         h: i32,
         cursor: c.Vector2,
     ) void {
-        self._active.drag(state, w, h, cursor);
+        self.translation.drag(state, w, h, cursor);
     }
 
     pub fn process_hotkey(self: *@This(), w: i32, h: i32, cursor: c.Vector2, hotkey: Hotkey) void {
@@ -212,8 +203,8 @@ pub const TRSGizmo = struct {
             .cam_orientation = .{ .x = rot.x, .y = rot.y, .z = rot.z, .w = rot.w },
         };
 
-        self._active.gizmo_state = self.active_state;
-        self._active.local_toggle = self.local_toggle;
+        self.translation.gizmo_state = self.active_state;
+        self.translation.local_toggle = self.local_toggle;
     }
 
     fn add_world_triangle(
@@ -273,9 +264,14 @@ pub const TRSGizmo = struct {
             const scaleMatrix =
                 tinygizmo.Float4x4.scaling(draw_scale, draw_scale, draw_scale);
             const modelMatrix = p.matrix().mul(scaleMatrix);
-            _ = modelMatrix; // autofix
+            // _ = modelMatrix; // autofix
 
-            // tinygizmo.translation_draw(self, add_world_triangle, self.active, modelMatrix);
+            tinygizmo.translation_draw(
+                self,
+                add_world_triangle,
+                null,
+                modelMatrix,
+            );
         }
 
         // if (_positions.size() && _indices.size()) {

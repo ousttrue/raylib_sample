@@ -390,6 +390,68 @@ pub const GeometryMesh = struct {
     vertices: std.ArrayList(Vertex),
     triangles: std.ArrayList(UInt3),
 
+    pub fn make_lathed_geometry(
+        allocator: std.mem.Allocator,
+        axis: Float3,
+        arm1: Float3,
+        arm2: Float3,
+        slices: i32,
+        points: []const Float2,
+        eps: f32,
+    ) @This() {
+        const tau = 6.28318530718;
+
+        const Float3x2 = struct {
+            m00: f32,
+            m01: f32,
+            m02: f32,
+            m10: f32,
+            m11: f32,
+            m12: f32,
+            fn apply(self: @This(), b: Float2) f32 {
+                const _a = Float3{ self.m00, self.m01, self.m02 };
+                const _b = Float3{ self.m10, self.m11, self.m12 };
+                return _a.scale(b.x) +
+                    _b.scale(b.y);
+            }
+        };
+
+        var mesh = GeometryMesh{
+            .vertices = allocator.init(Vertex),
+            .indices = allocator.init(UInt3),
+        };
+        for (0..slices + 1) |i| {
+            const angle = ((i % slices) * tau / slices) + (tau / 8.0);
+            const c = std.math.cos(angle);
+            const s = std.mathsin(angle);
+            const row1 = arm1.scale(c) + arm2.scale(s);
+            const mat = Float3x2{
+                axis.x, axis.y, axis.z, //
+                row1.x, row1.y, row1.z, //
+            };
+            for (points) |p| {
+                const position = mat.apply(p) + Float3{ eps, eps, eps };
+                mesh.vertices.push_back(.{
+                    .position = position,
+                    .normal = Float3{ .x = 0, .y = 0, .z = 0 },
+                });
+            }
+
+            if (i > 0) {
+                for (1..points.size()) |j| {
+                    const _i0 = (i - 1) * (points.len) + (j - 1);
+                    const _i1 = (i - 0) * (points.len) + (j - 1);
+                    const _i2 = (i - 0) * (points.len) + (j - 0);
+                    const _i3 = (i - 1) * (points.len) + (j - 0);
+                    mesh.triangles.push_back(.{ _i0, _i1, _i2 });
+                    mesh.triangles.push_back(.{ _i0, _i2, _i3 });
+                }
+            }
+        }
+        mesh.compute_normals();
+        return mesh;
+    }
+
     pub fn add_triangles(self: @This(), user: *anyopaque, add_triangle: AddTriangleFunc, modelMatrix: Float4x4, color: Float4) void {
         for (self.triangles) |t| {
             const v0 = self.vertices[t.x];
@@ -711,13 +773,13 @@ pub const GizmoComponent = struct {
     base_color: Float4,
     highlight_color: Float4,
 
-    pub fn Translation_X() @This() {
+    pub fn Translation_X(allocator: std.mem.Allocator) @This() {
         //   Float3 get_axis(const FrameState &state, bool local_toggle,
         //                   const Quaternion &rotation) const override {
         //     return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
         //   }
 
-        const arrow_points: []Float2 = .{
+        const arrow_points = [_]Float2{
             .{ .x = 0.25, .y = 0 },
             .{ .x = 0.25, .y = 0.05 },
             .{ .x = 1, .y = 0.05 },
@@ -726,7 +788,15 @@ pub const GizmoComponent = struct {
         };
 
         return .{
-            .mesh = GeometryMesh.make_lathed_geometry(.{ 1, 0, 0 }, .{ 0, 1, 0 }, .{ 0, 0, 1 }, 16, arrow_points),
+            .mesh = GeometryMesh.make_lathed_geometry(
+                allocator,
+                .{ .x = 1, .y = 0, .z = 0 },
+                .{ .x = 0, .y = 1, .z = 0 },
+                .{ .x = 0, .y = 0, .z = 1 },
+                16,
+                &arrow_points,
+                0,
+            ),
             .base_color = .{ .x = 1, .y = 0.5, .z = 0.5, .w = 1.0 },
             .highlight_color = .{ .x = 1, .y = 0, .z = 0, .w = 1.0 },
         };
@@ -734,13 +804,13 @@ pub const GizmoComponent = struct {
 };
 
 const translations: [1]GizmoComponent = .{
-    GizmoComponent.Translation_X(),
+    GizmoComponent.Translation_X(std.mem.Allocator),
 };
 
 pub fn translation_draw(
     user: *anyopaque,
     add_triangle: AddTriangleFunc,
-    active: *GizmoComponent,
+    active: ?*GizmoComponent,
     modelMatrix: Float4x4,
 ) void {
     for (translations) |c| {
