@@ -6,13 +6,13 @@ void TRSGizmo::hotkey(int w, int h, const Vector2 &cursor,
   if (hotkey.hotkey_ctrl == true) {
     if (_last_hotkey.hotkey_translate == false &&
         hotkey.hotkey_translate == true) {
-      _visible = _t;
+      _visible = GizmoMode::Translation;
     }
     if (_last_hotkey.hotkey_rotate == false && hotkey.hotkey_rotate == true) {
-      _visible = _r;
+      _visible = GizmoMode::Rotation;
     }
     if (_last_hotkey.hotkey_scale == false && hotkey.hotkey_scale == true) {
-      _visible = _s;
+      _visible = GizmoMode::Scaling;
     }
 
     if (hotkey.hotkey_local) {
@@ -78,7 +78,18 @@ void TRSGizmo::load(Drawable *drawable) {
         tinygizmo::Float4x4::scaling(draw_scale, draw_scale, draw_scale);
     modelMatrix = modelMatrix * scaleMatrix;
 
-    _visible->draw(_active, add_world_triangle, modelMatrix);
+    switch (this->_visible) {
+    case GizmoMode::Translation:
+      tinygizmo::TranslationGizmo::draw(_active, add_world_triangle,
+                                        modelMatrix);
+      break;
+    case GizmoMode::Rotation:
+      tinygizmo::RotationGizmo::draw(_active, add_world_triangle, modelMatrix);
+      break;
+    case GizmoMode::Scaling:
+      tinygizmo::ScalingGizmo::draw(_active, add_world_triangle, modelMatrix);
+      break;
+    }
   }
 
   if (_positions.size() && _indices.size()) {

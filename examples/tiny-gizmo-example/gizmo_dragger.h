@@ -14,6 +14,12 @@ struct hotkey {
   bool hotkey_local = false;
 };
 
+enum class GizmoMode {
+  Translation,
+  Rotation,
+  Scaling,
+};
+
 class TRSGizmo : public Dragger {
   Camera *_camera;
   std::list<std::shared_ptr<Drawable>> _scene;
@@ -24,14 +30,12 @@ class TRSGizmo : public Dragger {
   tinygizmo::FrameState _active_state;
   tinygizmo::FrameState _last_state;
   bool _local_toggle = true;
+  bool _uniform = true;
 
   std::shared_ptr<tinygizmo::gizmo_component> _active;
   tinygizmo::DragState _drag_state;
 
-  std::shared_ptr<tinygizmo::TranslationGizmo> _t;
-  std::shared_ptr<tinygizmo::RotationGizmo> _r;
-  std::shared_ptr<tinygizmo::ScalingGizmo> _s;
-  std::shared_ptr<tinygizmo::Gizmo> _visible;
+  GizmoMode _visible = GizmoMode::Translation;
 
   std::vector<Vector3> _positions;
   std::vector<Color> _colors;
@@ -39,12 +43,7 @@ class TRSGizmo : public Dragger {
 
 public:
   TRSGizmo(Camera *camera, std::list<std::shared_ptr<Drawable>> &scene)
-      : _camera(camera), _scene(scene) {
-    _t = std::make_shared<tinygizmo::TranslationGizmo>();
-    _r = std::make_shared<tinygizmo::RotationGizmo>();
-    _s = std::make_shared<tinygizmo::ScalingGizmo>();
-    _visible = _t;
-  }
+      : _camera(camera), _scene(scene) {}
 
   void begin(const Vector2 &cursor) override {
     float best_t = std::numeric_limits<float>::infinity();
@@ -54,7 +53,7 @@ public:
           _active_state.gizmo_transform_and_local_ray(_local_toggle,
                                                       target->transform);
       // ray intersection
-      auto [updated_state, t] = _visible->intersect(local_ray);
+      auto [updated_state, t] = _intersect(local_ray);
       if (updated_state) {
         ray_map.insert({target,
                         {
@@ -75,7 +74,31 @@ public:
     if (this->_active) {
       // begin drag
       auto ray_state = ray_map[this->_gizmo_target];
-      this->_drag_state = _visible->begin_gizmo(ray_state, _local_toggle);
+      this->_drag_state = _begin_gizmo(ray_state, _local_toggle);
+    }
+  }
+
+  std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
+  _intersect(const tinygizmo::Ray &local_ray) {
+    switch (this->_visible) {
+    case GizmoMode::Translation:
+      return tinygizmo::TranslationGizmo::intersect(local_ray);
+    case GizmoMode::Rotation:
+      return tinygizmo::RotationGizmo::intersect(local_ray);
+    case GizmoMode::Scaling:
+      return tinygizmo::ScalingGizmo::intersect(local_ray);
+    }
+  }
+
+  tinygizmo::DragState _begin_gizmo(const tinygizmo::RayState &ray_state,
+                                    bool local_toggle) {
+    switch (this->_visible) {
+    case GizmoMode::Translation:
+      return tinygizmo::TranslationGizmo::begin_gizmo(ray_state, _local_toggle);
+    case GizmoMode::Rotation:
+      return tinygizmo::RotationGizmo::begin_gizmo(ray_state, _local_toggle);
+    case GizmoMode::Scaling:
+      return tinygizmo::ScalingGizmo::begin_gizmo(ray_state, _local_toggle);
     }
   }
 
@@ -87,10 +110,25 @@ public:
 
   void drag(const DragState &state, int w, int h,
             const Vector2 &cursor) override {
-    for (auto &target : this->_scene) {
-      if (this->_active && this->_gizmo_target == target) {
-        target->transform = _visible->drag(&_drag_state, _active, _active_state,
-                                           _local_toggle, target->transform);
+    if (auto active = this->_active) {
+      if (auto target = this->_gizmo_target) {
+        switch (this->_visible) {
+        case GizmoMode::Translation:
+          target->transform = tinygizmo::TranslationGizmo::drag(
+              &_drag_state, active, _active_state, _local_toggle,
+              target->transform);
+          break;
+        case GizmoMode::Rotation:
+          target->transform = tinygizmo::RotationGizmo::drag(
+              &_drag_state, active, _active_state, _local_toggle,
+              target->transform);
+          break;
+        case GizmoMode::Scaling:
+          target->transform = tinygizmo::ScalingGizmo::drag(
+              &_drag_state, active, _active_state, _local_toggle,
+              target->transform, this->_uniform);
+          break;
+        }
       }
     }
   }

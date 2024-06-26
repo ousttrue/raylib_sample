@@ -58,7 +58,8 @@ ScalingGizmo::intersect(const Ray &local_ray) {
 Transform ScalingGizmo::drag(DragState *state,
                              const std::shared_ptr<gizmo_component> &component,
                              const FrameState &frame, bool local_toggle,
-                             const Transform &src) {
+                             const Transform &src,
+                             bool uniform) {
   auto dst = src;
   dst.scale = scaling_drag(state, frame, local_toggle, component, src, uniform);
   return dst;

@@ -15,38 +15,17 @@ struct RayState {
   float t;
 };
 
-class Gizmo {
-public:
-  virtual ~Gizmo() {}
-  virtual std::tuple<std::shared_ptr<gizmo_component>, float>
-  intersect(const tinygizmo::Ray &local_ray) = 0;
+struct TranslationGizmo {
 
-  virtual tinygizmo::DragState begin_gizmo(const RayState &ray_state,
-                                           bool local_toggle) = 0;
+  static void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
+                   const tinygizmo::AddTriangleFunc &add_triangle,
+                   const tinygizmo::Float4x4 &modelMatrix);
 
-  virtual tinygizmo::Transform
-  drag(tinygizmo::DragState *drag,
-       const std::shared_ptr<tinygizmo::gizmo_component> &component,
-       const tinygizmo::FrameState &frame, bool local_toggle,
-       const tinygizmo::Transform &src) = 0;
+  static std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
+  intersect(const tinygizmo::Ray &local_ray);
 
-  virtual void
-  draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
-       const tinygizmo::AddTriangleFunc &add_triangle,
-       const tinygizmo::Float4x4 &modelMatrix) = 0;
-};
-
-class TranslationGizmo : public Gizmo {
-public:
-  void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
-            const tinygizmo::AddTriangleFunc &add_triangle,
-            const tinygizmo::Float4x4 &modelMatrix) override;
-
-  std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
-  intersect(const tinygizmo::Ray &local_ray) override;
-
-  tinygizmo::DragState begin_gizmo(const RayState &ray_state,
-                                   bool local_toggle) override {
+  static tinygizmo::DragState begin_gizmo(const RayState &ray_state,
+                                          bool local_toggle) {
     auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
     tinygizmo::DragState drag_state = {
         .click_offset = ray.point(ray_state.t),
@@ -59,23 +38,24 @@ public:
     return drag_state;
   }
 
-  Transform drag(tinygizmo::DragState *state,
-                 const std::shared_ptr<tinygizmo::gizmo_component> &component,
-                 const tinygizmo::FrameState &frame, bool local_toggle,
-                 const Transform &src) override;
+  static Transform
+  drag(tinygizmo::DragState *state,
+       const std::shared_ptr<tinygizmo::gizmo_component> &component,
+       const tinygizmo::FrameState &frame, bool local_toggle,
+       const Transform &src);
 };
 
-class RotationGizmo : public Gizmo {
-public:
-  void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
-            const tinygizmo::AddTriangleFunc &add_triangle,
-            const tinygizmo::Float4x4 &modelMatrix) override;
+struct RotationGizmo {
 
-  std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
-  intersect(const tinygizmo::Ray &local_ray) override;
+  static void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
+                   const tinygizmo::AddTriangleFunc &add_triangle,
+                   const tinygizmo::Float4x4 &modelMatrix);
 
-  tinygizmo::DragState begin_gizmo(const RayState &ray_state,
-                                   bool local_toggle) override {
+  static std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
+  intersect(const tinygizmo::Ray &local_ray);
+
+  static tinygizmo::DragState begin_gizmo(const RayState &ray_state,
+                                          bool local_toggle) {
     auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
     tinygizmo::DragState drag_state = {
         .click_offset = ray_state.transform.transform_point(
@@ -85,24 +65,24 @@ public:
     return drag_state;
   }
 
-  Transform drag(tinygizmo::DragState *state,
-                 const std::shared_ptr<tinygizmo::gizmo_component> &component,
-                 const tinygizmo::FrameState &frame, bool local_toggle,
-                 const Transform &src) override;
+  static Transform
+  drag(tinygizmo::DragState *state,
+       const std::shared_ptr<tinygizmo::gizmo_component> &component,
+       const tinygizmo::FrameState &frame, bool local_toggle,
+       const Transform &src);
 };
 
-class ScalingGizmo : public Gizmo {
-public:
-  void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
-            const tinygizmo::AddTriangleFunc &add_triangle,
-            const tinygizmo::Float4x4 &modelMatrix) override;
+struct ScalingGizmo {
 
-  bool uniform = false;
-  std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
-  intersect(const tinygizmo::Ray &local_ray) override;
+  static void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
+                   const tinygizmo::AddTriangleFunc &add_triangle,
+                   const tinygizmo::Float4x4 &modelMatrix);
 
-  tinygizmo::DragState begin_gizmo(const RayState &ray_state,
-                                   bool local_toggle) override {
+  static std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
+  intersect(const tinygizmo::Ray &local_ray);
+
+  static tinygizmo::DragState begin_gizmo(const RayState &ray_state,
+                                          bool local_toggle) {
     auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
     tinygizmo::DragState drag_state = {
         .click_offset = ray_state.transform.transform_point(
@@ -112,10 +92,11 @@ public:
     return drag_state;
   }
 
-  Transform drag(tinygizmo::DragState *state,
-                 const std::shared_ptr<tinygizmo::gizmo_component> &component,
-                 const tinygizmo::FrameState &frame, bool local_toggle,
-                 const Transform &src) override;
+  static Transform
+  drag(tinygizmo::DragState *state,
+       const std::shared_ptr<tinygizmo::gizmo_component> &component,
+       const tinygizmo::FrameState &frame, bool local_toggle,
+       const Transform &src, bool uniform);
 };
 
 } // namespace tinygizmo
