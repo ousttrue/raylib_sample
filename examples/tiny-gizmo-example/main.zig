@@ -20,13 +20,13 @@ pub fn main() !void {
         .name = "first-example-gizmo",
         .position = .{ .x = -2, .y = 0, .z = 0 },
     };
-    try a.load_slice(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
+    try a.load_floats(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
 
     var b = drawable.Drawable{
         .name = "second-example-gizmo",
         .position = .{ .x = 2, .y = 0, .z = 0 },
     };
-    try b.load_slice(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
+    try b.load_floats(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
 
     var scene = [_]*const drawable.Drawable{
         &a,
@@ -55,7 +55,7 @@ pub fn main() !void {
     };
     var middle_drag = rdrag.make_dragger(&shift);
 
-    var gizmo = gizmo_dragger.TRSGizmo.init(allocator, &camera, &scene);
+    var gizmo = try gizmo_dragger.TRSGizmo.init(allocator, &camera, &scene);
     defer gizmo.deinit();
 
     var gizmo_mesh = drawable.Drawable{

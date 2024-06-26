@@ -395,11 +395,13 @@ pub const GeometryMesh = struct {
         axis: Float3,
         arm1: Float3,
         arm2: Float3,
-        slices: i32,
+        slices: usize,
         points: []const Float2,
         eps: f32,
-    ) @This() {
+    ) !@This() {
         const tau = 6.28318530718;
+        const tau_8 = tau / 8.0;
+        const tau_slices = tau / @as(f32, @floatFromInt(slices));
 
         const Float3x2 = struct {
             m00: f32,
@@ -408,55 +410,67 @@ pub const GeometryMesh = struct {
             m10: f32,
             m11: f32,
             m12: f32,
-            fn apply(self: @This(), b: Float2) f32 {
-                const _a = Float3{ self.m00, self.m01, self.m02 };
-                const _b = Float3{ self.m10, self.m11, self.m12 };
-                return _a.scale(b.x) +
-                    _b.scale(b.y);
+            fn apply(self: @This(), b: Float2) Float3 {
+                const _a = Float3{ .x = self.m00, .y = self.m01, .z = self.m02 };
+                const _b = Float3{ .x = self.m10, .y = self.m11, .z = self.m12 };
+                return _a.scale(b.x).add(_b.scale(b.y));
             }
         };
 
         var mesh = GeometryMesh{
-            .vertices = allocator.init(Vertex),
-            .indices = allocator.init(UInt3),
+            .vertices = std.ArrayList(Vertex).init(allocator),
+            .triangles = std.ArrayList(UInt3).init(allocator),
         };
-        for (0..slices + 1) |i| {
-            const angle = ((i % slices) * tau / slices) + (tau / 8.0);
+        for (0..(slices + 1)) |i| {
+            const angle = (@as(f32, @floatFromInt(@mod(i, slices))) * tau_slices) + tau_8;
             const c = std.math.cos(angle);
-            const s = std.mathsin(angle);
-            const row1 = arm1.scale(c) + arm2.scale(s);
+            const s = std.math.sin(angle);
+            const row1 = arm1.scale(c).add(arm2.scale(s));
             const mat = Float3x2{
-                axis.x, axis.y, axis.z, //
-                row1.x, row1.y, row1.z, //
+                .m00 = axis.x,
+                .m01 = axis.y,
+                .m02 = axis.z, //
+                .m10 = row1.x,
+                .m11 = row1.y,
+                .m12 = row1.z, //
             };
             for (points) |p| {
-                const position = mat.apply(p) + Float3{ eps, eps, eps };
-                mesh.vertices.push_back(.{
+                const position = mat.apply(p).add(.{ .x = eps, .y = eps, .z = eps });
+                try mesh.vertices.append(.{
                     .position = position,
-                    .normal = Float3{ .x = 0, .y = 0, .z = 0 },
+                    .normal = .{ .x = 0, .y = 0, .z = 0 },
+                    .color = .{ .x = 0, .y = 0, .z = 0, .w = 0 },
                 });
             }
 
             if (i > 0) {
-                for (1..points.size()) |j| {
+                for (1..points.len) |j| {
                     const _i0 = (i - 1) * (points.len) + (j - 1);
                     const _i1 = (i - 0) * (points.len) + (j - 1);
                     const _i2 = (i - 0) * (points.len) + (j - 0);
                     const _i3 = (i - 1) * (points.len) + (j - 0);
-                    mesh.triangles.push_back(.{ _i0, _i1, _i2 });
-                    mesh.triangles.push_back(.{ _i0, _i2, _i3 });
+                    try mesh.triangles.append(.{
+                        .x = @intCast(_i0),
+                        .y = @intCast(_i1),
+                        .z = @intCast(_i2),
+                    });
+                    try mesh.triangles.append(.{
+                        .x = @intCast(_i0),
+                        .y = @intCast(_i2),
+                        .z = @intCast(_i3),
+                    });
                 }
             }
         }
-        mesh.compute_normals();
+        // mesh.compute_normals();
         return mesh;
     }
 
     pub fn add_triangles(self: @This(), user: *anyopaque, add_triangle: AddTriangleFunc, modelMatrix: Float4x4, color: Float4) void {
-        for (self.triangles) |t| {
-            const v0 = self.vertices[t.x];
-            const v1 = self.vertices[t.y];
-            const v2 = self.vertices[t.z];
+        for (self.triangles.items) |t| {
+            const v0 = self.vertices.items[t.x];
+            const v1 = self.vertices.items[t.y];
+            const v2 = self.vertices.items[t.z];
             const p0 = transform_coord(modelMatrix, v0.position); // transform local coordinates into worldspace
             const p1 = transform_coord(modelMatrix, v1.position); // transform local coordinates into worldspace
             const p2 = transform_coord(modelMatrix, v2.position); // transform local coordinates into worldspace
@@ -773,7 +787,7 @@ pub const GizmoComponent = struct {
     base_color: Float4,
     highlight_color: Float4,
 
-    pub fn Translation_X(allocator: std.mem.Allocator) @This() {
+    pub fn Translation_X(allocator: std.mem.Allocator) !@This() {
         //   Float3 get_axis(const FrameState &state, bool local_toggle,
         //                   const Quaternion &rotation) const override {
         //     return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
@@ -788,7 +802,7 @@ pub const GizmoComponent = struct {
         };
 
         return .{
-            .mesh = GeometryMesh.make_lathed_geometry(
+            .mesh = try GeometryMesh.make_lathed_geometry(
                 allocator,
                 .{ .x = 1, .y = 0, .z = 0 },
                 .{ .x = 0, .y = 1, .z = 0 },
@@ -803,54 +817,144 @@ pub const GizmoComponent = struct {
     }
 };
 
-const translations: [1]GizmoComponent = .{
-    GizmoComponent.Translation_X(std.mem.Allocator),
+pub const TranslationGizmo = struct {
+
+    // std::list<std::shared_ptr<Drawable>> _scene;
+    // std::shared_ptr<Drawable> gizmo_target;
+    active_component: ?*GizmoComponent = null,
+    // tinygizmo::drag_state drag_state;
+
+    pub fn begin(self: *@This(), cursor: Float2) void {
+        _ = cursor; // autofix
+        _ = self; // autofix
+        // float best_t = std::numeric_limits<float>::infinity();
+        // std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
+        // for (auto &target : this._scene) {
+        //   minalg::rigid_transform src{
+        //       .orientation = *(minalg::float4 *)&target.rotation,
+        //       .position = *(minalg::float3 *)&target.position,
+        //       .scale = *(minalg::float3 *)&target.scale,
+        //   };
+        //   auto [draw_scale, gizmo_transform, local_ray] =
+        //       tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
+        //   // ray intersection
+        //   auto [updated_state, t] = tinygizmo::position_intersect(local_ray);
+        //   if (updated_state) {
+        //     ray_map.insert({target,
+        //                     {
+        //                         .transform = src,
+        //                         .draw_scale = draw_scale,
+        //                         .gizmo_transform = gizmo_transform,
+        //                         .local_ray = local_ray,
+        //                         .t = t,
+        //                     }});
+        //     if (t < best_t) {
+        //       this.active = updated_state;
+        //       this.gizmo_target = target;
+        //     }
+        //   }
+        // }
+        //
+        // if (this.active) {
+        //   // begin drag
+        //   auto ray_state = ray_map[this.gizmo_target];
+        //   auto ray = tinygizmo::scaling(ray_state.draw_scale, ray_state.local_ray);
+        //   this.drag_state = {.original_position = ray_state.transform.position,
+        //                       .click_offset = ray.point(ray_state.t)};
+        //   if (local_toggle) {
+        //     // click point in gizmo local
+        //     this.drag_state.click_offset =
+        //         ray_state.gizmo_transform.transform_vector(
+        //             this.drag_state.click_offset);
+        //   }
+        // }
+    }
+
+    pub fn drag(
+        self: *@This(),
+        state: DragState,
+        w: i32,
+        h: i32,
+        cursor: Float2,
+    ) void {
+        _ = cursor; // autofix
+        _ = h; // autofix
+        _ = w; // autofix
+        _ = w; // autofix
+        _ = state; // autofix
+        _ = self; // autofix
+    }
+
+    pub fn end(self: *@This(), _: Float2) void {
+        _ = self; // autofix
+        // self.active = .{};
+        // self.gizmo_target = .{};
+        // self.drag_state = .{};
+    }
+
+    //   virtual void draw(const tinygizmo::AddTriangleFunc &add_triangle,
+    //                     const minalg::float4x4 &modelMatrix) = 0;
 };
 
-pub fn translation_draw(
-    user: *anyopaque,
-    add_triangle: AddTriangleFunc,
-    active: ?*GizmoComponent,
-    modelMatrix: Float4x4,
-) void {
-    for (translations) |c| {
-        const color = if (c == active) c.base_color else c.highlight_color;
-        c.mesh.add_triangles(user, add_triangle, modelMatrix, color);
+pub const System = struct {
+    translations: std.ArrayList(GizmoComponent),
+
+    local_toggle: bool = true,
+    gizmo_state: FrameState = .{},
+
+    pub fn init(allocator: std.mem.Allocator) !@This() {
+        var system = System{
+            .translations = std.ArrayList(GizmoComponent).init(allocator),
+        };
+        try system.translations.append(try GizmoComponent.Translation_X(allocator));
+        return system;
     }
-}
+    pub fn deinit(self: *@This()) void {
+        self.translations.deinit();
+    }
 
-pub fn translation_intersect(ray: Ray) ?struct { GizmoComponent, f32 } {
-    var best_t = std.math.inf(f32);
-    var updated_state: ?GizmoComponent = null;
-    // std::shared_ptr<gizmo_component> updated_state = {};
-    var t: f32 = 0;
-
-    for (translations) |c| {
-        if (ray.intersect_mesh(c.mesh, &t) and t < best_t) {
-            updated_state = c;
-            best_t = t;
+    pub fn translation_draw(
+        self: @This(),
+        user: *anyopaque,
+        add_triangle: AddTriangleFunc,
+        active: ?*GizmoComponent,
+        modelMatrix: Float4x4,
+    ) void {
+        for (self.translations.items) |c| {
+            const color = if (&c == active) c.base_color else c.highlight_color;
+            c.mesh.add_triangles(user, add_triangle, modelMatrix, color);
         }
     }
 
-    if (updated_state) |c| {
-        return .{ c, best_t };
-    } else {
-        return null;
+    pub fn translation_intersect(self: @This(), ray: Ray) ?struct { GizmoComponent, f32 } {
+        var best_t = std.math.inf(f32);
+        var updated_state: ?GizmoComponent = null;
+        // std::shared_ptr<gizmo_component> updated_state = {};
+        var t: f32 = 0;
+
+        for (self.translations.items) |c| {
+            if (ray.intersect_mesh(c.mesh, &t) and t < best_t) {
+                updated_state = c;
+                best_t = t;
+            }
+        }
+
+        if (updated_state) |c| {
+            return .{ c, best_t };
+        } else {
+            return null;
+        }
     }
-}
 
-// Float3 position_drag(DragState *drag, const FrameState &state,
-//                      bool local_toggle,
-//                      const std::shared_ptr<gizmo_component> &active,
-//                      const RigidTransform &p) {
-//
-//   if (auto dst = active->drag(drag, state, local_toggle, p)) {
-//     return dst->position;
-//   } else {
-//     return p.position;
-//   }
-// }
-
-//
-//
-//
+    // Float3 position_drag(DragState *drag, const FrameState &state,
+    //                      bool local_toggle,
+    //                      const std::shared_ptr<gizmo_component> &active,
+    //                      const RigidTransform &p) {
+    //
+    //   if (auto dst = active->drag(drag, state, local_toggle, p)) {
+    //     return dst->position;
+    //   } else {
+    //     return p.position;
+    //   }
+    // }
+};

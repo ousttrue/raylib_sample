@@ -23,8 +23,38 @@ pub const Drawable = struct {
     rotation: c.Quaternion = .{ .x = 0, .y = 0, .z = 0, .w = 1 },
     scale: c.Vector3 = .{ .x = 1, .y = 1, .z = 1 },
 
-    // Generate a simple triangle mesh from code
+    pub fn load_pointer(
+        self: *@This(),
+        vertexCount: usize,
+        vertices: *const c.Vector3,
+        colors: *const c.Color,
+        indexCount: usize,
+        indices: *const c_ushort,
+        dynamic: bool,
+    ) void {
+        var mesh = c.Mesh{
+            .vertexCount = @intCast(vertexCount),
+            .triangleCount = @intCast(indexCount / 3),
+            .vertices = @ptrCast(@constCast(vertices)),
+            .colors = @ptrCast(@constCast(colors)),
+            .indices = @ptrCast(@constCast(indices)),
+        };
+        c.UploadMesh(&mesh, dynamic);
+        self.model = c.LoadModelFromMesh(mesh);
+    }
+
     pub fn load_slice(
+        self: *@This(),
+        vertices: []const c.Vector3,
+        colors: []const c.Color,
+        indices: []const c_ushort,
+        dynamic: bool,
+    ) void {
+        self.load_pointer(vertices.len, &vertices[0], &colors[0], indices.len, &indices[0], dynamic);
+    }
+
+    // Generate a simple triangle mesh from code
+    pub fn load_floats(
         self: *@This(),
         vertices: []const f32,
         indices: []const c_uint,
@@ -63,26 +93,6 @@ pub const Drawable = struct {
             &mesh_indices[0],
             dynamic,
         );
-    }
-
-    pub fn load_pointer(
-        self: *@This(),
-        vertexCount: usize,
-        vertices: *const c.Vector3,
-        colors: *const c.Color,
-        indexCount: usize,
-        indices: *const c_ushort,
-        dynamic: bool,
-    ) void {
-        var mesh = c.Mesh{
-            .vertexCount = @intCast(vertexCount),
-            .triangleCount = @intCast(indexCount / 3),
-            .vertices = @ptrCast(@constCast(vertices)),
-            .colors = @ptrCast(@constCast(colors)),
-            .indices = @ptrCast(@constCast(indices)),
-        };
-        c.UploadMesh(&mesh, dynamic);
-        self.model = c.LoadModelFromMesh(mesh);
     }
 
     pub fn draw(self: @This()) void {
