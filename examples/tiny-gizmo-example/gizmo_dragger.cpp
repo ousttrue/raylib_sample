@@ -80,14 +80,14 @@ void TRSGizmo::load(Drawable *drawable) {
 
     switch (this->_visible) {
     case GizmoMode::Translation:
-      tinygizmo::TranslationGizmo::draw(_active, add_world_triangle,
-                                        modelMatrix);
+      tinygizmo::TranslationGizmo::draw(modelMatrix, add_world_triangle,
+                                        _active);
       break;
     case GizmoMode::Rotation:
-      tinygizmo::RotationGizmo::draw(_active, add_world_triangle, modelMatrix);
+      tinygizmo::RotationGizmo::draw(modelMatrix, add_world_triangle, _active);
       break;
     case GizmoMode::Scaling:
-      tinygizmo::ScalingGizmo::draw(_active, add_world_triangle, modelMatrix);
+      tinygizmo::ScalingGizmo::draw(modelMatrix, add_world_triangle, _active);
       break;
     }
   }

@@ -5,63 +5,64 @@
 
 namespace tinygizmo {
 
-void TranslationGizmo::draw(const std::shared_ptr<GizmoComponent> &component,
+void TranslationGizmo::draw(const Float4x4 &modelMatrix,
                             const AddTriangleFunc &add_triangle,
-                            const Float4x4 &modelMatrix) {
-  position_draw(add_triangle, component, modelMatrix);
+                            GizmoComponentType active_component) {
+  position_draw(modelMatrix, add_triangle, active_component);
 }
 
-std::tuple<std::shared_ptr<GizmoComponent>, float>
+std::tuple<GizmoComponentType, float>
 TranslationGizmo::intersect(const Ray &local_ray) {
   return position_intersect(local_ray);
 };
 
-Transform TranslationGizmo::drag(
-    DragState *state, const std::shared_ptr<GizmoComponent> &component,
-    const FrameState &frame, bool local_toggle, const Transform &src) {
+Transform TranslationGizmo::drag(GizmoComponentType active_component,
+                                 const FrameState &frame, bool local_toggle,
+                                 const Transform &src, DragState *state) {
   auto dst = src;
-  dst.position = position_drag(state, frame, local_toggle, component, src);
+  dst.position =
+      position_drag(active_component, frame, local_toggle, src, state);
   return dst;
 }
 
-void RotationGizmo::draw(const std::shared_ptr<GizmoComponent> &component,
+void RotationGizmo::draw(const Float4x4 &modelMatrix,
                          const AddTriangleFunc &add_triangle,
-                         const Float4x4 &modelMatrix) {
-  rotation_draw(add_triangle, component, modelMatrix);
+                         GizmoComponentType active_component) {
+  rotation_draw(modelMatrix, add_triangle, active_component);
 }
 
-std::tuple<std::shared_ptr<GizmoComponent>, float>
+std::tuple<GizmoComponentType, float>
 RotationGizmo::intersect(const Ray &local_ray) {
   return rotation_intersect(local_ray);
 };
 
-Transform RotationGizmo::drag(DragState *state,
-                              const std::shared_ptr<GizmoComponent> &component,
+Transform RotationGizmo::drag(GizmoComponentType active_component,
                               const FrameState &frame, bool local_toggle,
-                              const Transform &src) {
+                              const Transform &src, DragState *state) {
   auto dst = src;
-  dst.orientation = rotation_drag(state, frame, local_toggle, component, src);
+  dst.orientation =
+      rotation_drag(active_component, frame, local_toggle, src, state);
   return dst;
 }
 
-void ScalingGizmo::draw(const std::shared_ptr<GizmoComponent> &component,
+void ScalingGizmo::draw(const Float4x4 &modelMatrix,
                         const AddTriangleFunc &add_triangle,
-                        const Float4x4 &modelMatrix) {
-  scaling_draw(add_triangle, component, modelMatrix);
+                        GizmoComponentType active_component) {
+  scaling_draw(modelMatrix, add_triangle, active_component);
 }
 
-std::tuple<std::shared_ptr<GizmoComponent>, float>
+std::tuple<GizmoComponentType, float>
 ScalingGizmo::intersect(const Ray &local_ray) {
   return scaling_intersect(local_ray);
 };
 
-Transform ScalingGizmo::drag(DragState *state,
-                             const std::shared_ptr<GizmoComponent> &component,
+Transform ScalingGizmo::drag(GizmoComponentType active_component,
                              const FrameState &frame, bool local_toggle,
-                             const Transform &src,
-                             bool uniform) {
+                             const Transform &src, bool uniform,
+                             DragState *state) {
   auto dst = src;
-  dst.scale = scaling_drag(state, frame, local_toggle, component, src, uniform);
+  dst.scale =
+      scaling_drag(active_component, frame, local_toggle, src, uniform, state);
   return dst;
 }
 

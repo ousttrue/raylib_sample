@@ -32,7 +32,7 @@ class TRSGizmo : public Dragger {
   bool _local_toggle = true;
   bool _uniform = true;
 
-  std::shared_ptr<tinygizmo::GizmoComponent> _active;
+  tinygizmo::GizmoComponentType _active = {};
   tinygizmo::DragState _drag_state;
 
   GizmoMode _visible = GizmoMode::Translation;
@@ -54,7 +54,7 @@ public:
                                                       target->transform);
       // ray intersection
       auto [updated_state, t] = _intersect(local_ray);
-      if (updated_state) {
+      if (updated_state != tinygizmo::GizmoComponentType::None) {
         ray_map.insert({target,
                         {
                             .transform = target->transform,
@@ -71,14 +71,14 @@ public:
       }
     }
 
-    if (this->_active) {
+    if (this->_active != tinygizmo::GizmoComponentType::None) {
       // begin drag
       auto ray_state = ray_map[this->_gizmo_target];
       this->_drag_state = _begin_gizmo(ray_state, _local_toggle);
     }
   }
 
-  std::tuple<std::shared_ptr<tinygizmo::GizmoComponent>, float>
+  std::tuple<tinygizmo::GizmoComponentType, float>
   _intersect(const tinygizmo::Ray &local_ray) {
     switch (this->_visible) {
     case GizmoMode::Translation:
@@ -92,7 +92,7 @@ public:
 
   tinygizmo::DragState _begin_gizmo(const tinygizmo::RayState &ray_state,
                                     bool local_toggle) {
-    switch (this->_visible) {
+    switch (_visible) {
     case GizmoMode::Translation:
       return tinygizmo::TranslationGizmo::begin_gizmo(ray_state, _local_toggle);
     case GizmoMode::Rotation:
@@ -103,30 +103,30 @@ public:
   }
 
   void end(const Vector2 &cursor) override {
-    this->_active = {};
-    this->_gizmo_target = {};
-    this->_drag_state = {};
+    _active = {};
+    _gizmo_target = {};
+    _drag_state = {};
   }
 
   void drag(const DragState &state, int w, int h,
             const Vector2 &cursor) override {
-    if (auto active = this->_active) {
-      if (auto target = this->_gizmo_target) {
-        switch (this->_visible) {
+    if (_active != tinygizmo::GizmoComponentType::None) {
+      if (auto target = _gizmo_target) {
+        switch (_visible) {
         case GizmoMode::Translation:
           target->transform = tinygizmo::TranslationGizmo::drag(
-              &_drag_state, active, _active_state, _local_toggle,
-              target->transform);
+              _active, _active_state, _local_toggle, target->transform,
+              &_drag_state);
           break;
         case GizmoMode::Rotation:
           target->transform = tinygizmo::RotationGizmo::drag(
-              &_drag_state, active, _active_state, _local_toggle,
-              target->transform);
+              _active, _active_state, _local_toggle, target->transform,
+              &_drag_state);
           break;
         case GizmoMode::Scaling:
           target->transform = tinygizmo::ScalingGizmo::drag(
-              &_drag_state, active, _active_state, _local_toggle,
-              target->transform, this->_uniform);
+              _active, _active_state, _local_toggle, target->transform,
+              _uniform, &_drag_state);
           break;
         }
       }

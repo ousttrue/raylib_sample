@@ -1,18 +1,15 @@
 #include "tinygizmo.h"
-#include "tinygizmo_component.h"
-#include <memory>
 
 namespace tinygizmo {
 
-std::tuple<std::shared_ptr<GizmoComponent>, float>
-scaling_intersect(const Ray &ray);
+void scaling_draw(const Float4x4 &modelMatrix,
+                  const AddTriangleFunc &add_world_triangle,
+                  GizmoComponentType active_component);
 
-Float3 scaling_drag(DragState *drag, const FrameState &state, bool local_toggle,
-                    const std::shared_ptr<GizmoComponent> &active,
-                    const Transform &p, bool uniform);
+std::tuple<GizmoComponentType, float> scaling_intersect(const Ray &ray);
 
-void scaling_draw(const AddTriangleFunc &add_world_triangle,
-                  const std::shared_ptr<GizmoComponent> &active,
-                  const Float4x4 &modelMatrix);
+Float3 scaling_drag(GizmoComponentType active_component,
+                    const FrameState &state, bool local_toggle,
+                    const Transform &p, bool uniform, DragState *drag);
 
 } // namespace tinygizmo

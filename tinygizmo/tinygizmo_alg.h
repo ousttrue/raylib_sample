@@ -275,6 +275,8 @@ using AddTriangleFunc = std::function<void(const Float4 &rgba, const Float3 &p0,
 struct GeometryMesh {
   std::vector<Vertex> vertices;
   std::vector<UInt3> triangles;
+  Float4 base_color;
+  Float4 highlight_color;
 
   void compute_normals() {
     static const double NORMAL_EPSILON = 0.0001;
@@ -319,9 +321,14 @@ struct GeometryMesh {
   }
 
   static GeometryMesh make_box_geometry(const Float3 &min_bounds,
-                                        const Float3 &max_bounds) {
+                                        const Float3 &max_bounds,
+                                        const Float4 &base_color,
+                                        const Float4 &highlight_color) {
     const auto a = min_bounds, b = max_bounds;
-    GeometryMesh mesh;
+    GeometryMesh mesh{
+        .base_color = base_color,
+        .highlight_color = highlight_color,
+    };
     mesh.vertices = {
         {{a.x, a.y, a.z}, {-1, 0, 0}}, {{a.x, a.y, b.z}, {-1, 0, 0}},
         {{a.x, b.y, b.z}, {-1, 0, 0}}, {{a.x, b.y, a.z}, {-1, 0, 0}},
@@ -389,15 +396,17 @@ struct GeometryMesh {
     }
   };
 
-  static GeometryMesh make_lathed_geometry(const Float3 &axis,
-                                           const Float3 &arm1,
-                                           const Float3 &arm2, int slices,
-                                           const std::vector<Float2> &points,
-                                           const float eps = 0.0f) {
+  static GeometryMesh make_lathed_geometry(
+      const Float3 &axis, const Float3 &arm1, const Float3 &arm2, int slices,
+      const std::vector<Float2> &points, const Float4 &base_color,
+      const Float4 &highlight_color, const float eps = 0.0f) {
 
     const float tau = 6.28318530718f;
 
-    GeometryMesh mesh;
+    GeometryMesh mesh{
+        .base_color = base_color,
+        .highlight_color = highlight_color,
+    };
     for (int i = 0; i <= slices; ++i) {
       const float angle = (static_cast<float>(i % slices) * tau / slices) +
                           (tau / 8.f),

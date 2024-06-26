@@ -1,18 +1,15 @@
-#include "tinygizmo_component.h"
-#include <memory>
+#include "tinygizmo.h"
 
 namespace tinygizmo {
 
-std::tuple<std::shared_ptr<GizmoComponent>, float>
-position_intersect(const Ray &ray);
+void position_draw(const Float4x4 &modelMatrix,
+                   const AddTriangleFunc &add_world_triangle,
+                   GizmoComponentType active_component);
 
-Float3 position_drag(DragState *drag, const FrameState &state,
-                     bool local_toggle,
-                     const std::shared_ptr<GizmoComponent> &active,
-                     const Transform &p);
+std::tuple<GizmoComponentType, float> position_intersect(const Ray &ray);
 
-void position_draw(const AddTriangleFunc &add_world_triangle,
-                   const std::shared_ptr<GizmoComponent> &active,
-                   const Float4x4 &modelMatrix);
+Float3 position_drag(GizmoComponentType active_component,
+                     const FrameState &state, bool local_toggle,
+                     const Transform &p, DragState *drag);
 
 } // namespace tinygizmo
