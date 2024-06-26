@@ -17,11 +17,11 @@ struct RayState {
 
 struct TranslationGizmo {
 
-  static void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
+  static void draw(const std::shared_ptr<tinygizmo::GizmoComponent> &component,
                    const tinygizmo::AddTriangleFunc &add_triangle,
                    const tinygizmo::Float4x4 &modelMatrix);
 
-  static std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
+  static std::tuple<std::shared_ptr<tinygizmo::GizmoComponent>, float>
   intersect(const tinygizmo::Ray &local_ray);
 
   static tinygizmo::DragState begin_gizmo(const RayState &ray_state,
@@ -40,18 +40,18 @@ struct TranslationGizmo {
 
   static Transform
   drag(tinygizmo::DragState *state,
-       const std::shared_ptr<tinygizmo::gizmo_component> &component,
+       const std::shared_ptr<tinygizmo::GizmoComponent> &component,
        const tinygizmo::FrameState &frame, bool local_toggle,
        const Transform &src);
 };
 
 struct RotationGizmo {
 
-  static void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
+  static void draw(const std::shared_ptr<tinygizmo::GizmoComponent> &component,
                    const tinygizmo::AddTriangleFunc &add_triangle,
                    const tinygizmo::Float4x4 &modelMatrix);
 
-  static std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
+  static std::tuple<std::shared_ptr<tinygizmo::GizmoComponent>, float>
   intersect(const tinygizmo::Ray &local_ray);
 
   static tinygizmo::DragState begin_gizmo(const RayState &ray_state,
@@ -67,18 +67,18 @@ struct RotationGizmo {
 
   static Transform
   drag(tinygizmo::DragState *state,
-       const std::shared_ptr<tinygizmo::gizmo_component> &component,
+       const std::shared_ptr<tinygizmo::GizmoComponent> &component,
        const tinygizmo::FrameState &frame, bool local_toggle,
        const Transform &src);
 };
 
 struct ScalingGizmo {
 
-  static void draw(const std::shared_ptr<tinygizmo::gizmo_component> &component,
+  static void draw(const std::shared_ptr<tinygizmo::GizmoComponent> &component,
                    const tinygizmo::AddTriangleFunc &add_triangle,
                    const tinygizmo::Float4x4 &modelMatrix);
 
-  static std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
+  static std::tuple<std::shared_ptr<tinygizmo::GizmoComponent>, float>
   intersect(const tinygizmo::Ray &local_ray);
 
   static tinygizmo::DragState begin_gizmo(const RayState &ray_state,
@@ -94,7 +94,7 @@ struct ScalingGizmo {
 
   static Transform
   drag(tinygizmo::DragState *state,
-       const std::shared_ptr<tinygizmo::gizmo_component> &component,
+       const std::shared_ptr<tinygizmo::GizmoComponent> &component,
        const tinygizmo::FrameState &frame, bool local_toggle,
        const Transform &src, bool uniform);
 };

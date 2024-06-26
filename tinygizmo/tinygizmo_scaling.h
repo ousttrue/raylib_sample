@@ -4,15 +4,15 @@
 
 namespace tinygizmo {
 
-std::tuple<std::shared_ptr<gizmo_component>, float>
+std::tuple<std::shared_ptr<GizmoComponent>, float>
 scaling_intersect(const Ray &ray);
 
 Float3 scaling_drag(DragState *drag, const FrameState &state, bool local_toggle,
-                    const std::shared_ptr<gizmo_component> &active,
+                    const std::shared_ptr<GizmoComponent> &active,
                     const Transform &p, bool uniform);
 
 void scaling_draw(const AddTriangleFunc &add_world_triangle,
-                  const std::shared_ptr<gizmo_component> &active,
+                  const std::shared_ptr<GizmoComponent> &active,
                   const Float4x4 &modelMatrix);
 
 } // namespace tinygizmo

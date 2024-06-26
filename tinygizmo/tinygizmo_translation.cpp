@@ -7,8 +7,8 @@ namespace tinygizmo {
 std::vector<Float2> arrow_points = {
     {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
 
-struct translation_plane_component : gizmo_component {
-  using gizmo_component::gizmo_component;
+struct translation_plane_component : GizmoComponent {
+  using GizmoComponent::GizmoComponent;
 
   virtual Float3 get_axis(const FrameState &state, bool local_toggle,
                           const Quaternion &rotation) const = 0;
@@ -34,8 +34,8 @@ struct translation_plane_component : gizmo_component {
   }
 };
 
-struct translation_axis_component : gizmo_component {
-  using gizmo_component::gizmo_component;
+struct translation_axis_component : GizmoComponent {
+  using GizmoComponent::GizmoComponent;
 
   virtual Float3 get_axis(const FrameState &state, bool local_toggle,
                           const Quaternion &rotation) const = 0;
@@ -164,15 +164,15 @@ auto _translate_yz = std::make_shared<translation_yz_component>();
 auto _translate_zx = std::make_shared<translation_zx_component>();
 auto _translate_xy = std::make_shared<translation_xy_component>();
 auto _translate_xyz = std::make_shared<translation_xyz_component>();
-std::shared_ptr<gizmo_component> _gizmo_components[] = {
+std::shared_ptr<GizmoComponent> _gizmo_components[] = {
     _translate_x,  _translate_y,  _translate_z,   _translate_yz,
     _translate_zx, _translate_xy, _translate_xyz,
 };
 
-std::tuple<std::shared_ptr<gizmo_component>, float>
+std::tuple<std::shared_ptr<GizmoComponent>, float>
 position_intersect(const Ray &ray) {
   float best_t = std::numeric_limits<float>::infinity();
-  std::shared_ptr<gizmo_component> updated_state = {};
+  std::shared_ptr<GizmoComponent> updated_state = {};
   float t;
   for (auto c : _gizmo_components) {
     if (ray.intersect_mesh(c->mesh, &t) && t < best_t) {
@@ -185,7 +185,7 @@ position_intersect(const Ray &ray) {
 
 Float3 position_drag(DragState *drag, const FrameState &state,
                      bool local_toggle,
-                     const std::shared_ptr<gizmo_component> &active,
+                     const std::shared_ptr<GizmoComponent> &active,
                      const Transform &p) {
 
   if (auto dst = active->drag(drag, state, local_toggle, p)) {
@@ -196,7 +196,7 @@ Float3 position_drag(DragState *drag, const FrameState &state,
 }
 
 void position_draw(const AddTriangleFunc &add_world_triangle,
-                   const std::shared_ptr<gizmo_component> &active,
+                   const std::shared_ptr<GizmoComponent> &active,
                    const Float4x4 &modelMatrix) {
   for (auto c : _gizmo_components) {
     auto color = (c == active) ? c->base_color : c->highlight_color;

@@ -10,26 +10,26 @@ template <typename T> T clamp(const T &val, const T &min, const T &max) {
 std::vector<Float2> mace_points = {{0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f},
                                    {1, 0.1f},  {1.25f, 0.1f},  {1.25f, 0}};
 
-auto _scale_x = std::make_shared<gizmo_component>(
+auto _scale_x = std::make_shared<GizmoComponent>(
     GeometryMesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 16,
                                        mace_points),
     Float4{1, 0.5f, 0.5f, 1.f}, Float4{1, 0, 0, 1.f});
 
-auto _scale_y = std::make_shared<gizmo_component>(
+auto _scale_y = std::make_shared<GizmoComponent>(
     GeometryMesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 16,
                                        mace_points),
     Float4{0.5f, 1, 0.5f, 1.f}, Float4{0, 1, 0, 1.f});
 
-auto _scale_z = std::make_shared<gizmo_component>(
+auto _scale_z = std::make_shared<GizmoComponent>(
     GeometryMesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16,
                                        mace_points),
     Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f});
 
-std::tuple<std::shared_ptr<gizmo_component>, float>
+std::tuple<std::shared_ptr<GizmoComponent>, float>
 scaling_intersect(const Ray &ray) {
 
   float best_t = std::numeric_limits<float>::infinity(), t;
-  std::shared_ptr<gizmo_component> updated_state = {};
+  std::shared_ptr<GizmoComponent> updated_state = {};
   if (ray.intersect_mesh(_scale_x->mesh, &t) && t < best_t) {
     updated_state = _scale_x;
     best_t = t;
@@ -99,7 +99,7 @@ static Transform axis_scale_dragger(DragState *drag,
 }
 
 Float3 scaling_drag(DragState *drag, const FrameState &state, bool local_toggle,
-                    const std::shared_ptr<gizmo_component> &active,
+                    const std::shared_ptr<GizmoComponent> &active,
                     const Transform &src, bool uniform) {
 
   auto scale = src.scale;
@@ -127,9 +127,9 @@ Float3 scaling_drag(DragState *drag, const FrameState &state, bool local_toggle,
 }
 
 void scaling_draw(const AddTriangleFunc &add_world_triangle,
-                  const std::shared_ptr<gizmo_component> &active,
+                  const std::shared_ptr<GizmoComponent> &active,
                   const Float4x4 &modelMatrix) {
-  std::vector<std::shared_ptr<gizmo_component>> draw_components{
+  std::vector<std::shared_ptr<GizmoComponent>> draw_components{
       _scale_x,
       _scale_y,
       _scale_z,

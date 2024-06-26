@@ -8,26 +8,26 @@ std::vector<Float2> ring_points = {
     {+0.025f, 1},    {-0.025f, 1},    {-0.025f, 1},    {-0.025f, 1.1f},
     {-0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1.1f}, {+0.025f, 1}};
 
-auto _rotate_x = std::make_shared<gizmo_component>(
+auto _rotate_x = std::make_shared<GizmoComponent>(
     GeometryMesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, 32,
                                        ring_points, 0.003f),
     Float4{1, 0.5f, 0.5f, 1.f}, Float4{1, 0, 0, 1.f});
 
-auto _rotate_y = std::make_shared<gizmo_component>(
+auto _rotate_y = std::make_shared<GizmoComponent>(
     GeometryMesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0}, 32,
                                        ring_points, -0.003f),
     Float4{0.5f, 1, 0.5f, 1.f}, Float4{0, 1, 0, 1.f});
 
-auto _rotate_z = std::make_shared<gizmo_component>(
+auto _rotate_z = std::make_shared<GizmoComponent>(
     GeometryMesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 32,
                                        ring_points),
     Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f});
 
-std::tuple<std::shared_ptr<gizmo_component>, float>
+std::tuple<std::shared_ptr<GizmoComponent>, float>
 rotation_intersect(const Ray &ray) {
 
   float best_t = std::numeric_limits<float>::infinity(), t;
-  std::shared_ptr<gizmo_component> updated_state = {};
+  std::shared_ptr<GizmoComponent> updated_state = {};
   if (ray.intersect_mesh(_rotate_x->mesh, &t) && t < best_t) {
     updated_state = _rotate_x;
     best_t = t;
@@ -105,7 +105,7 @@ static Transform axis_rotation_dragger(DragState *drag,
 
 Quaternion rotation_drag(DragState *drag, const FrameState &state,
                      bool local_toggle,
-                     const std::shared_ptr<gizmo_component> &active,
+                     const std::shared_ptr<GizmoComponent> &active,
                      const Transform &src) {
   if (active == _rotate_x) {
     return axis_rotation_dragger(drag, state, local_toggle, {1, 0, 0}, src, {})
@@ -123,10 +123,10 @@ Quaternion rotation_drag(DragState *drag, const FrameState &state,
 }
 
 void rotation_draw(const AddTriangleFunc &add_world_triangle,
-                   const std::shared_ptr<gizmo_component> &active,
+                   const std::shared_ptr<GizmoComponent> &active,
                    const Float4x4 &modelMatrix) {
 
-  std::vector<std::shared_ptr<gizmo_component>> draw_interactions;
+  std::vector<std::shared_ptr<GizmoComponent>> draw_interactions;
   // if (!state.local_toggle && this->active)
   //   draw_interactions = {interaction_mode(this->active)};
   // else

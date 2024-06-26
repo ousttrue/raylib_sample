@@ -4,6 +4,23 @@
 
 namespace tinygizmo {
 
+enum class GizmoComonentType {
+  TranslationX,
+  TranslationY,
+  TranslationZ,
+  TranslationXY,
+  TranslationYZ,
+  TranslationZX,
+  TranslationView,
+  RotationX,
+  RotationY,
+  RotationZ,
+  ScalingX,
+  ScalingY,
+  ScalingZ,
+  ScalingUniform,
+};
+
 struct FrameState {
   bool mouse_down = false;
   // If > 0.f, the gizmos are drawn scale-invariant with a screenspace value
@@ -50,16 +67,16 @@ struct DragState {
   Float3 original_scale;
 };
 
-struct gizmo_component {
+struct GizmoComponent {
   GeometryMesh mesh;
   Float4 base_color;
   Float4 highlight_color;
 
-  gizmo_component(const GeometryMesh &mesh, const Float4 &base,
+  GizmoComponent(const GeometryMesh &mesh, const Float4 &base,
                   const Float4 &high)
       : mesh(mesh), base_color(base), highlight_color(high) {}
 
-  virtual ~gizmo_component() {}
+  virtual ~GizmoComponent() {}
 
   virtual std::optional<Transform> drag(DragState *drag,
                                         const FrameState &active_state,

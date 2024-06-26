@@ -32,7 +32,7 @@ class TRSGizmo : public Dragger {
   bool _local_toggle = true;
   bool _uniform = true;
 
-  std::shared_ptr<tinygizmo::gizmo_component> _active;
+  std::shared_ptr<tinygizmo::GizmoComponent> _active;
   tinygizmo::DragState _drag_state;
 
   GizmoMode _visible = GizmoMode::Translation;
@@ -78,7 +78,7 @@ public:
     }
   }
 
-  std::tuple<std::shared_ptr<tinygizmo::gizmo_component>, float>
+  std::tuple<std::shared_ptr<tinygizmo::GizmoComponent>, float>
   _intersect(const tinygizmo::Ray &local_ray) {
     switch (this->_visible) {
     case GizmoMode::Translation:
