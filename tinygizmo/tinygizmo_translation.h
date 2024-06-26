@@ -1,4 +1,3 @@
-#include "tinygizmo.h"
 #include "tinygizmo_component.h"
 #include <memory>
 

@@ -7,7 +7,7 @@ namespace tinygizmo {
 std::tuple<std::shared_ptr<gizmo_component>, float>
 rotation_intersect(const Ray &ray);
 
-Float4 rotation_drag(DragState *drag, const FrameState &state,
+Quaternion rotation_drag(DragState *drag, const FrameState &state,
                      bool local_toggle,
                      const std::shared_ptr<gizmo_component> &active,
                      const Transform &p);

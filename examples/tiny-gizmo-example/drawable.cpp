@@ -63,11 +63,9 @@ void Drawable::load(size_t vertexCount, const Vector3 *vertices,
 }
 
 void Drawable::draw() {
-  auto _m = TRS(position, rotation, scale);
   rlPushMatrix();
-  auto m = MatrixTranspose(_m);
-  rlMultMatrixf(&m.m0);
+  auto m = this->transform.matrix();
+  rlMultMatrixf(&m.m00);
   DrawModel(this->model, {0, 0, 0}, 1.0f, WHITE);
   rlPopMatrix();
 }
-

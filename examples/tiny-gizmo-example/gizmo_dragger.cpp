@@ -70,11 +70,8 @@ void TRSGizmo::load(Drawable *drawable) {
       };
 
   for (auto &target : this->_scene) {
-    tinygizmo::Transform src(*(tinygizmo::Quaternion *)&target->rotation,
-                                  *(tinygizmo::Float3 *)&target->position,
-                                  *(tinygizmo::Float3 *)&target->scale);
-    auto [draw_scale, p, ray] =
-        _active_state.gizmo_transform_and_local_ray(_local_toggle, src);
+    auto [draw_scale, p, ray] = _active_state.gizmo_transform_and_local_ray(
+        _local_toggle, target->transform);
 
     auto modelMatrix = p.matrix();
     auto scaleMatrix =

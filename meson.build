@@ -46,6 +46,7 @@ executable(
         'tinygizmo/tinygizmo_translation.cpp',
         'tinygizmo/tinygizmo_rotation.cpp',
         'tinygizmo/tinygizmo_scaling.cpp',
+        'tinygizmo/tinygizmo.cpp',
     ],
     include_directories: include_directories(
         'tinygizmo',

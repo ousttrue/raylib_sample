@@ -16,13 +16,13 @@ int main(int argc, char *argv[]) {
 
   auto a = std::make_shared<Drawable>();
   a->name = "first-example-gizmo";
-  a->position = {-2, 0, 0};
+  a->transform.position = {-2, 0, 0};
   a->load({(Vertex *)teapot_vertices, _countof(teapot_vertices) / 6},
           teapot_triangles, false);
 
   auto b = std::make_shared<Drawable>();
   b->name = "second-example-gizmo";
-  b->position = {2, 0, 0};
+  b->transform.position = {2, 0, 0};
   b->load({(Vertex *)teapot_vertices, _countof(teapot_vertices) / 6},
           teapot_triangles, false);
 

@@ -1,4 +1,5 @@
 #pragma once
+#include "tinygizmo_alg.h"
 #include <raylib.h>
 #include <raymath.h>
 #include <rlgl.h>
@@ -13,9 +14,11 @@ struct Vertex {
 struct Drawable {
   std::string name;
   Model model = {};
-  Vector3 position = {0, 0, 0};
-  Quaternion rotation = {0, 0, 0, 1};
-  Vector3 scale = {1, 1, 1};
+  tinygizmo::Transform transform = {
+      .orientation = {0, 0, 0, 1},
+      .position = {0, 0, 0},
+      .scale = {1, 1, 1},
+  };
 
   // Generate a simple triangle mesh from code
   void load(std::span<const Vertex> vertices, std::span<const uint32_t> indices,
