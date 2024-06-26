@@ -70,7 +70,7 @@ void TRSGizmo::load(Drawable *drawable) {
       };
 
   for (auto &target : this->_scene) {
-    tinygizmo::RigidTransform src(*(tinygizmo::Quaternion *)&target->rotation,
+    tinygizmo::Transform src(*(tinygizmo::Quaternion *)&target->rotation,
                                   *(tinygizmo::Float3 *)&target->position,
                                   *(tinygizmo::Float3 *)&target->scale);
     auto [draw_scale, p, ray] =

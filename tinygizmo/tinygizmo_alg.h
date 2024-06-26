@@ -221,7 +221,7 @@ struct Quaternion : Float4 {
   }
 };
 
-struct RigidTransform {
+struct Transform {
   Quaternion orientation = {0, 0, 0, 1};
   Float3 position = {0, 0, 0};
   Float3 scale = {1, 1, 1};
@@ -474,12 +474,12 @@ struct Ray {
     };
   }
 
-  Ray transform(const RigidTransform &p) const {
+  Ray transform(const Transform &p) const {
     return {p.transform_point(this->origin),
             p.transform_vector(this->direction)};
   }
 
-  Ray detransform(const RigidTransform &p) const {
+  Ray detransform(const Transform &p) const {
     return {p.detransform_point(this->origin),
             p.detransform_vector(this->direction)};
   }

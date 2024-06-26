@@ -53,11 +53,11 @@ make_rotation_quat_between_vectors_snapped(const Float3 &from, const Float3 &to,
                                      snappedAcos);
 }
 
-static RigidTransform axis_rotation_dragger(DragState *drag,
+static Transform axis_rotation_dragger(DragState *drag,
                                             const FrameState &active_state,
                                             bool local_toggle,
                                             const Float3 &axis,
-                                            const RigidTransform &src, bool) {
+                                            const Transform &src, bool) {
   auto start_orientation =
       local_toggle ? drag->original_orientation : Quaternion{0, 0, 0, 1};
 
@@ -65,7 +65,7 @@ static RigidTransform axis_rotation_dragger(DragState *drag,
     return src;
   }
 
-  RigidTransform original_pose = {
+  Transform original_pose = {
       start_orientation,
       drag->original_position,
   };
@@ -87,16 +87,16 @@ static RigidTransform axis_rotation_dragger(DragState *drag,
 
   float d = Float3::dot(arm1, arm2);
   if (d > 0.999f) {
-    return RigidTransform(start_orientation, src.position, src.scale);
+    return Transform(start_orientation, src.position, src.scale);
   }
 
   float angle = std::acos(d);
   if (angle < 0.001f) {
-    return RigidTransform(start_orientation, src.position, src.scale);
+    return Transform(start_orientation, src.position, src.scale);
   }
 
   auto a = Float3::cross(arm1, arm2).normalize();
-  return RigidTransform{
+  return Transform{
       .orientation = Quaternion::from_axis_angle(a, angle) * start_orientation,
       .position = src.position,
       .scale = src.scale,
@@ -106,7 +106,7 @@ static RigidTransform axis_rotation_dragger(DragState *drag,
 Float4 rotation_drag(DragState *drag, const FrameState &state,
                      bool local_toggle,
                      const std::shared_ptr<gizmo_component> &active,
-                     const RigidTransform &src) {
+                     const Transform &src) {
   if (active == _rotate_x) {
     return axis_rotation_dragger(drag, state, local_toggle, {1, 0, 0}, src, {})
         .orientation;

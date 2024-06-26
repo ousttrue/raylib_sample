@@ -15,9 +15,9 @@ struct gizmo_component {
 
   virtual ~gizmo_component() {}
 
-  virtual std::optional<RigidTransform>
+  virtual std::optional<Transform>
   drag(DragState *drag, const FrameState &active_state,
-       bool local_toggle, const RigidTransform &src) const {
+       bool local_toggle, const Transform &src) const {
     return {};
   }
 };

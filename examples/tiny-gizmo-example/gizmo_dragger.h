@@ -7,9 +7,9 @@
 #include <tinygizmo_translation.h>
 
 struct RayState {
-  tinygizmo::RigidTransform transform;
+  tinygizmo::Transform transform;
   float draw_scale;
-  tinygizmo::RigidTransform gizmo_transform;
+  tinygizmo::Transform gizmo_transform;
   tinygizmo::Ray local_ray;
   float t;
 };
@@ -60,7 +60,7 @@ public:
             const std::shared_ptr<tinygizmo::gizmo_component> &component,
             const tinygizmo::FrameState &frame, bool local_toggle) override {
 
-    tinygizmo::RigidTransform src{
+    tinygizmo::Transform src{
         .orientation = *(tinygizmo::Quaternion *)&target->rotation,
         .position = *(tinygizmo::Float3 *)&target->position,
         .scale = *(tinygizmo::Float3 *)&target->scale,
@@ -99,7 +99,7 @@ public:
             tinygizmo::DragState *state,
             const std::shared_ptr<tinygizmo::gizmo_component> &component,
             const tinygizmo::FrameState &frame, bool local_toggle) override {
-    tinygizmo::RigidTransform src{
+    tinygizmo::Transform src{
         .orientation = *(tinygizmo::Quaternion *)&target->rotation,
         .position = *(tinygizmo::Float3 *)&target->position,
         .scale = *(tinygizmo::Float3 *)&target->scale,
@@ -139,7 +139,7 @@ public:
             tinygizmo::DragState *state,
             const std::shared_ptr<tinygizmo::gizmo_component> &component,
             const tinygizmo::FrameState &frame, bool local_toggle) override {
-    tinygizmo::RigidTransform src{
+    tinygizmo::Transform src{
         .orientation = *(tinygizmo::Quaternion *)&target->rotation,
         .position = *(tinygizmo::Float3 *)&target->position,
         .scale = *(tinygizmo::Float3 *)&target->scale,
@@ -199,7 +199,7 @@ public:
     float best_t = std::numeric_limits<float>::infinity();
     std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
     for (auto &target : this->_scene) {
-      tinygizmo::RigidTransform src{
+      tinygizmo::Transform src{
           .orientation = *(tinygizmo::Quaternion *)&target->rotation,
           .position = *(tinygizmo::Float3 *)&target->position,
           .scale = *(tinygizmo::Float3 *)&target->scale,

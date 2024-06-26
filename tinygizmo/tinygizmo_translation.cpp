@@ -13,10 +13,10 @@ struct translation_plane_component : gizmo_component {
   virtual Float3 get_axis(const FrameState &state, bool local_toggle,
                           const Quaternion &rotation) const = 0;
 
-  std::optional<RigidTransform> drag(DragState *drag,
+  std::optional<Transform> drag(DragState *drag,
                                      const FrameState &active_state,
                                      bool local_toggle,
-                                     const RigidTransform &p) const override {
+                                     const Transform &p) const override {
     auto plane_normal = get_axis(active_state, local_toggle, p.orientation);
     auto plane =
         Plane::from_normal_and_position(plane_normal, drag->original_position);
@@ -26,7 +26,7 @@ struct translation_plane_component : gizmo_component {
     }
     auto dst = active_state.ray.point(*t) - drag->click_offset;
 
-    return RigidTransform{
+    return Transform{
         .orientation = p.orientation,
         .position = dst,
         .scale = p.scale,
@@ -40,10 +40,10 @@ struct translation_axis_component : gizmo_component {
   virtual Float3 get_axis(const FrameState &state, bool local_toggle,
                           const Quaternion &rotation) const = 0;
 
-  std::optional<RigidTransform> drag(DragState *drag,
+  std::optional<Transform> drag(DragState *drag,
                                      const FrameState &active_state,
                                      bool local_toggle,
-                                     const RigidTransform &p) const override {
+                                     const Transform &p) const override {
     // First apply a plane translation dragger with a plane that contains the
     // desired axis and is oriented to face the camera
     auto axis = get_axis(active_state, local_toggle, p.orientation);
@@ -62,7 +62,7 @@ struct translation_axis_component : gizmo_component {
     auto point = drag->original_position +
                  axis.scale(Float3::dot(dst - drag->original_position, axis)) -
                  drag->click_offset;
-    return RigidTransform(p.orientation, point, p.scale);
+    return Transform(p.orientation, point, p.scale);
   }
 };
 
@@ -186,7 +186,7 @@ position_intersect(const Ray &ray) {
 Float3 position_drag(DragState *drag, const FrameState &state,
                      bool local_toggle,
                      const std::shared_ptr<gizmo_component> &active,
-                     const RigidTransform &p) {
+                     const Transform &p) {
 
   if (auto dst = active->drag(drag, state, local_toggle, p)) {
     return dst->position;

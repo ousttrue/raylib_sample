@@ -1,27 +1,20 @@
 const std = @import("std");
 const c = @import("c.zig");
+const tinygizmo = @import("tinygizmo");
 
 pub const Vertex = struct {
     position: c.Vector3,
     color: c.Vector3,
 };
 
-fn TRS(t: c.Vector3, r: c.Quaternion, s: c.Vector3) c.Matrix {
-    return c.MatrixMultiply(
-        c.MatrixMultiply(
-            c.MatrixScale(s.x, s.y, s.z),
-            c.QuaternionToMatrix(r),
-        ),
-        c.MatrixTranslate(t.x, t.y, t.z),
-    );
-}
-
 pub const Drawable = struct {
     name: []const u8,
     model: ?c.Model = null,
-    position: c.Vector3 = .{ .x = 0, .y = 0, .z = 0 },
-    rotation: c.Quaternion = .{ .x = 0, .y = 0, .z = 0, .w = 1 },
-    scale: c.Vector3 = .{ .x = 1, .y = 1, .z = 1 },
+    transform: tinygizmo.Transform = .{
+        .position = .{ .x = 0, .y = 0, .z = 0 },
+        .orientation = .{ .x = 0, .y = 0, .z = 0, .w = 1 },
+        .scale = .{ .x = 1, .y = 1, .z = 1 },
+    },
 
     pub fn load_pointer(
         self: *@This(),
@@ -96,10 +89,9 @@ pub const Drawable = struct {
     }
 
     pub fn draw(self: @This()) void {
-        const _m = TRS(self.position, self.rotation, self.scale);
         c.rlPushMatrix();
-        const m = c.MatrixTranspose(_m);
-        c.rlMultMatrixf(&m.m0);
+        const m = self.transform.matrix();
+        c.rlMultMatrixf(&m.m00);
         if (self.model) |model| {
             c.DrawModel(model, .{ .x = 0, .y = 0, .z = 0 }, 1.0, c.WHITE);
         }

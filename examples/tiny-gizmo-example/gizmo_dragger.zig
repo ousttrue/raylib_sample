@@ -64,27 +64,9 @@ pub const TRSGizmo = struct {
         var best_t = std.math.inf(f32);
         self.ray_map.clearRetainingCapacity();
         for (self.scene) |target| {
-            const src = tinygizmo.RigidTransform{
-                .orientation = .{
-                    .x = target.rotation.x,
-                    .y = target.rotation.y,
-                    .z = target.rotation.z,
-                    .w = target.rotation.w,
-                },
-                .position = .{
-                    .x = target.position.x,
-                    .y = target.position.y,
-                    .z = target.position.z,
-                },
-                .scale = .{
-                    .x = target.scale.x,
-                    .y = target.scale.y,
-                    .z = target.scale.z,
-                },
-            };
             const draw_scale, const gizmo_transform, const local_ray = self.active_state.gizmo_transform_and_local_ray(
                 self.local_toggle,
-                src,
+                target.transform,
             );
             // ray intersection
             const updated_state, const t = switch (self.visible) {
@@ -94,7 +76,7 @@ pub const TRSGizmo = struct {
             };
             if (updated_state) |active| {
                 self.ray_map.put(target, .{
-                    .transform = src,
+                    .transform = target.transform,
                     .draw_scale = draw_scale,
                     .gizmo_transform = gizmo_transform,
                     .local_ray = local_ray,
@@ -112,9 +94,18 @@ pub const TRSGizmo = struct {
             // begin drag
             if (self.ray_map.getEntry(target)) |entry| {
                 self.drag_state = switch (self.visible) {
-                    tinygizmo.GizmoModeType.Translation => |x| x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
-                    tinygizmo.GizmoModeType.Rotation => |x| x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
-                    tinygizmo.GizmoModeType.Scaling => |x| x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
+                    tinygizmo.GizmoModeType.Translation => |x| x.begin_gizmo(
+                        entry.value_ptr.*,
+                        self.local_toggle,
+                    ),
+                    tinygizmo.GizmoModeType.Rotation => |x| x.begin_gizmo(
+                        entry.value_ptr.*,
+                        self.local_toggle,
+                    ),
+                    tinygizmo.GizmoModeType.Scaling => |x| x.begin_gizmo(
+                        entry.value_ptr.*,
+                        self.local_toggle,
+                    ),
                 };
             }
         }
@@ -229,26 +220,8 @@ pub const TRSGizmo = struct {
         self.indices.clearRetainingCapacity();
 
         for (self.scene) |target| {
-            const src = tinygizmo.RigidTransform{
-                .orientation = .{
-                    .x = target.rotation.x,
-                    .y = target.rotation.y,
-                    .z = target.rotation.z,
-                    .w = target.rotation.w,
-                },
-                .position = .{
-                    .x = target.position.x,
-                    .y = target.position.y,
-                    .z = target.position.z,
-                },
-                .scale = .{
-                    .x = target.scale.x,
-                    .y = target.scale.y,
-                    .z = target.scale.z,
-                },
-            };
             const draw_scale, const p, const ray =
-                self.active_state.gizmo_transform_and_local_ray(self.local_toggle, src);
+                self.active_state.gizmo_transform_and_local_ray(self.local_toggle, target.transform);
             _ = ray; // autofix
 
             const scaleMatrix =

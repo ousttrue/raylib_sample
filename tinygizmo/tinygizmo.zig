@@ -190,6 +190,27 @@ pub const Float4x4 = struct {
         };
     }
 
+    pub fn transpose(self: @This()) @This() {
+        return .{
+            .m00 = self.m00,
+            .m01 = self.m10,
+            .m02 = self.m20,
+            .m03 = self.m30,
+            .m10 = self.m01,
+            .m11 = self.m11,
+            .m12 = self.m21,
+            .m13 = self.m31,
+            .m20 = self.m02,
+            .m21 = self.m12,
+            .m22 = self.m22,
+            .m23 = self.m32,
+            .m30 = self.m03,
+            .m31 = self.m13,
+            .m32 = self.m23,
+            .m33 = self.m33,
+        };
+    }
+
     pub fn scaling(x: f32, y: f32, z: f32) @This() {
         return .{
             .m00 = x,
@@ -324,7 +345,7 @@ pub const Quaternion = struct {
     }
 };
 
-pub const RigidTransform = struct {
+pub const Transform = struct {
     orientation: Quaternion = .{ .x = 0, .y = 0, .z = 0, .w = 1 },
     position: Float3 = .{ .x = 0, .y = 0, .z = 0 },
     scale: Float3 = .{ .x = 1, .y = 1, .z = 1 },
@@ -333,6 +354,15 @@ pub const RigidTransform = struct {
         return self.scale.x == self.scale.y and self.scale.x == self.scale.z;
     }
     pub fn matrix(self: @This()) Float4x4 {
+        // fn TRS(t: c.Vector3, r: c.Quaternion, s: c.Vector3) c.Matrix {
+        //     return c.MatrixMultiply(
+        //         c.MatrixMultiply(
+        //             c.MatrixScale(s.x, s.y, s.z),
+        //             c.QuaternionToMatrix(r),
+        //         ),
+        //         c.MatrixTranslate(t.x, t.y, t.z),
+        //     );
+        // }
         return Float4x4.make(
             Float4.make(self.orientation.xdir().scale(self.scale.x), 0),
             Float4.make(self.orientation.ydir().scale(self.scale.y), 0),
@@ -497,14 +527,14 @@ pub const Ray = struct {
         };
     }
 
-    pub fn transform(self: @This(), p: RigidTransform) @This() {
+    pub fn transform(self: @This(), p: Transform) @This() {
         return .{
             .origin = p.transform_point(self.origin),
             .direction = p.transform_vector(self.direction),
         };
     }
 
-    pub fn detransform(self: @This(), p: RigidTransform) @This() {
+    pub fn detransform(self: @This(), p: Transform) @This() {
         return .{
             .origin = p.detransform_point(self.origin),
             .direction = p.detransform_vector(self.direction),
@@ -602,10 +632,10 @@ pub const FrameState = struct {
     pub fn gizmo_transform_and_local_ray(
         self: @This(),
         local_toggle: bool,
-        src: RigidTransform,
-    ) struct { f32, RigidTransform, Ray } {
+        src: Transform,
+    ) struct { f32, Transform, Ray } {
         const draw_scale = self.scale_screenspace(src.position);
-        const p = RigidTransform{
+        const p = Transform{
             .orientation = if (local_toggle) src.orientation else Quaternion{},
             .position = src.position,
         };
@@ -971,9 +1001,9 @@ pub const System = struct {
 };
 
 pub const RayState = struct {
-    transform: RigidTransform,
+    transform: Transform,
     draw_scale: f32,
-    gizmo_transform: RigidTransform,
+    gizmo_transform: Transform,
     local_ray: Ray,
     t: f32,
 };

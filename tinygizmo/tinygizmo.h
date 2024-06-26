@@ -27,11 +27,11 @@ struct FrameState {
     return (_screenspace_scale > 0.f) ? calc_scale_screenspace(position) : 1.f;
   }
 
-  std::tuple<float, RigidTransform, Ray>
+  std::tuple<float, Transform, Ray>
   gizmo_transform_and_local_ray(bool local_toggle,
-                                const RigidTransform &src) const {
+                                const Transform &src) const {
     auto draw_scale = this->scale_screenspace(src.position);
-    auto p = RigidTransform{
+    auto p = Transform{
         .orientation = local_toggle ? src.orientation : Quaternion{0, 0, 0, 1},
         .position = src.position,
     };

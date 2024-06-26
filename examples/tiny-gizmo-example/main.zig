@@ -18,13 +18,17 @@ pub fn main() !void {
 
     var a = drawable.Drawable{
         .name = "first-example-gizmo",
-        .position = .{ .x = -2, .y = 0, .z = 0 },
+        .transform = .{
+            .position = .{ .x = -2, .y = 0, .z = 0 },
+        },
     };
     try a.load_floats(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
 
     var b = drawable.Drawable{
         .name = "second-example-gizmo",
-        .position = .{ .x = 2, .y = 0, .z = 0 },
+        .transform = .{
+            .position = .{ .x = 2, .y = 0, .z = 0 },
+        },
     };
     try b.load_floats(&teapot.teapot_vertices, &teapot.teapot_triangles, false);
 

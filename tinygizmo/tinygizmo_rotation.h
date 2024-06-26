@@ -10,7 +10,7 @@ rotation_intersect(const Ray &ray);
 Float4 rotation_drag(DragState *drag, const FrameState &state,
                      bool local_toggle,
                      const std::shared_ptr<gizmo_component> &active,
-                     const RigidTransform &p);
+                     const Transform &p);
 
 void rotation_draw(const AddTriangleFunc &add_world_triangle,
                    const std::shared_ptr<gizmo_component> &active,

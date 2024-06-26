@@ -55,10 +55,10 @@ inline void flush_to_zero(Float3 &f) {
     f.z = 0.f;
 }
 
-static RigidTransform axis_scale_dragger(DragState *drag,
+static Transform axis_scale_dragger(DragState *drag,
                                          const FrameState &active_state,
                                          bool local_toggle, const Float3 &axis,
-                                         const RigidTransform &src,
+                                         const Transform &src,
                                          bool uniform) {
   if (!active_state.mouse_down) {
     return src;
@@ -95,16 +95,16 @@ static RigidTransform axis_scale_dragger(DragState *drag,
                 : Float3(clamp(new_scale.x, 0.01f, 1000.f),
                          clamp(new_scale.y, 0.01f, 1000.f),
                          clamp(new_scale.z, 0.01f, 1000.f));
-  return RigidTransform(src.orientation, src.position, scale);
+  return Transform(src.orientation, src.position, scale);
 }
 
 Float3 scaling_drag(DragState *drag, const FrameState &state, bool local_toggle,
                     const std::shared_ptr<gizmo_component> &active,
-                    const RigidTransform &src, bool uniform) {
+                    const Transform &src, bool uniform) {
 
   auto scale = src.scale;
   if (active) {
-    RigidTransform _src{
+    Transform _src{
         .orientation = {0, 0, 0, 1},
         .position = src.position,
         .scale = scale,
