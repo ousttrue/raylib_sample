@@ -101,11 +101,15 @@ static Transform axis_scale_dragger(DragState *drag,
   flush_to_zero(offset_on_axis);
   Float3 new_scale = drag->original_scale + offset_on_axis;
 
-  Float3 scale =
-      (uniform) ? Float3(clamp(Float3::dot(distance, new_scale), 0.01f, 1000.f))
-                : Float3(clamp(new_scale.x, 0.01f, 1000.f),
-                         clamp(new_scale.y, 0.01f, 1000.f),
-                         clamp(new_scale.z, 0.01f, 1000.f));
+  Float3 scale =(uniform) 
+    ? Float3{
+      clamp(Float3::dot(distance, new_scale), 0.01f, 1000.f),
+        clamp(Float3::dot(distance, new_scale), 0.01f, 1000.f),
+        clamp(Float3::dot(distance, new_scale), 0.01f, 1000.f),
+    } 
+  : Float3{clamp(new_scale.x, 0.01f, 1000.f),
+    clamp(new_scale.y, 0.01f, 1000.f),
+    clamp(new_scale.z, 0.01f, 1000.f),};
   return Transform(src.orientation, src.position, scale);
 }
 
