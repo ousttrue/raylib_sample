@@ -975,18 +975,6 @@ pub const System = struct {
         return .{ updated_state, best_t };
     }
 
-    // Float3 position_drag(DragState *drag, const FrameState &state,
-    //                      bool local_toggle,
-    //                      const std::shared_ptr<gizmo_component> &active,
-    //                      const RigidTransform &p) {
-    //
-    //   if (auto dst = active->drag(drag, state, local_toggle, p)) {
-    //     return dst->position;
-    //   } else {
-    //     return p.position;
-    //   }
-    // }
-
     pub fn rotation_intersect(self: @This(), ray: Ray) struct { ?GizmoComponent, f32 } {
         _ = ray; // autofix
         _ = self; // autofix
@@ -1065,3 +1053,45 @@ pub const GizmoMode = union(GizmoModeType) {
         }
     },
 };
+
+pub fn translation_drag(
+    drag: DragState,
+    state: FrameState,
+    local_toggle: bool,
+    active: *const GizmoComponent,
+    p: Transform,
+) Float3 {
+    _ = active; // autofix
+    _ = local_toggle; // autofix
+    _ = state; // autofix
+    _ = drag; // autofix
+    return p.position;
+}
+
+pub fn rotation_drag(
+    drag: DragState,
+    state: FrameState,
+    local_toggle: bool,
+    active: *const GizmoComponent,
+    p: Transform,
+) Quaternion {
+    _ = active; // autofix
+    _ = local_toggle; // autofix
+    _ = state; // autofix
+    _ = drag; // autofix
+    return p.orientation;
+}
+
+pub fn scaling_drag(
+    drag: DragState,
+    state: FrameState,
+    local_toggle: bool,
+    active: *const GizmoComponent,
+    p: Transform,
+) Float3 {
+    _ = active; // autofix
+    _ = local_toggle; // autofix
+    _ = state; // autofix
+    _ = drag; // autofix
+    return p.scale;
+}

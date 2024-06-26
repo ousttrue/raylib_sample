@@ -111,26 +111,55 @@ pub const TRSGizmo = struct {
         }
     }
 
-    pub fn end(self: *@This(), cursor: c.Vector2) void {
-        _ = cursor; // autofix
-        _ = self; // autofix
-        // self._active = {};
-        // self._gizmo_target = {};
-        // self._drag_state = {};
+    pub fn end(self: *@This(), _: c.Vector2) void {
+        self.active = null;
+        self.gizmo_target = null;
+        self.drag_state = .{};
     }
 
-    pub fn drag(self: *@This(), state: rdrag.DragState, w: i32, h: i32, cursor: c.Vector2) void {
-        _ = cursor; // autofix
-        _ = h; // autofix
-        _ = w; // autofix
-        _ = state; // autofix
-        _ = self; // autofix
-        // for (auto &target : this->_scene) {
-        //   if (this->_active && this->_gizmo_target == target) {
-        //     _visible->drag(target, &_drag_state, _active, _active_state,
-        //                    _local_toggle);
-        //   }
-        // }
+    pub fn drag(
+        self: *@This(),
+        _: rdrag.DragState,
+        _: i32,
+        _: i32,
+        _: c.Vector2,
+    ) void {
+        if (self.active) |active| {
+            if (self.gizmo_target) |gizmo_target| {
+                switch (self.visible) {
+                    tinygizmo.GizmoModeType.Translation => {
+                        const position = tinygizmo.translation_drag(
+                            self.drag_state,
+                            self.active_state,
+                            self.local_toggle,
+                            &active,
+                            gizmo_target.transform,
+                        );
+                        gizmo_target.transform.position = position;
+                    },
+                    tinygizmo.GizmoModeType.Rotation => {
+                        const rotation = tinygizmo.rotation_drag(
+                            self.drag_state,
+                            self.active_state,
+                            self.local_toggle,
+                            &active,
+                            gizmo_target.transform,
+                        );
+                        gizmo_target.transform.orientation = rotation;
+                    },
+                    tinygizmo.GizmoModeType.Scaling => {
+                        const scale = tinygizmo.scaling_drag(
+                            self.drag_state,
+                            self.active_state,
+                            self.local_toggle,
+                            &active,
+                            gizmo_target.transform,
+                        );
+                        gizmo_target.transform.scale = scale;
+                    },
+                }
+            }
+        }
     }
 
     pub fn process_hotkey(self: *@This(), w: i32, h: i32, cursor: c.Vector2, hotkey: Hotkey) void {
