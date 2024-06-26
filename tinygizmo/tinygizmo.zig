@@ -956,4 +956,82 @@ pub const System = struct {
     //     return p.position;
     //   }
     // }
+
+    pub fn rotation_intersect(self: @This(), ray: Ray) struct { ?GizmoComponent, f32 } {
+        _ = ray; // autofix
+        _ = self; // autofix
+        return .{ null, 0 };
+    }
+
+    pub fn scaling_intersect(self: @This(), ray: Ray) struct { ?GizmoComponent, f32 } {
+        _ = ray; // autofix
+        _ = self; // autofix
+        return .{ null, 0 };
+    }
+};
+
+pub const RayState = struct {
+    transform: RigidTransform,
+    draw_scale: f32,
+    gizmo_transform: RigidTransform,
+    local_ray: Ray,
+    t: f32,
+};
+
+pub const GizmoModeType = enum {
+    Translation,
+    Rotation,
+    Scaling,
+};
+
+pub const GizmoMode = union(GizmoModeType) {
+    Translation: struct {
+        pub fn begin_gizmo(
+            _: @This(),
+            ray_state: RayState,
+            local_toggle: bool,
+        ) DragState {
+            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+            var drag_state = DragState{
+                .click_offset = ray.point(ray_state.t),
+                .original_position = ray_state.transform.position,
+            };
+            if (local_toggle) {
+                drag_state.click_offset =
+                    ray_state.gizmo_transform.transform_vector(drag_state.click_offset);
+            }
+            return drag_state;
+        }
+    },
+
+    Rotation: struct {
+        pub fn begin_gizmo(
+            _: @This(),
+            ray_state: RayState,
+            _: bool,
+        ) DragState {
+            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+            const drag_state = DragState{
+                .click_offset = ray_state.transform.transform_point(ray.origin.add(ray.direction.scale(ray_state.t))),
+                .original_orientation = ray_state.transform.orientation,
+            };
+            return drag_state;
+        }
+    },
+
+    Scaling: struct {
+        uniform: bool = false,
+        pub fn begin_gizmo(
+            _: @This(),
+            ray_state: RayState,
+            _: bool,
+        ) DragState {
+            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+            const drag_state = DragState{
+                .click_offset = ray_state.transform.transform_point(ray.origin.add(ray.direction.scale(ray_state.t))),
+                .original_scale = ray_state.transform.scale,
+            };
+            return drag_state;
+        }
+    },
 };

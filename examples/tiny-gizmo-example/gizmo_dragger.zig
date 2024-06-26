@@ -12,147 +12,6 @@ pub const Hotkey = struct {
     hotkey_local: bool = false,
 };
 
-pub const RayState = struct {
-    transform: tinygizmo.RigidTransform,
-    draw_scale: f32,
-    gizmo_transform: tinygizmo.RigidTransform,
-    local_ray: tinygizmo.Ray,
-    t: f32,
-};
-
-pub const GizmoModeType = enum {
-    Translation,
-    Rotation,
-    Scaling,
-};
-
-pub const GizmoMode = union(GizmoModeType) {
-    Translation: struct {
-        fn draw(_: @This(), component: tinygizmo.GizmoComponent, user: *anyopaque, add_triangle: tinygizmo.AddTriangleFunc, modelMatrix: tinygizmo.Float4x4) void {
-            tinygizmo.position_draw(user, add_triangle, component, modelMatrix);
-        }
-
-        fn intersect(_: @This(), gizmo_system: tinygizmo.System, local_ray: tinygizmo.Ray) struct { ?tinygizmo.GizmoComponent, f32 } {
-            return gizmo_system.translation_intersect(local_ray);
-        }
-
-        fn begin_gizmo(_: @This(), ray_state: RayState, local_toggle: bool) tinygizmo.DragState {
-            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-            var drag_state = tinygizmo.DragState{
-                .click_offset = ray.point(ray_state.t),
-                .original_position = ray_state.transform.position,
-            };
-            if (local_toggle) {
-                drag_state.click_offset =
-                    ray_state.gizmo_transform.transform_vector(drag_state.click_offset);
-            }
-            return drag_state;
-        }
-
-        fn drag(
-            _: @This(),
-            target: *drawable.Drawable,
-            state: *tinygizmo.DragState,
-            component: tinygizmo.GizmoComponent,
-            frame: tinygizmo.FrameState,
-            local_toggle: bool,
-        ) void {
-            const src = tinygizmo.RigidTransform{
-                .orientation = target.rotation,
-                .position = target.position,
-                .scale = target.scale,
-            };
-            const position = tinygizmo.position_drag(state, frame, local_toggle, component, src);
-            target.position = position;
-        }
-    },
-
-    Rotation: struct {
-        fn draw(
-            _: @This(),
-            component: tinygizmo.GizmoComponent,
-            user: *anyopaque,
-            add_triangle: tinygizmo.AddTriangleFunc,
-            modelMatrix: tinygizmo.Float4x4,
-        ) void {
-            tinygizmo.rotation_draw(user, add_triangle, component, modelMatrix);
-        }
-
-        fn intersect(_: @This(), local_ray: tinygizmo.Ray) struct { ?tinygizmo.GizmoComponent, f32 } {
-            _ = local_ray; // autofix
-            // return tinygizmo.rotation_intersect(local_ray);
-            return .{ null, 0 };
-        }
-
-        fn begin_gizmo(_: @This(), ray_state: RayState, _: bool) tinygizmo.DragState {
-            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-            const drag_state = tinygizmo.DragState{
-                .click_offset = ray_state.transform.transform_point(ray.origin.add(ray.direction.scale(ray_state.t))),
-                .original_orientation = ray_state.transform.orientation,
-            };
-            return drag_state;
-        }
-
-        fn drag(
-            _: @This(),
-            target: *drawable.Drawable,
-            state: tinygizmo.DragState,
-            component: tinygizmo.GizmoComponent,
-            frame: tinygizmo.FrameState,
-            local_toggle: bool,
-        ) void {
-            const src = tinygizmo.RigidTransform{
-                .orientation = target.rotation,
-                .position = target.position,
-                .scale = target.scale,
-            };
-            const rotation =
-                tinygizmo.rotation_drag(state, frame, local_toggle, component, src);
-            target.rotation = rotation;
-        }
-    },
-
-    Scaling: struct {
-        uniform: bool = false,
-
-        fn draw(_: @This(), component: tinygizmo.GizmoComponent, user: anyopaque, add_triangle: tinygizmo.AddTriangleFunc, modelMatrix: tinygizmo.Float4x4) void {
-            tinygizmo.scaling_draw(user, add_triangle, component, modelMatrix);
-        }
-
-        fn intersect(_: @This(), local_ray: tinygizmo.Ray) struct { ?tinygizmo.GizmoComponent, f32 } {
-            _ = local_ray; // autofix
-            // return tinygizmo.scaling_intersect(local_ray);
-            return .{ null, 0 };
-        }
-
-        fn begin_gizmo(_: @This(), ray_state: RayState, _: bool) tinygizmo.DragState {
-            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-            const drag_state = tinygizmo.DragState{
-                .click_offset = ray_state.transform.transform_point(ray.origin.add(ray.direction.scale(ray_state.t))),
-                .original_scale = ray_state.transform.scale,
-            };
-            return drag_state;
-        }
-
-        fn drag(
-            self: @This(),
-            target: *drawable.Drawable,
-            state: *tinygizmo.DragState,
-            component: tinygizmo.GizmoComponent,
-            frame: tinygizmo.FrameState,
-            local_toggle: bool,
-        ) void {
-            const src = tinygizmo.RigidTransform{
-                .orientation = target.rotation,
-                .position = target.position,
-                .scale = target.scale,
-            };
-            const scale = tinygizmo.scaling_drag(state, frame, local_toggle, component, src, self.uniform);
-            target.scale = scale;
-        }
-    },
-};
-
 pub const TRSGizmo = struct {
     positions: std.ArrayList(c.Vector3),
     colors: std.ArrayList(c.Color),
@@ -168,9 +27,9 @@ pub const TRSGizmo = struct {
     last_state: tinygizmo.FrameState = .{},
     local_toggle: bool = true,
 
-    visible: GizmoMode,
+    visible: tinygizmo.GizmoMode,
     gizmo_system: tinygizmo.System,
-    ray_map: std.AutoHashMap(*drawable.Drawable, RayState),
+    ray_map: std.AutoHashMap(*drawable.Drawable, tinygizmo.RayState),
 
     gizmo_target: ?*drawable.Drawable = null,
     active: ?tinygizmo.GizmoComponent = null,
@@ -189,7 +48,7 @@ pub const TRSGizmo = struct {
             .scene = scene,
             .visible = .{ .Translation = .{} },
             .gizmo_system = try tinygizmo.System.init(allocator),
-            .ray_map = std.AutoHashMap(*drawable.Drawable, RayState).init(allocator),
+            .ray_map = std.AutoHashMap(*drawable.Drawable, tinygizmo.RayState).init(allocator),
         };
     }
 
@@ -229,9 +88,9 @@ pub const TRSGizmo = struct {
             );
             // ray intersection
             const updated_state, const t = switch (self.visible) {
-                GizmoModeType.Translation => |x| x.intersect(self.gizmo_system, local_ray),
-                GizmoModeType.Rotation => |x| x.intersect(local_ray),
-                GizmoModeType.Scaling => |x| x.intersect(local_ray),
+                tinygizmo.GizmoModeType.Translation => self.gizmo_system.translation_intersect(local_ray),
+                tinygizmo.GizmoModeType.Rotation => self.gizmo_system.rotation_intersect(local_ray),
+                tinygizmo.GizmoModeType.Scaling => self.gizmo_system.scaling_intersect(local_ray),
             };
             if (updated_state) |active| {
                 self.ray_map.put(target, .{
@@ -252,12 +111,11 @@ pub const TRSGizmo = struct {
         if (self.gizmo_target) |target| {
             // begin drag
             if (self.ray_map.getEntry(target)) |entry| {
-                _ = switch (self.visible) {
-                    GizmoModeType.Translation => |x| self.drag_state = x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
-                    GizmoModeType.Rotation => |x| x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
-                    GizmoModeType.Scaling => |x| x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
+                self.drag_state = switch (self.visible) {
+                    tinygizmo.GizmoModeType.Translation => |x| x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
+                    tinygizmo.GizmoModeType.Rotation => |x| x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
+                    tinygizmo.GizmoModeType.Scaling => |x| x.begin_gizmo(entry.value_ptr.*, self.local_toggle),
                 };
-                // self.drag_state = _visible->begin_gizmo(ray_state, _local_toggle);
             }
         }
     }
