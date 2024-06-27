@@ -1,5 +1,6 @@
 #include "tinygizmo_scaling.h"
 #include <assert.h>
+#include <stdexcept>
 
 namespace tinygizmo {
 
@@ -22,39 +23,33 @@ auto _scale_z = GeometryMesh::make_lathed_geometry(
     {0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 16, mace_points,
     Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f});
 
-void scaling_draw(const Float4x4 &modelMatrix,
-                  const AddTriangleFunc &add_world_triangle,
-                  GizmoComponentType active_component) {
-  auto draw_components = {
-      std::make_pair(GizmoComponentType::ScalingX, _scale_x),
-      std::make_pair(GizmoComponentType::ScalingY, _scale_y),
-      std::make_pair(GizmoComponentType::ScalingZ, _scale_z),
-  };
+auto _gizmo_components = {
+    std::make_pair(ScalingGizmo::GizmoComponentType::ScalingX, _scale_x),
+    std::make_pair(ScalingGizmo::GizmoComponentType::ScalingY, _scale_y),
+    std::make_pair(ScalingGizmo::GizmoComponentType::ScalingZ, _scale_z),
+};
 
-  for (auto [component, mesh] : draw_components) {
+void scaling_draw(
+    const Float4x4 &modelMatrix, const AddTriangleFunc &add_world_triangle,
+    std::optional<ScalingGizmo::GizmoComponentType> active_component) {
+  for (auto &[component, mesh] : _gizmo_components) {
     mesh.add_triangles(add_world_triangle, modelMatrix,
                        (component == active_component) ? mesh.base_color
                                                        : mesh.highlight_color);
   }
 }
 
-std::tuple<GizmoComponentType, float> scaling_intersect(const Ray &ray) {
-  float best_t = std::numeric_limits<float>::infinity(), t;
-  GizmoComponentType updated_state = {};
-  if (ray.intersect_mesh(_scale_x, &t) && t < best_t) {
-    updated_state = GizmoComponentType::ScalingX;
-    ;
-    best_t = t;
+std::tuple<std::optional<ScalingGizmo::GizmoComponentType>, float>
+scaling_intersect(const Ray &ray) {
+  float best_t = std::numeric_limits<float>::infinity();
+  std::optional<ScalingGizmo::GizmoComponentType> updated_state = {};
+  for (auto &[component, mesh] : _gizmo_components) {
+    float t;
+    if (ray.intersect_mesh(mesh, &t) && t < best_t) {
+      updated_state = component;
+      best_t = t;
+    }
   }
-  if (ray.intersect_mesh(_scale_y, &t) && t < best_t) {
-    updated_state = GizmoComponentType::ScalingY;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_scale_z, &t) && t < best_t) {
-    updated_state = GizmoComponentType::ScalingZ;
-    best_t = t;
-  }
-
   return {updated_state, best_t};
 }
 
@@ -67,13 +62,17 @@ inline void flush_to_zero(Float3 &f) {
     f.z = 0.f;
 }
 
-static Transform axis_scale_dragger(DragState *drag,
-                                    const FrameState &active_state,
-                                    bool local_toggle, const Float3 &axis,
-                                    const Transform &src, bool uniform) {
-  if (!active_state.mouse_down) {
-    return src;
-  }
+static Float3 click_offset(const RayState &ray_state) {
+  auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+  return ray_state.transform.transform_point(ray.origin +
+                                             ray.direction.scale(ray_state.t));
+}
+
+static std::optional<Float3>
+axis_scale_dragger(const RayState &drag, const FrameState &active_state,
+                   bool local_toggle, const Float3 &axis, const Transform &src,
+                   bool uniform) {
+  assert(active_state.mouse_down);
 
   auto plane_tangent =
       Float3::cross(axis, src.position - active_state.ray.origin);
@@ -86,20 +85,20 @@ static Transform axis_scale_dragger(DragState *drag,
   // object at that point
   auto denom = Float3::dot(active_state.ray.direction, plane_normal);
   if (std::abs(denom) == 0) {
-    return src;
+    return {};
   }
 
   auto t =
       Float3::dot(plane_point - active_state.ray.origin, plane_normal) / denom;
   if (t < 0) {
-    return src;
+    return {};
   }
 
   auto distance = active_state.ray.point(t);
 
-  auto offset_on_axis = (distance - drag->click_offset).mult_each(axis);
+  auto offset_on_axis = (distance - click_offset(drag)).mult_each(axis);
   flush_to_zero(offset_on_axis);
-  Float3 new_scale = drag->original_scale + offset_on_axis;
+  Float3 new_scale = drag.transform.scale + offset_on_axis;
 
   Float3 scale =(uniform) 
     ? Float3{
@@ -110,44 +109,36 @@ static Transform axis_scale_dragger(DragState *drag,
   : Float3{clamp(new_scale.x, 0.01f, 1000.f),
     clamp(new_scale.y, 0.01f, 1000.f),
     clamp(new_scale.z, 0.01f, 1000.f),};
-  return Transform(src.orientation, src.position, scale);
+  return scale;
 }
 
-Float3 scaling_drag(GizmoComponentType active_component,
-                    const FrameState &state, bool local_toggle,
-                    const Transform &src, bool uniform, DragState *drag) {
-  auto scale = src.scale;
+std::optional<Float3>
+scaling_drag(ScalingGizmo::GizmoComponentType active_component,
+             const FrameState &state, bool local_toggle, const Transform &src,
+             bool uniform, const RayState &drag) {
+  // auto scale = src.scale;
   Transform _src{
       .orientation = {0, 0, 0, 1},
       .position = src.position,
-      .scale = scale,
+      .scale = src.scale,
   };
   switch (active_component) {
-  case GizmoComponentType::ScalingX:
-    scale =
-        axis_scale_dragger(drag, state, local_toggle, {1, 0, 0}, _src, uniform)
-            .scale;
-    break;
+  case ScalingGizmo::GizmoComponentType::ScalingX:
+    return axis_scale_dragger(drag, state, local_toggle, {1, 0, 0}, _src,
+                              uniform);
 
-  case GizmoComponentType::ScalingY:
+  case ScalingGizmo::GizmoComponentType::ScalingY:
+    return axis_scale_dragger(drag, state, local_toggle, {0, 1, 0}, _src,
+                              uniform);
 
-    scale =
-        axis_scale_dragger(drag, state, local_toggle, {0, 1, 0}, _src, uniform)
-            .scale;
-    break;
-
-  case GizmoComponentType::ScalingZ:
-    scale =
-        axis_scale_dragger(drag, state, local_toggle, {0, 0, 1}, _src, uniform)
-            .scale;
-    break;
+  case ScalingGizmo::GizmoComponentType::ScalingZ:
+    return axis_scale_dragger(drag, state, local_toggle, {0, 0, 1}, _src,
+                              uniform);
 
   default:
     assert(false);
-    break;
+    throw std::runtime_error("unknown scaling");
   }
-
-  return scale;
 }
 
 } // namespace tinygizmo

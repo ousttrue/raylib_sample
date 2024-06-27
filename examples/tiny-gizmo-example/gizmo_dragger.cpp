@@ -20,15 +20,15 @@ void TRSGizmo::hotkey(int w, int h, const Vector2 &cursor,
       std::cout << "_local_toggle: " << _local_toggle << std::endl;
     }
   }
-  _last_hotkey = _active_hotkey;
-  _active_hotkey = hotkey;
+  _last_hotkey = _current_hotkey;
+  _current_hotkey = hotkey;
 
   auto ray = GetMouseRay(cursor, *_camera);
   auto rot =
       QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
 
-  _last_state = _active_state;
-  _active_state = {
+  _last_state = _current_state;
+  _current_state = {
       .mouse_down = IsMouseButtonDown(MOUSE_BUTTON_LEFT),
       // optional flag to draw the gizmos at a constant screen-space
       // scale gizmo_state.screenspace_scale = 80.f; camera projection
@@ -70,7 +70,7 @@ void TRSGizmo::load(Drawable *drawable) {
       };
 
   for (auto &target : this->_scene) {
-    auto [draw_scale, p, ray] = _active_state.gizmo_transform_and_local_ray(
+    auto [draw_scale, p, ray] = _current_state.gizmo_transform_and_local_ray(
         _local_toggle, target->transform);
 
     auto modelMatrix = p.matrix();
@@ -80,14 +80,13 @@ void TRSGizmo::load(Drawable *drawable) {
 
     switch (this->_visible) {
     case GizmoMode::Translation:
-      tinygizmo::TranslationGizmo::draw(modelMatrix, add_world_triangle,
-                                        _active);
+      tinygizmo::TranslationGizmo::draw(modelMatrix, add_world_triangle, _t);
       break;
     case GizmoMode::Rotation:
-      tinygizmo::RotationGizmo::draw(modelMatrix, add_world_triangle, _active);
+      tinygizmo::RotationGizmo::draw(modelMatrix, add_world_triangle, _r);
       break;
     case GizmoMode::Scaling:
-      tinygizmo::ScalingGizmo::draw(modelMatrix, add_world_triangle, _active);
+      tinygizmo::ScalingGizmo::draw(modelMatrix, add_world_triangle, _s);
       break;
     }
   }

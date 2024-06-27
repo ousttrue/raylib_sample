@@ -1,6 +1,7 @@
 #include "tinygizmo_translation.h"
 #include <assert.h>
 #include <optional>
+#include <stdexcept>
 
 namespace tinygizmo {
 
@@ -29,31 +30,39 @@ auto _translate_xyz = GeometryMesh::make_box_geometry(
     {-0.05f, -0.05f, -0.05f}, {0.05f, 0.05f, 0.05f},
     Float4{0.9f, 0.9f, 0.9f, 0.25f}, Float4{1, 1, 1, 0.35f});
 
-auto _gizmo_components = {
-    std::make_pair(GizmoComponentType::TranslationX, _translate_x),
-    std::make_pair(GizmoComponentType::TranslationY, _translate_y),
-    std::make_pair(GizmoComponentType::TranslationZ, _translate_z),
-    std::make_pair(GizmoComponentType::TranslationYZ, _translate_yz),
-    std::make_pair(GizmoComponentType::TranslationZX, _translate_zx),
-    std::make_pair(GizmoComponentType::TranslationXY, _translate_xy),
-    std::make_pair(GizmoComponentType::TranslationView, _translate_xyz),
+static auto _gizmo_components = {
+    std::make_pair(TranslationGizmo::GizmoComponentType::TranslationX,
+                   _translate_x),
+    std::make_pair(TranslationGizmo::GizmoComponentType::TranslationY,
+                   _translate_y),
+    std::make_pair(TranslationGizmo::GizmoComponentType::TranslationZ,
+                   _translate_z),
+    std::make_pair(TranslationGizmo::GizmoComponentType::TranslationYZ,
+                   _translate_yz),
+    std::make_pair(TranslationGizmo::GizmoComponentType::TranslationZX,
+                   _translate_zx),
+    std::make_pair(TranslationGizmo::GizmoComponentType::TranslationXY,
+                   _translate_xy),
+    std::make_pair(TranslationGizmo::GizmoComponentType::TranslationView,
+                   _translate_xyz),
 };
 
-void position_draw(const Float4x4 &modelMatrix,
-                   const AddTriangleFunc &add_world_triangle,
-                   GizmoComponentType active_component) {
-  for (auto [component, mesh] : _gizmo_components) {
+void position_draw(
+    const Float4x4 &modelMatrix, const AddTriangleFunc &add_world_triangle,
+    std::optional<TranslationGizmo::GizmoComponentType> active_component) {
+  for (auto &[component, mesh] : _gizmo_components) {
     auto color = (component == active_component) ? mesh.base_color
                                                  : mesh.highlight_color;
     mesh.add_triangles(add_world_triangle, modelMatrix, color);
   }
 }
 
-std::tuple<GizmoComponentType, float> position_intersect(const Ray &ray) {
+std::tuple<std::optional<TranslationGizmo::GizmoComponentType>, float>
+position_intersect(const Ray &ray) {
   float best_t = std::numeric_limits<float>::infinity();
-  GizmoComponentType updated_state = {};
-  float t;
-  for (auto [compoennt, mesh] : _gizmo_components) {
+  std::optional<TranslationGizmo::GizmoComponentType> updated_state = {};
+  for (auto &[compoennt, mesh] : _gizmo_components) {
+    float t;
     if (ray.intersect_mesh(mesh, &t) && t < best_t) {
       updated_state = compoennt;
       best_t = t;
@@ -62,37 +71,43 @@ std::tuple<GizmoComponentType, float> position_intersect(const Ray &ray) {
   return {updated_state, best_t};
 }
 
-static std::optional<Transform> plane_drag(const Float3 &plane_normal,
-                                           DragState *drag,
-                                           const FrameState &active_state,
-                                           bool local_toggle,
-                                           const Transform &p) {
+static Float3 click_offset(const RayState &ray_state) {
+  auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+  //   DragState drag_state = {
+  auto click_offset = ray.point(ray_state.t);
+  //       .original_position = ray_state.transform.position,
+  //   };
+  if (ray_state.local_toggle) {
+    click_offset = ray_state.gizmo_transform.transform_vector(click_offset);
+  }
+  //   return drag_state;
+  return click_offset;
+}
+
+static std::optional<Float3> plane_drag(const Float3 &plane_normal,
+                                        const RayState &drag,
+                                        const FrameState &active_state,
+                                        bool local_toggle, const Transform &p) {
   auto plane =
-      Plane::from_normal_and_position(plane_normal, drag->original_position);
+      Plane::from_normal_and_position(plane_normal, drag.transform.position);
   auto t = active_state.ray.intersect_plane(plane);
   if (!t) {
     return {};
   }
-  auto dst = active_state.ray.point(*t) - drag->click_offset;
 
-  return Transform{
-      .orientation = p.orientation,
-      .position = dst,
-      .scale = p.scale,
-  };
+  return active_state.ray.point(*t) - click_offset(drag);
 }
 
-static std::optional<Transform> axis_drag(const Float3 &axis, DragState *drag,
-                                          const FrameState &active_state,
-                                          bool local_toggle,
-                                          const Transform &p) {
+static std::optional<Float3> axis_drag(const Float3 &axis, const RayState &drag,
+                                       const FrameState &active_state,
+                                       bool local_toggle, const Transform &p) {
   // First apply a plane translation dragger with a plane that contains the
   // desired axis and is oriented to face the camera
   auto plane_tangent =
       Float3::cross(axis, p.position - active_state.ray.origin);
   auto plane_normal = Float3::cross(axis, plane_tangent);
   auto plane =
-      Plane::from_normal_and_position(plane_normal, drag->original_position);
+      Plane::from_normal_and_position(plane_normal, drag.transform.position);
   auto t = active_state.ray.intersect_plane(plane);
   if (!t) {
     return {};
@@ -100,64 +115,56 @@ static std::optional<Transform> axis_drag(const Float3 &axis, DragState *drag,
   auto dst = active_state.ray.point(*t);
 
   // Constrain object motion to be along the desired axis
-  auto point = drag->original_position +
-               axis.scale(Float3::dot(dst - drag->original_position, axis)) -
-               drag->click_offset;
-  return Transform(p.orientation, point, p.scale);
+  return drag.transform.position +
+         axis.scale(Float3::dot(dst - drag.transform.position, axis)) -
+         click_offset(drag);
 }
 
-Float3 position_drag(GizmoComponentType active_component,
-                     const FrameState &state, bool local_toggle,
-                     const Transform &p, DragState *drag) {
+std::optional<Float3>
+position_drag(TranslationGizmo::GizmoComponentType active_component,
+              const FrameState &state, bool local_toggle, const Transform &p,
+              const RayState &drag) {
 
   switch (active_component) {
-  case GizmoComponentType::TranslationX: {
+  case TranslationGizmo::GizmoComponentType::TranslationX: {
     auto axis = (local_toggle) ? p.orientation.xdir() : Float3{1, 0, 0};
-    if (auto dst = axis_drag(axis, drag, state, local_toggle, p)) {
-      return dst->position;
-    }
-  }
-  case GizmoComponentType::TranslationY: {
-    auto axis = (local_toggle) ? p.orientation.ydir() : Float3{0, 1, 0};
-    if (auto dst = axis_drag(axis, drag, state, local_toggle, p)) {
-      return dst->position;
-    }
-  }
-  case GizmoComponentType::TranslationZ: {
-    auto axis = (local_toggle) ? p.orientation.zdir() : Float3{0, 0, 1};
-    if (auto dst = axis_drag(axis, drag, state, local_toggle, p)) {
-      return dst->position;
-    }
-  }
-  case GizmoComponentType::TranslationXY: {
-    auto normal = (local_toggle) ? p.orientation.zdir() : Float3{0, 0, 1};
-    if (auto dst = plane_drag(normal, drag, state, local_toggle, p)) {
-      return dst->position;
-    }
-  }
-  case GizmoComponentType::TranslationYZ: {
-    auto normal = (local_toggle) ? p.orientation.xdir() : Float3{1, 0, 0};
-    if (auto dst = plane_drag(normal, drag, state, local_toggle, p)) {
-      return dst->position;
-    }
-  }
-  case GizmoComponentType::TranslationZX: {
-    auto normal = (local_toggle) ? p.orientation.ydir() : Float3{0, 1, 0};
-    if (auto dst = plane_drag(normal, drag, state, local_toggle, p)) {
-      return dst->position;
-    }
-  }
-  case GizmoComponentType::TranslationView: {
-    auto normal = -state.cam_orientation.zdir();
-    if (auto dst = plane_drag(normal, drag, state, local_toggle, p)) {
-      return dst->position;
-    }
-  }
-  default:
-    assert(false);
+    return axis_drag(axis, drag, state, local_toggle, p);
   }
 
-  return p.position;
+  case TranslationGizmo::GizmoComponentType::TranslationY: {
+    auto axis = (local_toggle) ? p.orientation.ydir() : Float3{0, 1, 0};
+    return axis_drag(axis, drag, state, local_toggle, p);
+  }
+
+  case TranslationGizmo::GizmoComponentType::TranslationZ: {
+    auto axis = (local_toggle) ? p.orientation.zdir() : Float3{0, 0, 1};
+    return axis_drag(axis, drag, state, local_toggle, p);
+  }
+
+  case TranslationGizmo::GizmoComponentType::TranslationXY: {
+    auto normal = (local_toggle) ? p.orientation.zdir() : Float3{0, 0, 1};
+    return plane_drag(normal, drag, state, local_toggle, p);
+  }
+
+  case TranslationGizmo::GizmoComponentType::TranslationYZ: {
+    auto normal = (local_toggle) ? p.orientation.xdir() : Float3{1, 0, 0};
+    return plane_drag(normal, drag, state, local_toggle, p);
+  }
+
+  case TranslationGizmo::GizmoComponentType::TranslationZX: {
+    auto normal = (local_toggle) ? p.orientation.ydir() : Float3{0, 1, 0};
+    return plane_drag(normal, drag, state, local_toggle, p);
+  }
+
+  case TranslationGizmo::GizmoComponentType::TranslationView: {
+    auto normal = -state.cam_orientation.zdir();
+    return plane_drag(normal, drag, state, local_toggle, p);
+  }
+
+  default:
+    assert(false);
+    throw std::runtime_error("unknown translation");
+  }
 }
 
 } // namespace tinygizmo

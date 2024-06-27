@@ -1,5 +1,7 @@
 #include "tinygizmo_rotation.h"
 #include <assert.h>
+#include <optional>
+#include <stdexcept>
 
 namespace tinygizmo {
 
@@ -19,21 +21,22 @@ auto _rotate_z = GeometryMesh::make_lathed_geometry(
     {0, 0, 1}, {1, 0, 0}, {0, 1, 0}, 32, ring_points,
     Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f});
 
-void rotation_draw(const Float4x4 &modelMatrix,
-                   const AddTriangleFunc &add_world_triangle,
-                   GizmoComponentType active_component) {
+static auto _gizmo_components = {
+    std::make_pair(RotationGizmo::GizmoComponentType::RotationY, _rotate_x),
+    std::make_pair(RotationGizmo::GizmoComponentType::RotationY, _rotate_y),
+    std::make_pair(RotationGizmo::GizmoComponentType::RotationZ, _rotate_z),
+};
+
+void rotation_draw(
+    const Float4x4 &modelMatrix, const AddTriangleFunc &add_world_triangle,
+    std::optional<RotationGizmo::GizmoComponentType> active_component) {
 
   // std::vector<std::shared_ptr<GizmoComponent>> draw_interactions;
   // if (!state.local_toggle && this->active)
   //   draw_interactions = {interaction_mode(this->active)};
   // else
-  auto draw_interactions = {
-      std::make_pair(GizmoComponentType::RotationY, _rotate_x),
-      std::make_pair(GizmoComponentType::RotationY, _rotate_y),
-      std::make_pair(GizmoComponentType::RotationZ, _rotate_z),
-  };
 
-  for (auto [component, mesh] : draw_interactions) {
+  for (auto &[component, mesh] : _gizmo_components) {
     mesh.add_triangles(add_world_triangle, modelMatrix,
                        (component == active_component) ? mesh.base_color
                                                        : mesh.highlight_color);
@@ -84,20 +87,16 @@ void rotation_draw(const Float4x4 &modelMatrix,
   //
 }
 
-std::tuple<GizmoComponentType, float> rotation_intersect(const Ray &ray) {
-  float best_t = std::numeric_limits<float>::infinity(), t;
-  GizmoComponentType updated_state = {};
-  if (ray.intersect_mesh(_rotate_x, &t) && t < best_t) {
-    updated_state = GizmoComponentType::RotationX;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_rotate_y, &t) && t < best_t) {
-    updated_state = GizmoComponentType::RotationY;
-    best_t = t;
-  }
-  if (ray.intersect_mesh(_rotate_z, &t) && t < best_t) {
-    updated_state = GizmoComponentType::RotationZ;
-    best_t = t;
+std::tuple<std::optional<RotationGizmo::GizmoComponentType>, float>
+rotation_intersect(const Ray &ray) {
+  float best_t = std::numeric_limits<float>::infinity();
+  std::optional<RotationGizmo::GizmoComponentType> updated_state = {};
+  for (auto &[component, mesh] : _gizmo_components) {
+    float t;
+    if (ray.intersect_mesh(mesh, &t) && t < best_t) {
+      updated_state = component;
+      best_t = t;
+    }
   }
   return {updated_state, best_t};
 }
@@ -112,74 +111,73 @@ make_rotation_quat_between_vectors_snapped(const Float3 &from, const Float3 &to,
                                      snappedAcos);
 }
 
-static Transform axis_rotation_dragger(DragState *drag,
-                                       const FrameState &active_state,
-                                       bool local_toggle, const Float3 &axis,
-                                       const Transform &src, bool) {
-  auto start_orientation =
-      local_toggle ? drag->original_orientation : Quaternion{0, 0, 0, 1};
+static Float3 click_offset(const RayState &ray_state) {
+  auto ray = ray_state.local_ray.scaling(ray_state.draw_scale);
+  return ray_state.transform.transform_point(ray.origin +
+                                             ray.direction.scale(ray_state.t));
+}
 
-  if (!active_state.mouse_down) {
-    return src;
-  }
+static std::optional<Quaternion>
+axis_rotation_dragger(const RayState &drag, const FrameState &active_state,
+                      bool local_toggle, const Float3 &axis,
+                      const Transform &src, bool) {
+  auto start_orientation =
+      local_toggle ? drag.transform.orientation : Quaternion{0, 0, 0, 1};
+
+  assert(active_state.mouse_down);
 
   Transform original_pose = {
       start_orientation,
-      drag->original_position,
+      drag.transform.position,
   };
   auto the_axis = original_pose.transform_vector(axis);
   auto the_plane =
-      Plane::from_normal_and_position(the_axis, drag->click_offset);
+      Plane::from_normal_and_position(the_axis, click_offset(drag));
 
   auto t = active_state.ray.intersect_plane(the_plane);
   if (!t) {
-    return src;
+    return {};
   }
 
   auto center_of_rotation =
-      drag->original_position +
+      drag.transform.position +
       the_axis.scale(
-          Float3::dot(the_axis, drag->click_offset - drag->original_position));
-  auto arm1 = (drag->click_offset - center_of_rotation).normalize();
+          Float3::dot(the_axis, click_offset(drag) - drag.transform.position));
+  auto arm1 = (click_offset(drag) - center_of_rotation).normalize();
   auto arm2 = (active_state.ray.point(*t) - center_of_rotation).normalize();
 
   float d = Float3::dot(arm1, arm2);
   if (d > 0.999f) {
-    return Transform(start_orientation, src.position, src.scale);
+    return {};
   }
 
   float angle = std::acos(d);
   if (angle < 0.001f) {
-    return Transform(start_orientation, src.position, src.scale);
+    return {};
   }
 
   auto a = Float3::cross(arm1, arm2).normalize();
-  return Transform{
-      .orientation = Quaternion::from_axis_angle(a, angle) * start_orientation,
-      .position = src.position,
-      .scale = src.scale,
-  };
+  return Quaternion::from_axis_angle(a, angle) * start_orientation;
 }
 
-Quaternion rotation_drag(GizmoComponentType active_component,
-                         const FrameState &state, bool local_toggle,
-                         const Transform &src, DragState *drag) {
+std::optional<Quaternion>
+rotation_drag(RotationGizmo::GizmoComponentType active_component,
+              const FrameState &state, bool local_toggle, const Transform &src,
+              const RayState &drag) {
   switch (active_component) {
-  case GizmoComponentType::RotationX:
-    return axis_rotation_dragger(drag, state, local_toggle, {1, 0, 0}, src, {})
-        .orientation;
+  case RotationGizmo::GizmoComponentType::RotationX:
+    return axis_rotation_dragger(drag, state, local_toggle, {1, 0, 0}, src, {});
 
-  case GizmoComponentType::RotationY:
-    return axis_rotation_dragger(drag, state, local_toggle, {0, 1, 0}, src, {})
-        .orientation;
+  case RotationGizmo::GizmoComponentType::RotationY:
+    return axis_rotation_dragger(drag, state, local_toggle, {0, 1, 0}, src, {});
 
-  case GizmoComponentType::RotationZ:
-    return axis_rotation_dragger(drag, state, local_toggle, {0, 0, 1}, src, {})
-        .orientation;
+  case RotationGizmo::GizmoComponentType::RotationZ:
+    return axis_rotation_dragger(drag, state, local_toggle, {0, 0, 1}, src, {});
 
   default:
     assert(false);
-    return src.orientation;
+    throw std::runtime_error("unknown rotation");
+    ;
   }
 }
 
