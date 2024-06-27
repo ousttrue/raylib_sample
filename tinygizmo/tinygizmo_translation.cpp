@@ -1,4 +1,5 @@
 #include "tinygizmo_translation.h"
+#include "tinygizmo_geometrymesh.h"
 #include <assert.h>
 #include <optional>
 #include <stdexcept>
@@ -62,8 +63,8 @@ position_intersect(const Ray &ray) {
   float best_t = std::numeric_limits<float>::infinity();
   std::optional<TranslationGizmo::GizmoComponentType> updated_state = {};
   for (auto &[compoennt, mesh] : _gizmo_components) {
-    float t;
-    if (ray.intersect_mesh(mesh, &t) && t < best_t) {
+    float t = mesh.intersect(ray);
+    if (t < best_t) {
       updated_state = compoennt;
       best_t = t;
     }

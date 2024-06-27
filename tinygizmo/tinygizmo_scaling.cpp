@@ -1,4 +1,5 @@
 #include "tinygizmo_scaling.h"
+#include "tinygizmo_geometrymesh.h"
 #include <assert.h>
 #include <stdexcept>
 
@@ -44,8 +45,8 @@ scaling_intersect(const Ray &ray) {
   float best_t = std::numeric_limits<float>::infinity();
   std::optional<ScalingGizmo::GizmoComponentType> updated_state = {};
   for (auto &[component, mesh] : _gizmo_components) {
-    float t;
-    if (ray.intersect_mesh(mesh, &t) && t < best_t) {
+    float t = mesh.intersect(ray);
+    if (t < best_t) {
       updated_state = component;
       best_t = t;
     }
