@@ -42,6 +42,7 @@ struct FrameState {
 
 struct RayState {
   bool local_toggle;
+  bool uniform;
   Transform transform;
   float draw_scale;
   Transform gizmo_transform;
@@ -60,14 +61,14 @@ enum class GizmoComponentType {
   TranslationView,
 };
 
-void draw(const Float4x4 &modelMatrix, const AddTriangleFunc &add_triangle,
+void mesh(const Float4x4 &modelMatrix, const AddTriangleFunc &add_triangle,
           std::optional<GizmoComponentType> active_component);
 
-std::tuple<std::optional<GizmoComponentType>, float>
-intersect(const Ray &local_ray);
+std::optional<std::tuple<RayState, GizmoComponentType>>
+intersect(const FrameState &frame, bool local_toggle, const Transform &p);
 
 Transform drag(GizmoComponentType active_component, const FrameState &frame,
-               bool local_toggle, const Transform &src, const RayState &state);
+               const RayState &drag, const Transform &src);
 }; // namespace TranslationGizmo
 
 namespace RotationGizmo {
@@ -77,14 +78,14 @@ enum class GizmoComponentType {
   RotationZ,
 };
 
-void draw(const Float4x4 &modelMatrix, const AddTriangleFunc &add_triangle,
+void mesh(const Float4x4 &modelMatrix, const AddTriangleFunc &add_triangle,
           std::optional<GizmoComponentType> active_component);
 
-std::tuple<std::optional<GizmoComponentType>, float>
-intersect(const Ray &local_ray);
+std::optional<std::tuple<RayState, GizmoComponentType>>
+intersect(const FrameState &frame, bool local_toggle, const Transform &p);
 
 Transform drag(GizmoComponentType active_component, const FrameState &frame,
-               bool local_toggle, const Transform &src, const RayState &state);
+               const RayState &drag, const Transform &src);
 } // namespace RotationGizmo
 
 namespace ScalingGizmo {
@@ -94,15 +95,15 @@ enum class GizmoComponentType {
   ScalingZ,
 };
 
-void draw(const Float4x4 &modelMatrix, const AddTriangleFunc &add_triangle,
+void mesh(const Float4x4 &modelMatrix, const AddTriangleFunc &add_triangle,
           std::optional<GizmoComponentType> active_component);
 
-std::tuple<std::optional<GizmoComponentType>, float>
-intersect(const Ray &local_ray);
+std::optional<std::tuple<RayState, GizmoComponentType>>
+intersect(const FrameState &frame, bool local_toggle, const Transform &p,
+          bool uniform);
 
 Transform drag(GizmoComponentType active_component, const FrameState &frame,
-               bool local_toggle, const Transform &src, bool uniform,
-               const RayState &state);
+               const RayState &drag, const Transform &src);
 }; // namespace ScalingGizmo
 
 } // namespace tinygizmo

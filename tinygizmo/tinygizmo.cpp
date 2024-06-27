@@ -5,22 +5,39 @@
 
 namespace tinygizmo {
 
-void TranslationGizmo::draw(
+void TranslationGizmo::mesh(
     const Float4x4 &modelMatrix, const AddTriangleFunc &add_triangle,
     std::optional<GizmoComponentType> active_component) {
-  position_draw(modelMatrix, add_triangle, active_component);
+  position_mesh(modelMatrix, add_triangle, active_component);
 }
 
-std::tuple<std::optional<TranslationGizmo::GizmoComponentType>, float>
-TranslationGizmo::intersect(const Ray &local_ray) {
-  return position_intersect(local_ray);
-};
+std::optional<std::tuple<RayState, TranslationGizmo::GizmoComponentType>>
+TranslationGizmo::intersect(const FrameState &frame, bool local_toggle,
+                            const Transform &p) {
+  auto [draw_scale, gizmo_transform, local_ray] =
+      frame.gizmo_transform_and_local_ray(local_toggle, p);
+
+  auto [active_component, t] = position_intersect(local_ray);
+  if (!active_component) {
+    return {};
+  }
+
+  RayState state{
+      .local_toggle = local_toggle,
+      .uniform = false,
+      .transform = p,
+      .draw_scale = draw_scale,
+      .gizmo_transform = gizmo_transform,
+      .local_ray = local_ray,
+      .t = t,
+  };
+  return std::make_pair(state, *active_component);
+}
 
 Transform TranslationGizmo::drag(GizmoComponentType active_component,
-                                 const FrameState &frame, bool local_toggle,
-                                 const Transform &src, const RayState &state) {
-  if (auto position =
-          position_drag(active_component, frame, local_toggle, src, state)) {
+                                 const FrameState &frame, const RayState &drag,
+                                 const Transform &src) {
+  if (auto position = position_drag(active_component, frame, drag, src)) {
     auto dst = src;
     dst.position = *position;
     return dst;
@@ -28,22 +45,39 @@ Transform TranslationGizmo::drag(GizmoComponentType active_component,
   return src;
 }
 
-void RotationGizmo::draw(const Float4x4 &modelMatrix,
+void RotationGizmo::mesh(const Float4x4 &modelMatrix,
                          const AddTriangleFunc &add_triangle,
                          std::optional<GizmoComponentType> active_component) {
-  rotation_draw(modelMatrix, add_triangle, active_component);
+  rotation_mesh(modelMatrix, add_triangle, active_component);
 }
 
-std::tuple<std::optional<RotationGizmo::GizmoComponentType>, float>
-RotationGizmo::intersect(const Ray &local_ray) {
-  return rotation_intersect(local_ray);
-};
+std::optional<std::tuple<RayState, RotationGizmo::GizmoComponentType>>
+RotationGizmo::intersect(const FrameState &frame, bool local_toggle,
+                         const Transform &p) {
+  auto [draw_scale, gizmo_transform, local_ray] =
+      frame.gizmo_transform_and_local_ray(local_toggle, p);
+
+  auto [active_component, t] = rotation_intersect(local_ray);
+  if (!active_component) {
+    return {};
+  }
+
+  RayState state{
+      .local_toggle = local_toggle,
+      .uniform = false,
+      .transform = p,
+      .draw_scale = draw_scale,
+      .gizmo_transform = gizmo_transform,
+      .local_ray = local_ray,
+      .t = t,
+  };
+  return std::make_pair(state, *active_component);
+}
 
 Transform RotationGizmo::drag(GizmoComponentType active_component,
-                              const FrameState &frame, bool local_toggle,
-                              const Transform &src, const RayState &state) {
-  if (auto rotation =
-          rotation_drag(active_component, frame, local_toggle, src, state)) {
+                              const FrameState &frame, const RayState &drag,
+                              const Transform &src) {
+  if (auto rotation = rotation_drag(active_component, frame, drag, src)) {
     auto dst = src;
     dst.orientation = *rotation;
     return dst;
@@ -52,23 +86,39 @@ Transform RotationGizmo::drag(GizmoComponentType active_component,
   return src;
 }
 
-void ScalingGizmo::draw(const Float4x4 &modelMatrix,
+void ScalingGizmo::mesh(const Float4x4 &modelMatrix,
                         const AddTriangleFunc &add_triangle,
                         std::optional<GizmoComponentType> active_component) {
-  scaling_draw(modelMatrix, add_triangle, active_component);
+  scaling_mesh(modelMatrix, add_triangle, active_component);
 }
 
-std::tuple<std::optional<ScalingGizmo::GizmoComponentType>, float>
-ScalingGizmo::intersect(const Ray &local_ray) {
-  return scaling_intersect(local_ray);
-};
+std::optional<std::tuple<RayState, ScalingGizmo::GizmoComponentType>>
+ScalingGizmo::intersect(const FrameState &frame, bool local_toggle,
+                        const Transform &p, bool uniform) {
+  auto [draw_scale, gizmo_transform, local_ray] =
+      frame.gizmo_transform_and_local_ray(local_toggle, p);
+
+  auto [active_component, t] = scaling_intersect(local_ray);
+  if (!active_component) {
+    return {};
+  }
+
+  RayState state{
+      .local_toggle = local_toggle,
+      .uniform = uniform,
+      .transform = p,
+      .draw_scale = draw_scale,
+      .gizmo_transform = gizmo_transform,
+      .local_ray = local_ray,
+      .t = t,
+  };
+  return std::make_pair(state, *active_component);
+}
 
 Transform ScalingGizmo::drag(GizmoComponentType active_component,
-                             const FrameState &frame, bool local_toggle,
-                             const Transform &src, bool uniform,
-                             const RayState &state) {
-  if (auto scale = scaling_drag(active_component, frame, local_toggle, src,
-                                uniform, state)) {
+                             const FrameState &frame, const RayState &drag,
+                             const Transform &src) {
+  if (auto scale = scaling_drag(active_component, frame, drag, src)) {
     auto dst = src;
     dst.scale = *scale;
     return dst;

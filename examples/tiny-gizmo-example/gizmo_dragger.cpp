@@ -1,8 +1,102 @@
 #include "gizmo_dragger.h"
+#include <assert.h>
 #include <iostream>
 
+void TRSGizmo::begin(const Vector2 &cursor) {
+  float best_t = std::numeric_limits<float>::infinity();
+  for (auto &target : this->_scene) {
+    //
+    // ray intersection
+    //
+    switch (this->_visible) {
+    case GizmoMode::Translation: {
+      auto intersection = tinygizmo::TranslationGizmo::intersect(
+          _current_state, _local_toggle, target->transform);
+      if (intersection) {
+        auto [ray_state, active_component] = *intersection;
+        if (ray_state.t < best_t) {
+          best_t = ray_state.t;
+          this->_t = active_component;
+          this->_gizmo_target = target;
+          this->_ray_state = ray_state;
+        }
+      }
+      break;
+    }
+
+    case GizmoMode::Rotation: {
+      auto intersection = tinygizmo::RotationGizmo::intersect(
+          _current_state, _local_toggle, target->transform);
+      if (intersection) {
+        auto [ray_state, active_component] = *intersection;
+        if (ray_state.t < best_t) {
+          best_t = ray_state.t;
+          this->_r = active_component;
+          this->_gizmo_target = target;
+          this->_ray_state = ray_state;
+        }
+      }
+      break;
+    }
+
+    case GizmoMode::Scaling: {
+      auto intersection = tinygizmo::ScalingGizmo::intersect(
+          _current_state, _local_toggle, target->transform, _uniform);
+      if (intersection) {
+        auto [ray_state, active_component] = *intersection;
+        if (ray_state.t < best_t) {
+          best_t = ray_state.t;
+          this->_s = active_component;
+          this->_gizmo_target = target;
+          this->_ray_state = ray_state;
+        }
+      }
+      break;
+    }
+
+    default:
+      assert(false);
+      throw std::runtime_error("unknown gizmo mode");
+    }
+  }
+}
+
+void TRSGizmo::end(const Vector2 &cursor) {
+  _t = {};
+  _r = {};
+  _s = {};
+  _gizmo_target = {};
+  _ray_state = {};
+}
+
+void TRSGizmo::drag(const DragState &state, int w, int h,
+                    const Vector2 &cursor) {
+  if (auto target = _gizmo_target) {
+    switch (_visible) {
+    case GizmoMode::Translation:
+      if (_t) {
+        target->transform = tinygizmo::TranslationGizmo::drag(
+            *_t, _current_state, _ray_state, target->transform);
+      }
+      break;
+    case GizmoMode::Rotation:
+      if (_r) {
+        target->transform = tinygizmo::RotationGizmo::drag(
+            *_r, _current_state, _ray_state, target->transform);
+      }
+      break;
+    case GizmoMode::Scaling:
+      if (_s) {
+        target->transform = tinygizmo::ScalingGizmo::drag(
+            *_s, _current_state, _ray_state, target->transform);
+      }
+      break;
+    }
+  }
+}
+
 void TRSGizmo::hotkey(int w, int h, const Vector2 &cursor,
-                      const struct hotkey &hotkey) {
+                      const struct Hotkey &hotkey) {
   if (hotkey.hotkey_ctrl == true) {
     if (_last_hotkey.hotkey_translate == false &&
         hotkey.hotkey_translate == true) {
@@ -72,21 +166,17 @@ void TRSGizmo::load(Drawable *drawable) {
   for (auto &target : this->_scene) {
     auto [draw_scale, p, ray] = _current_state.gizmo_transform_and_local_ray(
         _local_toggle, target->transform);
-
-    auto modelMatrix = p.matrix();
-    auto scaleMatrix =
-        tinygizmo::Float4x4::scaling(draw_scale, draw_scale, draw_scale);
-    modelMatrix = modelMatrix * scaleMatrix;
-
+    auto gizmoMatrix = p.matrix() * tinygizmo::Float4x4::scaling(
+                                        draw_scale, draw_scale, draw_scale);
     switch (this->_visible) {
     case GizmoMode::Translation:
-      tinygizmo::TranslationGizmo::draw(modelMatrix, add_world_triangle, _t);
+      tinygizmo::TranslationGizmo::mesh(gizmoMatrix, add_world_triangle, _t);
       break;
     case GizmoMode::Rotation:
-      tinygizmo::RotationGizmo::draw(modelMatrix, add_world_triangle, _r);
+      tinygizmo::RotationGizmo::mesh(gizmoMatrix, add_world_triangle, _r);
       break;
     case GizmoMode::Scaling:
-      tinygizmo::ScalingGizmo::draw(modelMatrix, add_world_triangle, _s);
+      tinygizmo::ScalingGizmo::mesh(gizmoMatrix, add_world_triangle, _s);
       break;
     }
   }

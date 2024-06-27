@@ -30,7 +30,7 @@ auto _gizmo_components = {
     std::make_pair(ScalingGizmo::GizmoComponentType::ScalingZ, _scale_z),
 };
 
-void scaling_draw(
+void scaling_mesh(
     const Float4x4 &modelMatrix, const AddTriangleFunc &add_world_triangle,
     std::optional<ScalingGizmo::GizmoComponentType> active_component) {
   for (auto &[component, mesh] : _gizmo_components) {
@@ -69,14 +69,13 @@ static Float3 click_offset(const RayState &ray_state) {
                                              ray.direction.scale(ray_state.t));
 }
 
-static std::optional<Float3>
-axis_scale_dragger(const RayState &drag, const FrameState &active_state,
-                   bool local_toggle, const Float3 &axis, const Transform &src,
-                   bool uniform) {
-  assert(active_state.mouse_down);
+static std::optional<Float3> axis_scale_dragger(const FrameState &frame,
+                                                const RayState &drag,
+                                                const Float3 &axis,
+                                                const Transform &src) {
+  assert(frame.mouse_down);
 
-  auto plane_tangent =
-      Float3::cross(axis, src.position - active_state.ray.origin);
+  auto plane_tangent = Float3::cross(axis, src.position - frame.ray.origin);
   auto plane_normal = Float3::cross(axis, plane_tangent);
 
   // Define the plane to contain the original position of the object
@@ -84,24 +83,23 @@ axis_scale_dragger(const RayState &drag, const FrameState &active_state,
 
   // If an intersection exists between the ray and the plane, place the
   // object at that point
-  auto denom = Float3::dot(active_state.ray.direction, plane_normal);
+  auto denom = Float3::dot(frame.ray.direction, plane_normal);
   if (std::abs(denom) == 0) {
     return {};
   }
 
-  auto t =
-      Float3::dot(plane_point - active_state.ray.origin, plane_normal) / denom;
+  auto t = Float3::dot(plane_point - frame.ray.origin, plane_normal) / denom;
   if (t < 0) {
     return {};
   }
 
-  auto distance = active_state.ray.point(t);
+  auto distance = frame.ray.point(t);
 
   auto offset_on_axis = (distance - click_offset(drag)).mult_each(axis);
   flush_to_zero(offset_on_axis);
   Float3 new_scale = drag.transform.scale + offset_on_axis;
 
-  Float3 scale =(uniform) 
+  Float3 scale =(drag.uniform) 
     ? Float3{
       clamp(Float3::dot(distance, new_scale), 0.01f, 1000.f),
         clamp(Float3::dot(distance, new_scale), 0.01f, 1000.f),
@@ -115,8 +113,8 @@ axis_scale_dragger(const RayState &drag, const FrameState &active_state,
 
 std::optional<Float3>
 scaling_drag(ScalingGizmo::GizmoComponentType active_component,
-             const FrameState &state, bool local_toggle, const Transform &src,
-             bool uniform, const RayState &drag) {
+             const FrameState &frame, const RayState &drag,
+             const Transform &src) {
   // auto scale = src.scale;
   Transform _src{
       .orientation = {0, 0, 0, 1},
@@ -125,16 +123,13 @@ scaling_drag(ScalingGizmo::GizmoComponentType active_component,
   };
   switch (active_component) {
   case ScalingGizmo::GizmoComponentType::ScalingX:
-    return axis_scale_dragger(drag, state, local_toggle, {1, 0, 0}, _src,
-                              uniform);
+    return axis_scale_dragger(frame, drag, {1, 0, 0}, _src);
 
   case ScalingGizmo::GizmoComponentType::ScalingY:
-    return axis_scale_dragger(drag, state, local_toggle, {0, 1, 0}, _src,
-                              uniform);
+    return axis_scale_dragger(frame, drag, {0, 1, 0}, _src);
 
   case ScalingGizmo::GizmoComponentType::ScalingZ:
-    return axis_scale_dragger(drag, state, local_toggle, {0, 0, 1}, _src,
-                              uniform);
+    return axis_scale_dragger(frame, drag, {0, 0, 1}, _src);
 
   default:
     assert(false);

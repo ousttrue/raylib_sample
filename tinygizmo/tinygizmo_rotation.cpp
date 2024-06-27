@@ -23,12 +23,12 @@ auto _rotate_z = GeometryMesh::make_lathed_geometry(
     Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f});
 
 static auto _gizmo_components = {
-    std::make_pair(RotationGizmo::GizmoComponentType::RotationY, _rotate_x),
+    std::make_pair(RotationGizmo::GizmoComponentType::RotationX, _rotate_x),
     std::make_pair(RotationGizmo::GizmoComponentType::RotationY, _rotate_y),
     std::make_pair(RotationGizmo::GizmoComponentType::RotationZ, _rotate_z),
 };
 
-void rotation_draw(
+void rotation_mesh(
     const Float4x4 &modelMatrix, const AddTriangleFunc &add_world_triangle,
     std::optional<RotationGizmo::GizmoComponentType> active_component) {
 
@@ -118,14 +118,14 @@ static Float3 click_offset(const RayState &ray_state) {
                                              ray.direction.scale(ray_state.t));
 }
 
-static std::optional<Quaternion>
-axis_rotation_dragger(const RayState &drag, const FrameState &active_state,
-                      bool local_toggle, const Float3 &axis,
-                      const Transform &src, bool) {
-  auto start_orientation =
-      local_toggle ? drag.transform.orientation : Quaternion{0, 0, 0, 1};
+static std::optional<Quaternion> axis_rotation_dragger(const FrameState &frame,
+                                                       const RayState &drag,
+                                                       const Float3 &axis,
+                                                       const Transform &src) {
+  assert(frame.mouse_down);
 
-  assert(active_state.mouse_down);
+  auto start_orientation =
+      drag.local_toggle ? drag.transform.orientation : Quaternion{0, 0, 0, 1};
 
   Transform original_pose = {
       start_orientation,
@@ -135,7 +135,7 @@ axis_rotation_dragger(const RayState &drag, const FrameState &active_state,
   auto the_plane =
       Plane::from_normal_and_position(the_axis, click_offset(drag));
 
-  auto t = active_state.ray.intersect_plane(the_plane);
+  auto t = frame.ray.intersect_plane(the_plane);
   if (!t) {
     return {};
   }
@@ -145,7 +145,7 @@ axis_rotation_dragger(const RayState &drag, const FrameState &active_state,
       the_axis.scale(
           Float3::dot(the_axis, click_offset(drag) - drag.transform.position));
   auto arm1 = (click_offset(drag) - center_of_rotation).normalize();
-  auto arm2 = (active_state.ray.point(*t) - center_of_rotation).normalize();
+  auto arm2 = (frame.ray.point(*t) - center_of_rotation).normalize();
 
   float d = Float3::dot(arm1, arm2);
   if (d > 0.999f) {
@@ -163,22 +163,21 @@ axis_rotation_dragger(const RayState &drag, const FrameState &active_state,
 
 std::optional<Quaternion>
 rotation_drag(RotationGizmo::GizmoComponentType active_component,
-              const FrameState &state, bool local_toggle, const Transform &src,
-              const RayState &drag) {
+              const FrameState &frame, const RayState &drag,
+              const Transform &src) {
   switch (active_component) {
   case RotationGizmo::GizmoComponentType::RotationX:
-    return axis_rotation_dragger(drag, state, local_toggle, {1, 0, 0}, src, {});
+    return axis_rotation_dragger(frame, drag, {1, 0, 0}, src);
 
   case RotationGizmo::GizmoComponentType::RotationY:
-    return axis_rotation_dragger(drag, state, local_toggle, {0, 1, 0}, src, {});
+    return axis_rotation_dragger(frame, drag, {0, 1, 0}, src);
 
   case RotationGizmo::GizmoComponentType::RotationZ:
-    return axis_rotation_dragger(drag, state, local_toggle, {0, 0, 1}, src, {});
+    return axis_rotation_dragger(frame, drag, {0, 0, 1}, src);
 
   default:
     assert(false);
     throw std::runtime_error("unknown rotation");
-    ;
   }
 }
 

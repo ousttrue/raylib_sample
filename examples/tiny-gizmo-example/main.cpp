@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     auto h = GetScreenHeight();
     auto cursor = GetMousePosition();
 
-    hotkey active_hotkey = {
+    Hotkey active_hotkey = {
         .hotkey_ctrl = IsKeyDown(KEY_LEFT_CONTROL),
         .hotkey_translate = IsKeyDown(KEY_T),
         .hotkey_rotate = IsKeyDown(KEY_R),
