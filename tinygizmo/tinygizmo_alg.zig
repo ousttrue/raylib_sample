@@ -14,6 +14,10 @@ pub const Float3 = struct {
     y: f32,
     z: f32,
 
+    pub const x_axis = Float3{ .x = 1, .y = 0, .z = 0 };
+    pub const y_axis = Float3{ .x = 0, .y = 1, .z = 0 };
+    pub const z_axis = Float3{ .x = 0, .y = 0, .z = 1 };
+
     pub fn dot(lhs: @This(), rhs: @This()) f32 {
         return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
     }
@@ -590,6 +594,20 @@ pub const GeometryMesh = struct {
             add_triangle(user, color, p0, p1, p2);
         }
     }
+
+    pub fn intersect(self: @This(), ray: Ray) f32 {
+        var best_t = std.math.inf(f32);
+        var best_tri: ?usize = null;
+        for (self.triangles, 0..) |tri, i| {
+            if (ray.intersect_triangle(self.vertices[tri.x].position, self.vertices[tri.y].position, self.vertices[tri.z].position)) |t| {
+                if (t < best_t) {
+                    best_t = t;
+                    best_tri = i;
+                }
+            }
+        }
+        return best_t;
+    }
 };
 
 pub const Ray = struct {
@@ -632,7 +650,7 @@ pub const Ray = struct {
         const denom = Float3.dot(plane.normal, self.direction);
         if (@abs(denom) == 0) {
             // not intersect
-            return {};
+            return null;
         }
         return -(Float3.dot(plane.normal, self.origin) + plane.d) / denom;
     }
