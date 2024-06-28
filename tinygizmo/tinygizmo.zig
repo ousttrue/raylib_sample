@@ -394,7 +394,7 @@ pub const Plane = struct {
 pub const Vertex = struct {
     position: Float3,
     normal: Float3,
-    color: Float4,
+    // color: Float4,
 };
 
 pub const AddTriangleFunc = fn (
@@ -417,6 +417,51 @@ fn make_mesh(comptime verts: anytype, comptime tris: anytype) type {
     };
 }
 
+pub fn make_box_geometry(comptime a: Float3, comptime b: Float3) type {
+    return struct {
+        const vertices = [_]Vertex{
+            .{ .position = .{ .x = a.x, .y = a.y, .z = a.z }, .normal = .{ .x = -1, .y = 0, .z = 0 } },
+            .{ .position = .{ .x = a.x, .y = a.y, .z = b.z }, .normal = .{ .x = -1, .y = 0, .z = 0 } },
+            .{ .position = .{ .x = a.x, .y = b.y, .z = b.z }, .normal = .{ .x = -1, .y = 0, .z = 0 } },
+            .{ .position = .{ .x = a.x, .y = b.y, .z = a.z }, .normal = .{ .x = -1, .y = 0, .z = 0 } },
+            .{ .position = .{ .x = b.x, .y = a.y, .z = a.z }, .normal = .{ .x = 1, .y = 0, .z = 0 } },
+            .{ .position = .{ .x = b.x, .y = b.y, .z = a.z }, .normal = .{ .x = 1, .y = 0, .z = 0 } },
+            .{ .position = .{ .x = b.x, .y = b.y, .z = b.z }, .normal = .{ .x = 1, .y = 0, .z = 0 } },
+            .{ .position = .{ .x = b.x, .y = a.y, .z = b.z }, .normal = .{ .x = 1, .y = 0, .z = 0 } },
+            .{ .position = .{ .x = a.x, .y = a.y, .z = a.z }, .normal = .{ .x = 0, .y = -1, .z = 0 } },
+            .{ .position = .{ .x = b.x, .y = a.y, .z = a.z }, .normal = .{ .x = 0, .y = -1, .z = 0 } },
+            .{ .position = .{ .x = b.x, .y = a.y, .z = b.z }, .normal = .{ .x = 0, .y = -1, .z = 0 } },
+            .{ .position = .{ .x = a.x, .y = a.y, .z = b.z }, .normal = .{ .x = 0, .y = -1, .z = 0 } },
+            .{ .position = .{ .x = a.x, .y = b.y, .z = a.z }, .normal = .{ .x = 0, .y = 1, .z = 0 } },
+            .{ .position = .{ .x = a.x, .y = b.y, .z = b.z }, .normal = .{ .x = 0, .y = 1, .z = 0 } },
+            .{ .position = .{ .x = b.x, .y = b.y, .z = b.z }, .normal = .{ .x = 0, .y = 1, .z = 0 } },
+            .{ .position = .{ .x = b.x, .y = b.y, .z = a.z }, .normal = .{ .x = 0, .y = 1, .z = 0 } },
+            .{ .position = .{ .x = a.x, .y = a.y, .z = a.z }, .normal = .{ .x = 0, .y = 0, .z = -1 } },
+            .{ .position = .{ .x = a.x, .y = b.y, .z = a.z }, .normal = .{ .x = 0, .y = 0, .z = -1 } },
+            .{ .position = .{ .x = b.x, .y = b.y, .z = a.z }, .normal = .{ .x = 0, .y = 0, .z = -1 } },
+            .{ .position = .{ .x = b.x, .y = a.y, .z = a.z }, .normal = .{ .x = 0, .y = 0, .z = -1 } },
+            .{ .position = .{ .x = a.x, .y = a.y, .z = b.z }, .normal = .{ .x = 0, .y = 0, .z = 1 } },
+            .{ .position = .{ .x = b.x, .y = a.y, .z = b.z }, .normal = .{ .x = 0, .y = 0, .z = 1 } },
+            .{ .position = .{ .x = b.x, .y = b.y, .z = b.z }, .normal = .{ .x = 0, .y = 0, .z = 1 } },
+            .{ .position = .{ .x = a.x, .y = b.y, .z = b.z }, .normal = .{ .x = 0, .y = 0, .z = 1 } },
+        };
+        const triangles = [_]UInt3{
+            .{ .x = 0, .y = 1, .z = 2 },
+            .{ .x = 0, .y = 2, .z = 3 },
+            .{ .x = 4, .y = 5, .z = 6 },
+            .{ .x = 4, .y = 6, .z = 7 },
+            .{ .x = 8, .y = 9, .z = 10 },
+            .{ .x = 8, .y = 10, .z = 11 },
+            .{ .x = 12, .y = 13, .z = 14 },
+            .{ .x = 12, .y = 14, .z = 15 },
+            .{ .x = 16, .y = 17, .z = 18 },
+            .{ .x = 16, .y = 18, .z = 19 },
+            .{ .x = 20, .y = 21, .z = 22 },
+            .{ .x = 20, .y = 22, .z = 23 },
+        };
+    };
+}
+
 fn make_lathed_geometry(
     comptime axis: Float3,
     comptime arm1: Float3,
@@ -425,6 +470,8 @@ fn make_lathed_geometry(
     comptime points: []const Float2,
     comptime eps: f32,
 ) type {
+    @setEvalBranchQuota(5000);
+
     const tau = 6.28318530718;
     const tau_8 = tau / 8.0;
     const tau_slices = tau / @as(f32, @floatFromInt(slices));
@@ -465,7 +512,7 @@ fn make_lathed_geometry(
             vertices[k] = .{
                 .position = position,
                 .normal = .{ .x = 0, .y = 0, .z = 0 },
-                .color = .{ .x = 0, .y = 0, .z = 0, .w = 0 },
+                // .color = .{ .x = 0, .y = 0, .z = 0, .w = 0 },
             };
             k += 1;
         }
@@ -500,6 +547,21 @@ pub const GeometryMesh = struct {
     triangles: []const UInt3,
     base_color: Float4,
     highlight_color: Float4,
+
+    pub fn make_box(
+        comptime min: Float3,
+        comptime max: Float3,
+        base_color: Float4,
+        highlight_color: Float4,
+    ) @This() {
+        const mesh = make_box_geometry(min, max);
+        return .{
+            .vertices = &mesh.vertices,
+            .triangles = &mesh.triangles,
+            .base_color = base_color,
+            .highlight_color = highlight_color,
+        };
+    }
 
     pub fn make_lathed(
         axis: Float3,
@@ -817,6 +879,52 @@ pub const TranslationGizmo = struct {
             0,
             .{ .x = 1, .y = 0.5, .z = 0.5, .w = 1.0 },
             .{ .x = 1, .y = 0, .z = 0, .w = 1.0 },
+        ) },
+
+        .{ .TranslationY, GeometryMesh.make_lathed(
+            .{ .x = 0, .y = 1, .z = 0 },
+            .{ .x = 0, .y = 0, .z = 1 },
+            .{ .x = 1, .y = 0, .z = 0 },
+            16,
+            &arrow_points,
+            0,
+            .{ .x = 0.5, .y = 1, .z = 0.5, .w = 1.0 },
+            .{ .x = 0, .y = 1, .z = 0, .w = 1.0 },
+        ) },
+
+        .{ .TranslationZ, GeometryMesh.make_lathed(
+            .{ .x = 0, .y = 0, .z = 1 },
+            .{ .x = 1, .y = 0, .z = 0 },
+            .{ .x = 0, .y = 1, .z = 0 },
+            16,
+            &arrow_points,
+            0,
+            .{ .x = 0.5, .y = 0.5, .z = 1, .w = 1.0 },
+            .{ .x = 0, .y = 0, .z = 1, .w = 1.0 },
+        ) },
+        .{ .TranslationYZ, GeometryMesh.make_box(
+            .{ .x = -0.01, .y = 0.25, .z = 0.25 },
+            .{ .x = 0.01, .y = 0.75, .z = 0.75 },
+            .{ .x = 0.5, .y = 1, .z = 1, .w = 0.5 },
+            .{ .x = 0, .y = 1, .z = 1, .w = 0.6 },
+        ) },
+        .{ .TranslationZX, GeometryMesh.make_box(
+            .{ .x = 0.25, .y = -0.01, .z = 0.25 },
+            .{ .x = 0.75, .y = 0.01, .z = 0.75 },
+            .{ .x = 1, .y = 0.5, .z = 1, .w = 0.5 },
+            .{ .x = 1, .y = 0, .z = 1, .w = 0.6 },
+        ) },
+        .{ .TranslationXY, GeometryMesh.make_box(
+            .{ .x = 0.25, .y = 0.25, .z = -0.01 },
+            .{ .x = 0.75, .y = 0.75, .z = 0.01 },
+            .{ .x = 1, .y = 1, .z = 0.5, .w = 0.5 },
+            .{ .x = 1, .y = 1, .z = 0, .w = 0.6 },
+        ) },
+        .{ .TranslationView, GeometryMesh.make_box(
+            .{ .x = -0.05, .y = -0.05, .z = -0.05 },
+            .{ .x = 0.05, .y = 0.05, .z = 0.05 },
+            .{ .x = 0.9, .y = 0.9, .z = 0.9, .w = 0.25 },
+            .{ .x = 1, .y = 1, .z = 1, .w = 0.35 },
         ) },
     };
 
