@@ -357,15 +357,6 @@ pub const Transform = struct {
         return self.scale.x == self.scale.y and self.scale.x == self.scale.z;
     }
     pub fn matrix(self: @This()) Float4x4 {
-        // fn TRS(t: c.Vector3, r: c.Quaternion, s: c.Vector3) c.Matrix {
-        //     return c.MatrixMultiply(
-        //         c.MatrixMultiply(
-        //             c.MatrixScale(s.x, s.y, s.z),
-        //             c.QuaternionToMatrix(r),
-        //         ),
-        //         c.MatrixTranslate(t.x, t.y, t.z),
-        //     );
-        // }
         return Float4x4.make(
             Float4.make(self.orientation.xdir().scale(self.scale.x), 0),
             Float4.make(self.orientation.ydir().scale(self.scale.y), 0),
@@ -419,91 +410,121 @@ fn transform_coord(m: Float4x4, coord: Float3) Float3 {
     return r.xyz().scale(1.0 / r.w);
 }
 
-pub const GeometryMesh = struct {
-    vertices: std.ArrayList(Vertex),
-    triangles: std.ArrayList(UInt3),
+fn make_mesh(comptime verts: anytype, comptime tris: anytype) type {
+    return struct {
+        const vertices = verts;
+        const triangles = tris;
+    };
+}
 
-    pub fn make_lathed_geometry(
-        allocator: std.mem.Allocator,
+fn make_lathed_geometry(
+    comptime axis: Float3,
+    comptime arm1: Float3,
+    comptime arm2: Float3,
+    comptime slices: usize,
+    comptime points: []const Float2,
+    comptime eps: f32,
+) type {
+    const tau = 6.28318530718;
+    const tau_8 = tau / 8.0;
+    const tau_slices = tau / @as(f32, @floatFromInt(slices));
+
+    const Float3x2 = struct {
+        m00: f32,
+        m01: f32,
+        m02: f32,
+        m10: f32,
+        m11: f32,
+        m12: f32,
+        fn apply(self: @This(), b: Float2) Float3 {
+            const _a = Float3{ .x = self.m00, .y = self.m01, .z = self.m02 };
+            const _b = Float3{ .x = self.m10, .y = self.m11, .z = self.m12 };
+            return _a.scale(b.x).add(_b.scale(b.y));
+        }
+    };
+
+    var vertices: [points.len * (slices + 1)]Vertex = undefined;
+    var triangles: [(points.len - 1) * slices * 2]UInt3 = undefined;
+    var k: usize = 0;
+    var l: usize = 0;
+    for (0..(slices + 1)) |i| {
+        const angle = (@as(f32, @floatFromInt(@mod(i, slices))) * tau_slices) + tau_8;
+        const c = std.math.cos(angle);
+        const s = std.math.sin(angle);
+        const row1 = arm1.scale(c).add(arm2.scale(s));
+        const mat = Float3x2{
+            .m00 = axis.x,
+            .m01 = axis.y,
+            .m02 = axis.z, //
+            .m10 = row1.x,
+            .m11 = row1.y,
+            .m12 = row1.z, //
+        };
+        for (points) |p| {
+            const position = mat.apply(p).add(.{ .x = eps, .y = eps, .z = eps });
+            vertices[k] = .{
+                .position = position,
+                .normal = .{ .x = 0, .y = 0, .z = 0 },
+                .color = .{ .x = 0, .y = 0, .z = 0, .w = 0 },
+            };
+            k += 1;
+        }
+
+        if (i > 0) {
+            for (1..points.len) |j| {
+                const _i0 = (i - 1) * (points.len) + (j - 1);
+                const _i1 = (i - 0) * (points.len) + (j - 1);
+                const _i2 = (i - 0) * (points.len) + (j - 0);
+                const _i3 = (i - 1) * (points.len) + (j - 0);
+                triangles[l] = .{
+                    .x = @intCast(_i0),
+                    .y = @intCast(_i1),
+                    .z = @intCast(_i2),
+                };
+                l += 1;
+                triangles[l] = .{
+                    .x = @intCast(_i0),
+                    .y = @intCast(_i2),
+                    .z = @intCast(_i3),
+                };
+                l += 1;
+            }
+        }
+    }
+
+    return make_mesh(vertices, triangles);
+}
+
+pub const GeometryMesh = struct {
+    vertices: []const Vertex,
+    triangles: []const UInt3,
+    base_color: Float4,
+    highlight_color: Float4,
+
+    pub fn make_lathed(
         axis: Float3,
         arm1: Float3,
         arm2: Float3,
-        slices: usize,
-        points: []const Float2,
+        comptime slices: usize,
+        comptime points: []const Float2,
         eps: f32,
-    ) !@This() {
-        const tau = 6.28318530718;
-        const tau_8 = tau / 8.0;
-        const tau_slices = tau / @as(f32, @floatFromInt(slices));
-
-        const Float3x2 = struct {
-            m00: f32,
-            m01: f32,
-            m02: f32,
-            m10: f32,
-            m11: f32,
-            m12: f32,
-            fn apply(self: @This(), b: Float2) Float3 {
-                const _a = Float3{ .x = self.m00, .y = self.m01, .z = self.m02 };
-                const _b = Float3{ .x = self.m10, .y = self.m11, .z = self.m12 };
-                return _a.scale(b.x).add(_b.scale(b.y));
-            }
+        base_color: Float4,
+        highlight_color: Float4,
+    ) @This() {
+        const mesh = make_lathed_geometry(axis, arm1, arm2, slices, points, eps);
+        return .{
+            .vertices = &mesh.vertices,
+            .triangles = &mesh.triangles,
+            .base_color = base_color,
+            .highlight_color = highlight_color,
         };
-
-        var mesh = GeometryMesh{
-            .vertices = std.ArrayList(Vertex).init(allocator),
-            .triangles = std.ArrayList(UInt3).init(allocator),
-        };
-        for (0..(slices + 1)) |i| {
-            const angle = (@as(f32, @floatFromInt(@mod(i, slices))) * tau_slices) + tau_8;
-            const c = std.math.cos(angle);
-            const s = std.math.sin(angle);
-            const row1 = arm1.scale(c).add(arm2.scale(s));
-            const mat = Float3x2{
-                .m00 = axis.x,
-                .m01 = axis.y,
-                .m02 = axis.z, //
-                .m10 = row1.x,
-                .m11 = row1.y,
-                .m12 = row1.z, //
-            };
-            for (points) |p| {
-                const position = mat.apply(p).add(.{ .x = eps, .y = eps, .z = eps });
-                try mesh.vertices.append(.{
-                    .position = position,
-                    .normal = .{ .x = 0, .y = 0, .z = 0 },
-                    .color = .{ .x = 0, .y = 0, .z = 0, .w = 0 },
-                });
-            }
-
-            if (i > 0) {
-                for (1..points.len) |j| {
-                    const _i0 = (i - 1) * (points.len) + (j - 1);
-                    const _i1 = (i - 0) * (points.len) + (j - 1);
-                    const _i2 = (i - 0) * (points.len) + (j - 0);
-                    const _i3 = (i - 1) * (points.len) + (j - 0);
-                    try mesh.triangles.append(.{
-                        .x = @intCast(_i0),
-                        .y = @intCast(_i1),
-                        .z = @intCast(_i2),
-                    });
-                    try mesh.triangles.append(.{
-                        .x = @intCast(_i0),
-                        .y = @intCast(_i2),
-                        .z = @intCast(_i3),
-                    });
-                }
-            }
-        }
-        // mesh.compute_normals();
-        return mesh;
     }
 
     pub fn add_triangles(self: @This(), user: *anyopaque, add_triangle: AddTriangleFunc, modelMatrix: Float4x4, color: Float4) void {
-        for (self.triangles.items) |t| {
-            const v0 = self.vertices.items[t.x];
-            const v1 = self.vertices.items[t.y];
-            const v2 = self.vertices.items[t.z];
+        for (self.triangles) |t| {
+            const v0 = self.vertices[t.x];
+            const v1 = self.vertices[t.y];
+            const v2 = self.vertices[t.z];
             const p0 = transform_coord(modelMatrix, v0.position); // transform local coordinates into worldspace
             const p1 = transform_coord(modelMatrix, v1.position); // transform local coordinates into worldspace
             const p2 = transform_coord(modelMatrix, v2.position); // transform local coordinates into worldspace
@@ -664,6 +685,109 @@ pub const RayState = struct {
     t: f32 = 0,
 };
 
+/// A hashmap which is constructed at compile time from constant values.
+/// Intended to be used as a faster lookup table.
+pub fn ComptimeHashMap(comptime K: type, comptime V: type, comptime hash: fn (key: K) u64, comptime eql: fn (a: K, b: K) bool, comptime values: anytype) type {
+    std.debug.assert(values.len != 0);
+    @setEvalBranchQuota(1000 * values.len);
+
+    const Entry = struct {
+        distance_from_start_index: usize = 0,
+        key: K = undefined,
+        val: V = undefined,
+        used: bool = false,
+    };
+
+    // ensure that the hash map will be at most 60% full
+    const size = std.math.ceilPowerOfTwo(usize, values.len * 5 / 3) catch unreachable;
+    comptime var slots = [1]Entry{.{}} ** size;
+
+    comptime var max_distance_from_start_index = 0;
+
+    slot_loop: for (values) |kv| {
+        var key: K = kv.@"0";
+        var value: V = kv.@"1";
+
+        const start_index = @as(usize, hash(key)) & (size - 1);
+
+        var roll_over = 0;
+        var distance_from_start_index = 0;
+        while (roll_over < size) : ({
+            roll_over += 1;
+            distance_from_start_index += 1;
+        }) {
+            const index = (start_index + roll_over) & (size - 1);
+            const entry = &slots[index];
+
+            if (entry.used and !eql(entry.key, key)) {
+                if (entry.distance_from_start_index < distance_from_start_index) {
+                    // robin hood to the rescue
+                    const tmp = slots[index];
+                    max_distance_from_start_index = @max(max_distance_from_start_index, distance_from_start_index);
+                    entry.* = .{
+                        .used = true,
+                        .distance_from_start_index = distance_from_start_index,
+                        .key = key,
+                        .val = value,
+                    };
+                    key = tmp.key;
+                    value = tmp.val;
+                    distance_from_start_index = tmp.distance_from_start_index;
+                }
+                continue;
+            }
+
+            max_distance_from_start_index = @max(distance_from_start_index, max_distance_from_start_index);
+            entry.* = .{
+                .used = true,
+                .distance_from_start_index = distance_from_start_index,
+                .key = key,
+                .val = value,
+            };
+            continue :slot_loop;
+        }
+        unreachable; // put into a full map
+    }
+
+    return struct {
+        const entries = slots;
+
+        pub fn has(key: K) bool {
+            return get(key) != null;
+        }
+
+        pub fn get(key: K) ?*const V {
+            const start_index = @as(usize, hash(key)) & (size - 1);
+            {
+                var roll_over: usize = 0;
+                while (roll_over <= max_distance_from_start_index) : (roll_over += 1) {
+                    const index = (start_index + roll_over) & (size - 1);
+                    const entry = &entries[index];
+
+                    if (!entry.used) return null;
+                    if (eql(entry.key, key)) return &entry.val;
+                }
+            }
+            return null;
+        }
+    };
+}
+
+/// A comptime hashmap constructed with automatically selected hash and eql functions.
+pub fn AutoComptimeHashMap(
+    comptime K: type,
+    comptime V: type,
+    comptime values: anytype,
+) type {
+    return ComptimeHashMap(
+        K,
+        V,
+        std.hash_map.getAutoHashFn(K),
+        std.hash_map.getAutoEqlFn(K),
+        values,
+    );
+}
+
 pub const TranslationGizmo = struct {
     pub const GizmoComponentType = enum {
         TranslationX,
@@ -675,16 +799,38 @@ pub const TranslationGizmo = struct {
         TranslationView,
     };
 
+    const arrow_points = [_]Float2{
+        .{ .x = 0.25, .y = 0 },
+        .{ .x = 0.25, .y = 0.05 },
+        .{ .x = 1, .y = 0.05 },
+        .{ .x = 1, .y = 0.10 },
+        .{ .x = 1.2, .y = 0 },
+    };
+
+    const gizmo_components = [_]struct { GizmoComponentType, GeometryMesh }{
+        .{ .TranslationX, GeometryMesh.make_lathed(
+            .{ .x = 1, .y = 0, .z = 0 },
+            .{ .x = 0, .y = 1, .z = 0 },
+            .{ .x = 0, .y = 0, .z = 1 },
+            16,
+            &arrow_points,
+            0,
+            .{ .x = 1, .y = 0.5, .z = 0.5, .w = 1.0 },
+            .{ .x = 1, .y = 0, .z = 0, .w = 1.0 },
+        ) },
+    };
+
     pub fn mesh(
         modelMatrix: Float4x4,
         user: *anyopaque,
         add_triangle: AddTriangleFunc,
         active_component: ?GizmoComponentType,
     ) void {
-        _ = active_component; // autofix
-        _ = add_triangle; // autofix
-        _ = user; // autofix
-        _ = modelMatrix; // autofix
+        for (gizmo_components) |entry| {
+            const component, const geometry = entry;
+            const color = if (component == active_component) geometry.base_color else geometry.highlight_color;
+            geometry.add_triangles(user, add_triangle, modelMatrix, color);
+        }
     }
 
     pub fn intersect(
@@ -709,6 +855,7 @@ pub const TranslationGizmo = struct {
         _ = ray; // autofix
         _ = frame; // autofix
         _ = active_component; // autofix}
+        return .{};
     }
 }; // namespace TranslationGizmo
 
@@ -721,9 +868,11 @@ pub const RotationGizmo = struct {
 
     pub fn mesh(
         modelMatrix: Float4x4,
+        user: *anyopaque,
         add_triangle: AddTriangleFunc,
         active_component: ?GizmoComponentType,
     ) void {
+        _ = user; // autofix
         _ = active_component; // autofix
         _ = add_triangle; // autofix
         _ = modelMatrix; // autofix}
@@ -751,7 +900,7 @@ pub const RotationGizmo = struct {
         _ = frame; // autofix
         _ = active_component; // autofix
         _ = active_component; // autofix
-        //
+        return .{};
     }
 }; // namespace RotationGizmo
 
@@ -764,9 +913,11 @@ pub const ScalingGizmo = struct {
 
     pub fn mesh(
         modelMatrix: Float4x4,
+        user: *anyopaque,
         add_triangle: AddTriangleFunc,
         active_component: ?GizmoComponentType,
     ) void {
+        _ = user; // autofix
         _ = active_component; // autofix
         _ = active_component; // autofix
         _ = add_triangle; // autofix
@@ -797,6 +948,6 @@ pub const ScalingGizmo = struct {
         _ = ray; // autofix
         _ = frame; // autofix
         _ = active_component; // autofix
-        //
+        return .{};
     }
 }; // namespace ScalingGizmo

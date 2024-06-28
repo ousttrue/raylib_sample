@@ -139,7 +139,42 @@ pub const TRSGizmo = struct {
         _: i32,
         _: c.Vector2,
     ) void {
-        _ = self; // autofix
+        if (self.gizmo_target) |target| {
+            switch (self.mode) {
+                .Translation => |t| {
+                    if (t) |active_component| {
+                        target.transform = tinygizmo.TranslationGizmo.drag(
+                            active_component,
+                            self.current_state,
+                            self.ray_state,
+                            target.transform,
+                        );
+                    }
+                },
+
+                .Rotation => |r| {
+                    if (r) |active_component| {
+                        target.transform = tinygizmo.RotationGizmo.drag(
+                            active_component,
+                            self.current_state,
+                            self.ray_state,
+                            target.transform,
+                        );
+                    }
+                },
+
+                .Scaling => |s| {
+                    if (s) |active_component| {
+                        target.transform = tinygizmo.ScalingGizmo.drag(
+                            active_component,
+                            self.current_state,
+                            self.ray_state,
+                            target.transform,
+                        );
+                    }
+                },
+            }
+        }
     }
 
     pub fn process_hotkey(self: *@This(), w: i32, h: i32, cursor: c.Vector2, hotkey: Hotkey) void {
@@ -147,15 +182,15 @@ pub const TRSGizmo = struct {
             if (self.last_hotkey.hotkey_translate == false and
                 hotkey.hotkey_translate == true)
             {
-                // _active = _t;
+                self.mode = .{ .Translation = null };
             } else if (self.last_hotkey.hotkey_rotate == false and
                 hotkey.hotkey_rotate == true)
             {
-                // _active = _r;
+                self.mode = .{ .Rotation = null };
             } else if (self.last_hotkey.hotkey_scale == false and
                 hotkey.hotkey_scale == true)
             {
-                // _active = _s;
+                self.mode = .{ .Scaling = null };
             }
 
             self.local_toggle = if (!self.last_hotkey.hotkey_local and hotkey.hotkey_local)
@@ -194,7 +229,7 @@ pub const TRSGizmo = struct {
         };
     }
 
-    fn add_world_triangle(
+    fn add_triangle(
         user: *anyopaque,
         rgba: tinygizmo.Float4,
         p0: tinygizmo.Float3,
@@ -232,13 +267,30 @@ pub const TRSGizmo = struct {
 
             const scaleMatrix =
                 tinygizmo.Float4x4.scaling(draw_scale, draw_scale, draw_scale);
-            const modelMatrix = p.matrix().mul(scaleMatrix);
-            _ = modelMatrix; // autofix
+            const gizmoMatrix = p.matrix().mul(scaleMatrix);
 
+            switch (self.mode) {
+                .Translation => |_t| {
+                    tinygizmo.TranslationGizmo.mesh(gizmoMatrix, self, add_triangle, _t);
+                },
+
+                .Rotation => |_r| {
+                    tinygizmo.RotationGizmo.mesh(gizmoMatrix, self, add_triangle, _r);
+                },
+
+                .Scaling => |_s| {
+                    tinygizmo.ScalingGizmo.mesh(gizmoMatrix, self, add_triangle, _s);
+                },
+            }
         }
 
         if (self.positions.items.len > 0 and self.indices.items.len > 0) {
-            dst.load_slice(self.positions.items, self.colors.items, self.indices.items, true);
+            dst.load_slice(
+                self.positions.items,
+                self.colors.items,
+                self.indices.items,
+                true,
+            );
         }
     }
 };
