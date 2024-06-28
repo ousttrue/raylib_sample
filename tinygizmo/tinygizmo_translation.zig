@@ -1,6 +1,8 @@
-const alg = @import("tinygizmo_alg.zig");
-const state = @import("tinygizmo_state.zig");
 const std = @import("std");
+const alg = @import("tinygizmo_alg.zig");
+const geometrymesh = @import("tinygizmo_geometrymesh.zig");
+const GeometryMesh = geometrymesh.GeometryMesh;
+const state = @import("tinygizmo_state.zig");
 
 pub const GizmoComponentType = enum {
     TranslationX,
@@ -20,58 +22,58 @@ const arrow_points = [_]alg.Float2{
     .{ .x = 1.2, .y = 0 },
 };
 
-const gizmo_components = [_]struct { GizmoComponentType, alg.GeometryMesh }{
-    .{ .TranslationX, alg.GeometryMesh.make_lathed(
+const gizmo_components = [_]struct { GizmoComponentType, geometrymesh.GeometryMesh }{
+    .{ .TranslationX, geometrymesh.GeometryMesh.make_lathed(
         .{ .x = 1, .y = 0, .z = 0 },
         .{ .x = 0, .y = 1, .z = 0 },
         .{ .x = 0, .y = 0, .z = 1 },
         16,
         &arrow_points,
-        0,
         .{ .x = 1, .y = 0.5, .z = 0.5, .w = 1.0 },
         .{ .x = 1, .y = 0, .z = 0, .w = 1.0 },
+        0,
     ) },
 
-    .{ .TranslationY, alg.GeometryMesh.make_lathed(
+    .{ .TranslationY, geometrymesh.GeometryMesh.make_lathed(
         .{ .x = 0, .y = 1, .z = 0 },
         .{ .x = 0, .y = 0, .z = 1 },
         .{ .x = 1, .y = 0, .z = 0 },
         16,
         &arrow_points,
-        0,
         .{ .x = 0.5, .y = 1, .z = 0.5, .w = 1.0 },
         .{ .x = 0, .y = 1, .z = 0, .w = 1.0 },
+        0,
     ) },
 
-    .{ .TranslationZ, alg.GeometryMesh.make_lathed(
+    .{ .TranslationZ, GeometryMesh.make_lathed(
         .{ .x = 0, .y = 0, .z = 1 },
         .{ .x = 1, .y = 0, .z = 0 },
         .{ .x = 0, .y = 1, .z = 0 },
         16,
         &arrow_points,
-        0,
         .{ .x = 0.5, .y = 0.5, .z = 1, .w = 1.0 },
         .{ .x = 0, .y = 0, .z = 1, .w = 1.0 },
+        0,
     ) },
-    .{ .TranslationYZ, alg.GeometryMesh.make_box(
+    .{ .TranslationYZ, GeometryMesh.make_box(
         .{ .x = -0.01, .y = 0.25, .z = 0.25 },
         .{ .x = 0.01, .y = 0.75, .z = 0.75 },
         .{ .x = 0.5, .y = 1, .z = 1, .w = 0.5 },
         .{ .x = 0, .y = 1, .z = 1, .w = 0.6 },
     ) },
-    .{ .TranslationZX, alg.GeometryMesh.make_box(
+    .{ .TranslationZX, GeometryMesh.make_box(
         .{ .x = 0.25, .y = -0.01, .z = 0.25 },
         .{ .x = 0.75, .y = 0.01, .z = 0.75 },
         .{ .x = 1, .y = 0.5, .z = 1, .w = 0.5 },
         .{ .x = 1, .y = 0, .z = 1, .w = 0.6 },
     ) },
-    .{ .TranslationXY, alg.GeometryMesh.make_box(
+    .{ .TranslationXY, GeometryMesh.make_box(
         .{ .x = 0.25, .y = 0.25, .z = -0.01 },
         .{ .x = 0.75, .y = 0.75, .z = 0.01 },
         .{ .x = 1, .y = 1, .z = 0.5, .w = 0.5 },
         .{ .x = 1, .y = 1, .z = 0, .w = 0.6 },
     ) },
-    .{ .TranslationView, alg.GeometryMesh.make_box(
+    .{ .TranslationView, GeometryMesh.make_box(
         .{ .x = -0.05, .y = -0.05, .z = -0.05 },
         .{ .x = 0.05, .y = 0.05, .z = 0.05 },
         .{ .x = 0.9, .y = 0.9, .z = 0.9, .w = 0.25 },
@@ -82,7 +84,7 @@ const gizmo_components = [_]struct { GizmoComponentType, alg.GeometryMesh }{
 pub fn mesh(
     modelMatrix: alg.Float4x4,
     user: *anyopaque,
-    add_triangle: alg.AddTriangleFunc,
+    add_triangle: geometrymesh.AddTriangleFunc,
     active_component: ?GizmoComponentType,
 ) void {
     for (gizmo_components) |entry| {
