@@ -1,5 +1,8 @@
 const std = @import("std");
 
+//
+// linear algebra
+//
 pub const Float2 = struct {
     x: f32,
     y: f32,
@@ -607,6 +610,9 @@ pub const Ray = struct {
     }
 };
 
+//
+// tinygizmo
+//
 pub const FrameState = struct {
     mouse_down: bool = false,
     // If > 0.f, the gizmos are drawn scale-invariant with a screenspace value
@@ -645,453 +651,152 @@ pub const FrameState = struct {
     }
 };
 
-pub const DragState = struct {
-    // Original position of an object being manipulated with a gizmo
-    original_position: Float3 = .{ .x = 0, .y = 0, .z = 0 },
-    // Offset from position of grabbed object to coordinates of clicked point
-    click_offset: Float3 = .{ .x = 0, .y = 0, .z = 0 },
-    // Original scale of an object being manipulated with a gizmo
-    original_scale: Float3 = .{ .x = 0, .y = 0, .z = 0 },
-    // Original orientation of an object being manipulated with a gizmo
-    original_orientation: Quaternion = .{ .x = 0, .y = 0, .z = 0, .w = 1 },
-};
-
-// std::vector<Float2> arrow_points = {
-//     {0.25f, 0}, {0.25f, 0.05f}, {1, 0.05f}, {1, 0.10f}, {1.2f, 0}};
-//
-// struct translation_plane_component : gizmo_component {
-//   using gizmo_component::gizmo_component;
-//
-//   virtual Float3 get_axis(const FrameState &state, bool local_toggle,
-//                           const Quaternion &rotation) const = 0;
-//
-//   std::optional<RigidTransform> drag(DragState *drag,
-//                                      const FrameState &active_state,
-//                                      bool local_toggle,
-//                                      const RigidTransform &p) const override {
-//     auto plane_normal = get_axis(active_state, local_toggle, p.orientation);
-//     auto plane =
-//         Plane::from_normal_and_position(plane_normal, drag->original_position);
-//     auto t = active_state.ray.intersect_plane(plane);
-//     if (!t) {
-//       return {};
-//     }
-//     auto dst = active_state.ray.point(*t) - drag->click_offset;
-//
-//     return RigidTransform{
-//         .orientation = p.orientation,
-//         .position = dst,
-//         .scale = p.scale,
-//     };
-//   }
-// };
-//
-// struct translation_axis_component : gizmo_component {
-//   using gizmo_component::gizmo_component;
-//
-//   virtual Float3 get_axis(const FrameState &state, bool local_toggle,
-//                           const Quaternion &rotation) const = 0;
-//
-//   std::optional<RigidTransform> drag(DragState *drag,
-//                                      const FrameState &active_state,
-//                                      bool local_toggle,
-//                                      const RigidTransform &p) const override {
-//     // First apply a plane translation dragger with a plane that contains the
-//     // desired axis and is oriented to face the camera
-//     auto axis = get_axis(active_state, local_toggle, p.orientation);
-//     auto plane_tangent =
-//         Float3::cross(axis, p.position - active_state.ray.origin);
-//     auto plane_normal = Float3::cross(axis, plane_tangent);
-//     auto plane =
-//         Plane::from_normal_and_position(plane_normal, drag->original_position);
-//     auto t = active_state.ray.intersect_plane(plane);
-//     if (!t) {
-//       return {};
-//     }
-//     auto dst = active_state.ray.point(*t);
-//
-//     // Constrain object motion to be along the desired axis
-//     auto point = drag->original_position +
-//                  axis.scale(Float3::dot(dst - drag->original_position, axis)) -
-//                  drag->click_offset;
-//     return RigidTransform(p.orientation, point, p.scale);
-//   }
-// };
-//
-// struct translation_x_component : translation_axis_component {
-//   translation_x_component()
-//       : translation_axis_component(
-//             GeometryMesh::make_lathed_geometry({1, 0, 0}, {0, 1, 0}, {0, 0, 1},
-//                                                16, arrow_points),
-//             Float4{1, 0.5f, 0.5f, 1.f}, Float4{1, 0, 0, 1.f}) {}
-//
-//   Float3 get_axis(const FrameState &state, bool local_toggle,
-//                   const Quaternion &rotation) const override {
-//     return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
-//   }
-// };
-//
-// struct translation_y_component : translation_axis_component {
-//   translation_y_component()
-//       : translation_axis_component(
-//             GeometryMesh::make_lathed_geometry({0, 1, 0}, {0, 0, 1}, {1, 0, 0},
-//                                                16, arrow_points),
-//             Float4{0.5f, 1, 0.5f, 1.f}, Float4{0, 1, 0, 1.f}) {}
-//
-//   Float3 get_axis(const FrameState &state, bool local_toggle,
-//                   const Quaternion &rotation) const override {
-//     return (local_toggle) ? rotation.ydir() : Float3{0, 1, 0};
-//   }
-// };
-//
-// struct translation_z_component : translation_axis_component {
-//   translation_z_component()
-//       : translation_axis_component(
-//             GeometryMesh::make_lathed_geometry({0, 0, 1}, {1, 0, 0}, {0, 1, 0},
-//                                                16, arrow_points),
-//             Float4{0.5f, 0.5f, 1, 1.f}, Float4{0, 0, 1, 1.f}) {}
-//
-//   Float3 get_axis(const FrameState &state, bool local_toggle,
-//                   const Quaternion &rotation) const override {
-//     return (local_toggle) ? rotation.zdir() : Float3{0, 0, 1};
-//   }
-// };
-//
-// struct translation_yz_component : translation_plane_component {
-//   translation_yz_component()
-//       : translation_plane_component(
-//             GeometryMesh::make_box_geometry({-0.01f, 0.25, 0.25},
-//                                             {0.01f, 0.75f, 0.75f}),
-//             Float4{0.5f, 1, 1, 0.5f}, Float4{0, 1, 1, 0.6f}) {}
-//
-//   Float3 get_axis(const FrameState &state, bool local_toggle,
-//                   const Quaternion &rotation) const override {
-//     return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
-//   }
-// };
-//
-// struct translation_zx_component : translation_plane_component {
-//   translation_zx_component()
-//       : translation_plane_component(
-//             GeometryMesh::make_box_geometry({0.25, -0.01f, 0.25},
-//                                             {0.75f, 0.01f, 0.75f}),
-//             Float4{1, 0.5f, 1, 0.5f}, Float4{1, 0, 1, 0.6f}) {}
-//
-//   Float3 get_axis(const FrameState &state, bool local_toggle,
-//                   const Quaternion &rotation) const override {
-//     return (local_toggle) ? rotation.ydir() : Float3{0, 1, 0};
-//   }
-// };
-//
-// struct translation_xy_component : translation_plane_component {
-//   translation_xy_component()
-//       : translation_plane_component(
-//             GeometryMesh::make_box_geometry({0.25, 0.25, -0.01f},
-//                                             {0.75f, 0.75f, 0.01f}),
-//             Float4{1, 1, 0.5f, 0.5f}, Float4{1, 1, 0, 0.6f}) {}
-//
-//   Float3 get_axis(const FrameState &state, bool local_toggle,
-//                   const Quaternion &rotation) const override {
-//     return (local_toggle) ? rotation.zdir() : Float3{0, 0, 1};
-//   }
-// };
-//
-// struct translation_xyz_component : translation_plane_component {
-//   translation_xyz_component()
-//       : translation_plane_component(
-//             GeometryMesh::make_box_geometry({-0.05f, -0.05f, -0.05f},
-//                                             {0.05f, 0.05f, 0.05f}),
-//             Float4{0.9f, 0.9f, 0.9f, 0.25f}, Float4{1, 1, 1, 0.35f}) {}
-//
-//   Float3 get_axis(const FrameState &state, bool local_toggle,
-//                   const Quaternion &) const override {
-//     return -state.cam_orientation.zdir();
-//   }
-// };
-
-// auto _translate_x = std::make_shared<translation_x_component>();
-// auto _translate_y = std::make_shared<translation_y_component>();
-// auto _translate_z = std::make_shared<translation_z_component>();
-// auto _translate_yz = std::make_shared<translation_yz_component>();
-// auto _translate_zx = std::make_shared<translation_zx_component>();
-// auto _translate_xy = std::make_shared<translation_xy_component>();
-// auto _translate_xyz = std::make_shared<translation_xyz_component>();
-
-pub const GizmoComponent = struct {
-    mesh: GeometryMesh,
-    base_color: Float4,
-    highlight_color: Float4,
-
-    pub fn Translation_X(allocator: std.mem.Allocator) !@This() {
-        //   Float3 get_axis(const FrameState &state, bool local_toggle,
-        //                   const Quaternion &rotation) const override {
-        //     return (local_toggle) ? rotation.xdir() : Float3{1, 0, 0};
-        //   }
-
-        const arrow_points = [_]Float2{
-            .{ .x = 0.25, .y = 0 },
-            .{ .x = 0.25, .y = 0.05 },
-            .{ .x = 1, .y = 0.05 },
-            .{ .x = 1, .y = 0.10 },
-            .{ .x = 1.2, .y = 0 },
-        };
-
-        return .{
-            .mesh = try GeometryMesh.make_lathed_geometry(
-                allocator,
-                .{ .x = 1, .y = 0, .z = 0 },
-                .{ .x = 0, .y = 1, .z = 0 },
-                .{ .x = 0, .y = 0, .z = 1 },
-                16,
-                &arrow_points,
-                0,
-            ),
-            .base_color = .{ .x = 1, .y = 0.5, .z = 0.5, .w = 1.0 },
-            .highlight_color = .{ .x = 1, .y = 0, .z = 0, .w = 1.0 },
-        };
-    }
+pub const RayState = struct {
+    local_toggle: bool = false,
+    uniform: bool = false,
+    transform: Transform = .{},
+    draw_scale: f32 = 0,
+    gizmo_transform: Transform = .{},
+    local_ray: Ray = .{
+        .origin = .{ .x = 0, .y = 0, .z = 0 },
+        .direction = .{ .x = 0, .y = 0, .z = 0 },
+    },
+    t: f32 = 0,
 };
 
 pub const TranslationGizmo = struct {
+    pub const GizmoComponentType = enum {
+        TranslationX,
+        TranslationY,
+        TranslationZ,
+        TranslationXY,
+        TranslationYZ,
+        TranslationZX,
+        TranslationView,
+    };
 
-    // std::list<std::shared_ptr<Drawable>> _scene;
-    // std::shared_ptr<Drawable> gizmo_target;
-    active_component: ?*GizmoComponent = null,
-    // tinygizmo::drag_state drag_state;
+    pub fn mesh(
+        modelMatrix: Float4x4,
+        user: *anyopaque,
+        add_triangle: AddTriangleFunc,
+        active_component: ?GizmoComponentType,
+    ) void {
+        _ = active_component; // autofix
+        _ = add_triangle; // autofix
+        _ = user; // autofix
+        _ = modelMatrix; // autofix
+    }
 
-    pub fn begin(self: *@This(), cursor: Float2) void {
-        _ = cursor; // autofix
-        _ = self; // autofix
-        // float best_t = std::numeric_limits<float>::infinity();
-        // std::unordered_map<std::shared_ptr<Drawable>, RayState> ray_map;
-        // for (auto &target : this._scene) {
-        //   minalg::rigid_transform src{
-        //       .orientation = *(minalg::float4 *)&target.rotation,
-        //       .position = *(minalg::float3 *)&target.position,
-        //       .scale = *(minalg::float3 *)&target.scale,
-        //   };
-        //   auto [draw_scale, gizmo_transform, local_ray] =
-        //       tinygizmo::gizmo_transform(gizmo_state, local_toggle, src);
-        //   // ray intersection
-        //   auto [updated_state, t] = tinygizmo::position_intersect(local_ray);
-        //   if (updated_state) {
-        //     ray_map.insert({target,
-        //                     {
-        //                         .transform = src,
-        //                         .draw_scale = draw_scale,
-        //                         .gizmo_transform = gizmo_transform,
-        //                         .local_ray = local_ray,
-        //                         .t = t,
-        //                     }});
-        //     if (t < best_t) {
-        //       this.active = updated_state;
-        //       this.gizmo_target = target;
-        //     }
-        //   }
-        // }
-        //
-        // if (this.active) {
-        //   // begin drag
-        //   auto ray_state = ray_map[this.gizmo_target];
-        //   auto ray = tinygizmo::scaling(ray_state.draw_scale, ray_state.local_ray);
-        //   this.drag_state = {.original_position = ray_state.transform.position,
-        //                       .click_offset = ray.point(ray_state.t)};
-        //   if (local_toggle) {
-        //     // click point in gizmo local
-        //     this.drag_state.click_offset =
-        //         ray_state.gizmo_transform.transform_vector(
-        //             this.drag_state.click_offset);
-        //   }
-        // }
+    pub fn intersect(
+        frame: FrameState,
+        local_toggle: bool,
+        p: Transform,
+    ) ?struct { RayState, GizmoComponentType } {
+        _ = p; // autofix
+        _ = local_toggle; // autofix
+        _ = frame; // autofix}
+        return null;
     }
 
     pub fn drag(
-        self: *@This(),
-        state: DragState,
-        w: i32,
-        h: i32,
-        cursor: Float2,
-    ) void {
-        _ = cursor; // autofix
-        _ = h; // autofix
-        _ = w; // autofix
-        _ = w; // autofix
-        _ = state; // autofix
-        _ = self; // autofix
+        active_component: GizmoComponentType,
+        frame: FrameState,
+        ray: RayState,
+        src: Transform,
+    ) Transform {
+        _ = src; // autofix
+        _ = ray; // autofix
+        _ = ray; // autofix
+        _ = frame; // autofix
+        _ = active_component; // autofix}
     }
+}; // namespace TranslationGizmo
 
-    pub fn end(self: *@This(), _: Float2) void {
-        _ = self; // autofix
-        // self.active = .{};
-        // self.gizmo_target = .{};
-        // self.drag_state = .{};
-    }
+pub const RotationGizmo = struct {
+    pub const GizmoComponentType = enum {
+        RotationX,
+        RotationY,
+        RotationZ,
+    };
 
-    //   virtual void draw(const tinygizmo::AddTriangleFunc &add_triangle,
-    //                     const minalg::float4x4 &modelMatrix) = 0;
-};
-
-pub const System = struct {
-    translations: std.ArrayList(GizmoComponent),
-
-    local_toggle: bool = true,
-    gizmo_state: FrameState = .{},
-
-    pub fn init(allocator: std.mem.Allocator) !@This() {
-        var system = System{
-            .translations = std.ArrayList(GizmoComponent).init(allocator),
-        };
-        try system.translations.append(try GizmoComponent.Translation_X(allocator));
-        return system;
-    }
-    pub fn deinit(self: *@This()) void {
-        self.translations.deinit();
-    }
-
-    pub fn translation_draw(
-        self: @This(),
-        user: *anyopaque,
-        add_triangle: AddTriangleFunc,
-        active: ?*GizmoComponent,
+    pub fn mesh(
         modelMatrix: Float4x4,
+        add_triangle: AddTriangleFunc,
+        active_component: ?GizmoComponentType,
     ) void {
-        for (self.translations.items) |c| {
-            const color = if (&c == active) c.base_color else c.highlight_color;
-            c.mesh.add_triangles(user, add_triangle, modelMatrix, color);
-        }
+        _ = active_component; // autofix
+        _ = add_triangle; // autofix
+        _ = modelMatrix; // autofix}
     }
 
-    pub fn translation_intersect(self: @This(), ray: Ray) struct { ?GizmoComponent, f32 } {
-        var best_t = std.math.inf(f32);
-        var updated_state: ?GizmoComponent = null;
-        for (self.translations.items) |c| {
-            if (ray.intersect_mesh(c.mesh)) |t| {
-                if (t < best_t) {
-                    updated_state = c;
-                    best_t = t;
-                }
-            }
-        }
-        return .{ updated_state, best_t };
+    pub fn intersect(
+        frame: FrameState,
+        local_toggle: bool,
+        p: Transform,
+    ) ?struct { RayState, GizmoComponentType } {
+        _ = p; // autofix
+        _ = local_toggle; // autofix
+        _ = frame; // autofix}
+        return null;
     }
 
-    pub fn rotation_intersect(self: @This(), ray: Ray) struct { ?GizmoComponent, f32 } {
+    pub fn drag(
+        active_component: GizmoComponentType,
+        frame: FrameState,
+        ray: RayState,
+        src: Transform,
+    ) Transform {
+        _ = src; // autofix
         _ = ray; // autofix
-        _ = self; // autofix
-        return .{ null, 0 };
+        _ = frame; // autofix
+        _ = active_component; // autofix
+        _ = active_component; // autofix
+        //
+    }
+}; // namespace RotationGizmo
+
+pub const ScalingGizmo = struct {
+    pub const GizmoComponentType = enum {
+        ScalingX,
+        ScalingY,
+        ScalingZ,
+    };
+
+    pub fn mesh(
+        modelMatrix: Float4x4,
+        add_triangle: AddTriangleFunc,
+        active_component: ?GizmoComponentType,
+    ) void {
+        _ = active_component; // autofix
+        _ = active_component; // autofix
+        _ = add_triangle; // autofix
+        _ = modelMatrix; // autofix
+        //
     }
 
-    pub fn scaling_intersect(self: @This(), ray: Ray) struct { ?GizmoComponent, f32 } {
+    pub fn intersect(
+        frame: FrameState,
+        local_toggle: bool,
+        p: Transform,
+        uniform: bool,
+    ) ?struct { RayState, GizmoComponentType } {
+        _ = uniform; // autofix
+        _ = p; // autofix
+        _ = local_toggle; // autofix
+        _ = frame; // autofix
+        return null;
+    }
+
+    pub fn drag(
+        active_component: GizmoComponentType,
+        frame: FrameState,
+        ray: RayState,
+        src: Transform,
+    ) Transform {
+        _ = src; // autofix
         _ = ray; // autofix
-        _ = self; // autofix
-        return .{ null, 0 };
+        _ = frame; // autofix
+        _ = active_component; // autofix
+        //
     }
-};
-
-pub const RayState = struct {
-    transform: Transform,
-    draw_scale: f32,
-    gizmo_transform: Transform,
-    local_ray: Ray,
-    t: f32,
-};
-
-pub const GizmoModeType = enum {
-    Translation,
-    Rotation,
-    Scaling,
-};
-
-pub const GizmoMode = union(GizmoModeType) {
-    Translation: struct {
-        pub fn begin_gizmo(
-            _: @This(),
-            ray_state: RayState,
-            local_toggle: bool,
-        ) DragState {
-            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-            var drag_state = DragState{
-                .click_offset = ray.point(ray_state.t),
-                .original_position = ray_state.transform.position,
-            };
-            if (local_toggle) {
-                drag_state.click_offset =
-                    ray_state.gizmo_transform.transform_vector(drag_state.click_offset);
-            }
-            return drag_state;
-        }
-    },
-
-    Rotation: struct {
-        pub fn begin_gizmo(
-            _: @This(),
-            ray_state: RayState,
-            _: bool,
-        ) DragState {
-            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-            const drag_state = DragState{
-                .click_offset = ray_state.transform.transform_point(ray.origin.add(ray.direction.scale(ray_state.t))),
-                .original_orientation = ray_state.transform.orientation,
-            };
-            return drag_state;
-        }
-    },
-
-    Scaling: struct {
-        uniform: bool = false,
-        pub fn begin_gizmo(
-            _: @This(),
-            ray_state: RayState,
-            _: bool,
-        ) DragState {
-            const ray = ray_state.local_ray.scaling(ray_state.draw_scale);
-            const drag_state = DragState{
-                .click_offset = ray_state.transform.transform_point(ray.origin.add(ray.direction.scale(ray_state.t))),
-                .original_scale = ray_state.transform.scale,
-            };
-            return drag_state;
-        }
-    },
-};
-
-pub fn translation_drag(
-    drag: DragState,
-    state: FrameState,
-    local_toggle: bool,
-    active: *const GizmoComponent,
-    p: Transform,
-) Float3 {
-    _ = active; // autofix
-    _ = local_toggle; // autofix
-    _ = state; // autofix
-    _ = drag; // autofix
-    return p.position;
-}
-
-pub fn rotation_drag(
-    drag: DragState,
-    state: FrameState,
-    local_toggle: bool,
-    active: *const GizmoComponent,
-    p: Transform,
-) Quaternion {
-    _ = active; // autofix
-    _ = local_toggle; // autofix
-    _ = state; // autofix
-    _ = drag; // autofix
-    return p.orientation;
-}
-
-pub fn scaling_drag(
-    drag: DragState,
-    state: FrameState,
-    local_toggle: bool,
-    active: *const GizmoComponent,
-    p: Transform,
-) Float3 {
-    _ = active; // autofix
-    _ = local_toggle; // autofix
-    _ = state; // autofix
-    _ = drag; // autofix
-    return p.scale;
-}
+}; // namespace ScalingGizmo

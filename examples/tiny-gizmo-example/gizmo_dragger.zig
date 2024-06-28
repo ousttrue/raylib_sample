@@ -4,6 +4,18 @@ const drawable = @import("drawable.zig");
 const rdrag = @import("rdrag.zig");
 const tinygizmo = @import("tinygizmo");
 
+pub const GizmoMode = enum {
+    Translation,
+    Rotation,
+    Scaling,
+};
+
+pub const GizmoActiveComponent = union(GizmoMode) {
+    Translation: ?tinygizmo.TranslationGizmo.GizmoComponentType,
+    Rotation: ?tinygizmo.RotationGizmo.GizmoComponentType,
+    Scaling: ?tinygizmo.ScalingGizmo.GizmoComponentType,
+};
+
 pub const Hotkey = struct {
     hotkey_ctrl: bool = false,
     hotkey_translate: bool = false,
@@ -13,27 +25,23 @@ pub const Hotkey = struct {
 };
 
 pub const TRSGizmo = struct {
+    mode: GizmoActiveComponent = .{ .Translation = null },
+    camera: *c.Camera,
+    scene: []*drawable.Drawable,
+    gizmo_target: ?*drawable.Drawable = null,
+
+    current_hotkey: Hotkey = .{},
+    last_hotkey: Hotkey = .{},
+    current_state: tinygizmo.FrameState = .{},
+    last_state: tinygizmo.FrameState = .{},
+    local_toggle: bool = true,
+    uniform: bool = true,
+
+    ray_state: tinygizmo.RayState = .{},
+
     positions: std.ArrayList(c.Vector3),
     colors: std.ArrayList(c.Color),
     indices: std.ArrayList(c_ushort),
-
-    camera: *c.Camera,
-    scene: []*drawable.Drawable,
-
-    active_hotkey: Hotkey = .{},
-    last_hotkey: Hotkey = .{},
-
-    active_state: tinygizmo.FrameState = .{},
-    last_state: tinygizmo.FrameState = .{},
-    local_toggle: bool = true,
-
-    visible: tinygizmo.GizmoMode,
-    gizmo_system: tinygizmo.System,
-    ray_map: std.AutoHashMap(*drawable.Drawable, tinygizmo.RayState),
-
-    gizmo_target: ?*drawable.Drawable = null,
-    active: ?tinygizmo.GizmoComponent = null,
-    drag_state: tinygizmo.DragState = .{},
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -46,15 +54,10 @@ pub const TRSGizmo = struct {
             .indices = std.ArrayList(c_ushort).init(allocator),
             .camera = camera,
             .scene = scene,
-            .visible = .{ .Translation = .{} },
-            .gizmo_system = try tinygizmo.System.init(allocator),
-            .ray_map = std.AutoHashMap(*drawable.Drawable, tinygizmo.RayState).init(allocator),
         };
     }
 
     pub fn deinit(self: *@This()) void {
-        self.ray_map.deinit();
-        self.gizmo_system.deinit();
         self.positions.deinit();
         self.colors.deinit();
         self.indices.deinit();
@@ -62,59 +65,71 @@ pub const TRSGizmo = struct {
 
     pub fn begin(self: *@This(), _: c.Vector2) void {
         var best_t = std.math.inf(f32);
-        self.ray_map.clearRetainingCapacity();
         for (self.scene) |target| {
-            const draw_scale, const gizmo_transform, const local_ray = self.active_state.gizmo_transform_and_local_ray(
-                self.local_toggle,
-                target.transform,
-            );
+            //
             // ray intersection
-            const updated_state, const t = switch (self.visible) {
-                tinygizmo.GizmoModeType.Translation => self.gizmo_system.translation_intersect(local_ray),
-                tinygizmo.GizmoModeType.Rotation => self.gizmo_system.rotation_intersect(local_ray),
-                tinygizmo.GizmoModeType.Scaling => self.gizmo_system.scaling_intersect(local_ray),
-            };
-            if (updated_state) |active| {
-                self.ray_map.put(target, .{
-                    .transform = target.transform,
-                    .draw_scale = draw_scale,
-                    .gizmo_transform = gizmo_transform,
-                    .local_ray = local_ray,
-                    .t = t,
-                }) catch @panic("put");
-                if (t < best_t) {
-                    best_t = t;
-                    self.active = active;
-                    self.gizmo_target = target;
-                }
-            }
-        }
+            //
+            switch (self.mode) {
+                .Translation => {
+                    if (tinygizmo.TranslationGizmo.intersect(
+                        self.current_state,
+                        self.local_toggle,
+                        target.transform,
+                    )) |intersection| {
+                        const ray_state, const active_component = intersection;
+                        if (ray_state.t < best_t) {
+                            best_t = ray_state.t;
+                            self.mode = .{ .Translation = active_component };
+                            self.gizmo_target = target;
+                            self.ray_state = ray_state;
+                        }
+                    }
+                },
 
-        if (self.gizmo_target) |target| {
-            // begin drag
-            if (self.ray_map.getEntry(target)) |entry| {
-                self.drag_state = switch (self.visible) {
-                    tinygizmo.GizmoModeType.Translation => |x| x.begin_gizmo(
-                        entry.value_ptr.*,
+                .Rotation => {
+                    if (tinygizmo.RotationGizmo.intersect(
+                        self.current_state,
                         self.local_toggle,
-                    ),
-                    tinygizmo.GizmoModeType.Rotation => |x| x.begin_gizmo(
-                        entry.value_ptr.*,
+                        target.transform,
+                    )) |intersection| {
+                        const ray_state, const active_component = intersection;
+                        if (ray_state.t < best_t) {
+                            best_t = ray_state.t;
+                            self.mode = .{ .Rotation = active_component };
+                            self.gizmo_target = target;
+                            self.ray_state = ray_state;
+                        }
+                    }
+                },
+
+                .Scaling => {
+                    if (tinygizmo.ScalingGizmo.intersect(
+                        self.current_state,
                         self.local_toggle,
-                    ),
-                    tinygizmo.GizmoModeType.Scaling => |x| x.begin_gizmo(
-                        entry.value_ptr.*,
-                        self.local_toggle,
-                    ),
-                };
+                        target.transform,
+                        self.uniform,
+                    )) |intersection| {
+                        const ray_state, const active_component = intersection;
+                        if (ray_state.t < best_t) {
+                            best_t = ray_state.t;
+                            self.mode = .{ .Scaling = active_component };
+                            self.gizmo_target = target;
+                            self.ray_state = ray_state;
+                        }
+                    }
+                },
             }
         }
     }
 
     pub fn end(self: *@This(), _: c.Vector2) void {
-        self.active = null;
+        self.mode = switch (self.mode) {
+            .Translation => .{ .Translation = null },
+            .Rotation => .{ .Rotation = null },
+            .Scaling => .{ .Scaling = null },
+        };
         self.gizmo_target = null;
-        self.drag_state = .{};
+        self.ray_state = .{};
     }
 
     pub fn drag(
@@ -124,42 +139,7 @@ pub const TRSGizmo = struct {
         _: i32,
         _: c.Vector2,
     ) void {
-        if (self.active) |active| {
-            if (self.gizmo_target) |gizmo_target| {
-                switch (self.visible) {
-                    tinygizmo.GizmoModeType.Translation => {
-                        const position = tinygizmo.translation_drag(
-                            self.drag_state,
-                            self.active_state,
-                            self.local_toggle,
-                            &active,
-                            gizmo_target.transform,
-                        );
-                        gizmo_target.transform.position = position;
-                    },
-                    tinygizmo.GizmoModeType.Rotation => {
-                        const rotation = tinygizmo.rotation_drag(
-                            self.drag_state,
-                            self.active_state,
-                            self.local_toggle,
-                            &active,
-                            gizmo_target.transform,
-                        );
-                        gizmo_target.transform.orientation = rotation;
-                    },
-                    tinygizmo.GizmoModeType.Scaling => {
-                        const scale = tinygizmo.scaling_drag(
-                            self.drag_state,
-                            self.active_state,
-                            self.local_toggle,
-                            &active,
-                            gizmo_target.transform,
-                        );
-                        gizmo_target.transform.scale = scale;
-                    },
-                }
-            }
-        }
+        _ = self; // autofix
     }
 
     pub fn process_hotkey(self: *@This(), w: i32, h: i32, cursor: c.Vector2, hotkey: Hotkey) void {
@@ -184,15 +164,15 @@ pub const TRSGizmo = struct {
                 self.local_toggle;
         }
 
-        self.last_hotkey = self.active_hotkey;
-        self.active_hotkey = hotkey;
+        self.last_hotkey = self.current_hotkey;
+        self.current_hotkey = hotkey;
 
         const ray = c.GetMouseRay(cursor, self.camera.*);
         const rot =
             c.QuaternionFromEuler(ray.direction.x, ray.direction.y, ray.direction.z);
 
-        self.last_state = self.active_state;
-        self.active_state = .{
+        self.last_state = self.current_state;
+        self.current_state = .{
             .mouse_down = c.IsMouseButtonDown(c.MOUSE_BUTTON_LEFT),
             // optional flag to draw the gizmos at a constant screen-space
             // scale gizmo_state.screenspace_scale = 80.f; camera projection
@@ -212,9 +192,6 @@ pub const TRSGizmo = struct {
             .cam_yfov = 1.0,
             .cam_orientation = .{ .x = rot.x, .y = rot.y, .z = rot.z, .w = rot.w },
         };
-
-        self.gizmo_system.gizmo_state = self.active_state;
-        self.gizmo_system.local_toggle = self.local_toggle;
     }
 
     fn add_world_triangle(
@@ -250,19 +227,14 @@ pub const TRSGizmo = struct {
 
         for (self.scene) |target| {
             const draw_scale, const p, const ray =
-                self.active_state.gizmo_transform_and_local_ray(self.local_toggle, target.transform);
+                self.current_state.gizmo_transform_and_local_ray(self.local_toggle, target.transform);
             _ = ray; // autofix
 
             const scaleMatrix =
                 tinygizmo.Float4x4.scaling(draw_scale, draw_scale, draw_scale);
             const modelMatrix = p.matrix().mul(scaleMatrix);
+            _ = modelMatrix; // autofix
 
-            self.gizmo_system.translation_draw(
-                self,
-                add_world_triangle,
-                null,
-                modelMatrix,
-            );
         }
 
         if (self.positions.items.len > 0 and self.indices.items.len > 0) {
